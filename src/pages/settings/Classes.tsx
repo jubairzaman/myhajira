@@ -214,12 +214,15 @@ export default function ClassesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Shift (Optional)</Label>
-                  <Select value={formData.shift_id} onValueChange={(v) => setFormData({ ...formData, shift_id: v })}>
+                  <Select 
+                    value={formData.shift_id || 'all'} 
+                    onValueChange={(v) => setFormData({ ...formData, shift_id: v === 'all' ? '' : v })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Shift" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Shifts</SelectItem>
+                      <SelectItem value="all">All Shifts</SelectItem>
                       {shifts.map((shift) => (
                         <SelectItem key={shift.id} value={shift.id}>
                           {shift.name} {shift.name_bn && `(${shift.name_bn})`}
