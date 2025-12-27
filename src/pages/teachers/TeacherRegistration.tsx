@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PhotoCapture } from '@/components/forms/PhotoCapture';
 import { RfidEnroll } from '@/components/forms/RfidEnroll';
@@ -12,28 +12,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, Save, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Users, Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 
-const shifts = [
-  { id: '1', name: 'Morning Shift', nameBn: 'প্রভাতী শিফট' },
-  { id: '2', name: 'Day Shift', nameBn: 'দিবা শিফট' },
-];
+interface Shift {
+  id: string;
+  name: string;
+  name_bn: string | null;
+}
 
 const designations = [
-  { id: '1', name: 'Head Teacher', nameBn: 'প্রধান শিক্ষক' },
-  { id: '2', name: 'Assistant Head Teacher', nameBn: 'সহকারী প্রধান শিক্ষক' },
-  { id: '3', name: 'Senior Teacher', nameBn: 'সিনিয়র শিক্ষক' },
-  { id: '4', name: 'Assistant Teacher', nameBn: 'সহকারী শিক্ষক' },
-  { id: '5', name: 'Junior Teacher', nameBn: 'জুনিয়র শিক্ষক' },
+  { id: 'head_teacher', name: 'Head Teacher', nameBn: 'প্রধান শিক্ষক' },
+  { id: 'assistant_head', name: 'Assistant Head Teacher', nameBn: 'সহকারী প্রধান শিক্ষক' },
+  { id: 'senior_teacher', name: 'Senior Teacher', nameBn: 'সিনিয়র শিক্ষক' },
+  { id: 'assistant_teacher', name: 'Assistant Teacher', nameBn: 'সহকারী শিক্ষক' },
+  { id: 'junior_teacher', name: 'Junior Teacher', nameBn: 'জুনিয়র শিক্ষক' },
 ];
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function TeacherRegistration() {
+  const navigate = useNavigate();
+  const { activeYear } = useAcademicYear();
+  const [loading, setLoading] = useState(false);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+
   const [formData, setFormData] = useState({
     name: '',
+    nameBn: '',
     designation: '',
     shiftId: '',
     mobile: '',
@@ -42,19 +51,122 @@ export default function TeacherRegistration() {
     rfidCardId: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch shifts
+  useEffect(() => {
+    const fetchShifts = async () => {
+      if (!activeYear) return;
+
+      try {
+        const { data } = await supabase
+          .from('shifts')
+          .select('id, name, name_bn')
+          .eq('academic_year_id', activeYear.id)
+          .eq('is_active', true)
+          .order('start_time');
+        setShifts(data || []);
+      } catch (error) {
+        console.error('Error fetching shifts:', error);
+      }
+    };
+
+    fetchShifts();
+  }, [activeYear]);
+
+  const uploadPhoto = async (base64Photo: string): Promise<string | null> => {
+    if (!base64Photo || !base64Photo.startsWith('data:image')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(base64Photo);
+      const blob = await response.blob();
+      const fileName = `teachers/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+      const { data, error } = await supabase.storage
+        .from('photos')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(data.path);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!formData.name || !formData.designation || !formData.shiftId || 
-        !formData.mobile || !formData.rfidCardId) {
+    if (!formData.name || !formData.designation || !formData.shiftId || !formData.mobile) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    // In production, this would save to database
-    console.log('Teacher data:', formData);
-    toast.success('Teacher registered successfully!');
+    if (!/^01\d{9}$/.test(formData.mobile)) {
+      toast.error('Please enter a valid mobile number (e.g., 01XXXXXXXXX)');
+      return;
+    }
+
+    if (!activeYear) {
+      toast.error('No active academic year');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let photoUrl: string | null = null;
+      if (formData.photoUrl) {
+        photoUrl = await uploadPhoto(formData.photoUrl);
+      }
+
+      const { data: teacher, error: teacherError } = await supabase
+        .from('teachers')
+        .insert({
+          name: formData.name,
+          name_bn: formData.nameBn || null,
+          designation: formData.designation,
+          shift_id: formData.shiftId,
+          mobile: formData.mobile,
+          blood_group: formData.bloodGroup || null,
+          photo_url: photoUrl,
+          academic_year_id: activeYear.id,
+        })
+        .select()
+        .single();
+
+      if (teacherError) throw teacherError;
+
+      if (formData.rfidCardId && teacher) {
+        const { error: rfidError } = await supabase
+          .from('rfid_cards_teachers')
+          .insert({
+            teacher_id: teacher.id,
+            card_number: formData.rfidCardId,
+          });
+
+        if (rfidError) {
+          console.error('RFID enrollment error:', rfidError);
+          toast.warning('Teacher saved, but RFID card enrollment failed');
+        }
+      }
+
+      toast.success('Teacher registered successfully!');
+      navigate('/teachers');
+    } catch (error: any) {
+      console.error('Error saving teacher:', error);
+      toast.error(error.message || 'Failed to save teacher');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateField = (field: string, value: string) => {
@@ -115,12 +227,22 @@ export default function TeacherRegistration() {
                 <p className="text-sm text-muted-foreground mb-4 font-bengali">মৌলিক তথ্য</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="form-label-required">Teacher Name / শিক্ষকের নাম</Label>
+                  <div className="space-y-2">
+                    <Label className="form-label-required">Teacher Name (English)</Label>
                     <Input
                       placeholder="Enter full name"
                       value={formData.name}
                       onChange={(e) => updateField('name', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-bengali">শিক্ষকের নাম (বাংলা)</Label>
+                    <Input
+                      placeholder="বাংলায় নাম লিখুন"
+                      className="font-bengali"
+                      value={formData.nameBn}
+                      onChange={(e) => updateField('nameBn', e.target.value)}
                     />
                   </div>
 
@@ -149,7 +271,7 @@ export default function TeacherRegistration() {
                       <SelectContent>
                         {shifts.map((shift) => (
                           <SelectItem key={shift.id} value={shift.id}>
-                            {shift.name} ({shift.nameBn})
+                            {shift.name} {shift.name_bn && `(${shift.name_bn})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -199,8 +321,12 @@ export default function TeacherRegistration() {
                     Cancel
                   </Button>
                 </Link>
-                <Button type="submit" variant="hero" className="gap-2">
-                  <Save className="w-4 h-4" />
+                <Button type="submit" variant="hero" className="gap-2" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
                   <span>Save Teacher</span>
                   <span className="font-bengali">/ সংরক্ষণ করুন</span>
                 </Button>

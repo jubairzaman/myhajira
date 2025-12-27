@@ -91,7 +91,8 @@ export type Database = {
           is_active: boolean
           name: string
           name_bn: string | null
-          panel_id: string
+          panel_id: string | null
+          shift_id: string | null
           updated_at: string
         }
         Insert: {
@@ -101,7 +102,8 @@ export type Database = {
           is_active?: boolean
           name: string
           name_bn?: string | null
-          panel_id: string
+          panel_id?: string | null
+          shift_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -111,7 +113,8 @@ export type Database = {
           is_active?: boolean
           name?: string
           name_bn?: string | null
-          panel_id?: string
+          panel_id?: string | null
+          shift_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -120,6 +123,13 @@ export type Database = {
             columns: ["panel_id"]
             isOneToOne: false
             referencedRelation: "panels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
@@ -362,35 +372,44 @@ export type Database = {
       }
       shifts: {
         Row: {
+          absent_cutoff_time: string | null
           academic_year_id: string
           created_at: string
           end_time: string
           id: string
           is_active: boolean
+          late_threshold_time: string | null
           name: string
           name_bn: string | null
+          sms_trigger_time: string | null
           start_time: string
           updated_at: string
         }
         Insert: {
+          absent_cutoff_time?: string | null
           academic_year_id: string
           created_at?: string
           end_time: string
           id?: string
           is_active?: boolean
+          late_threshold_time?: string | null
           name: string
           name_bn?: string | null
+          sms_trigger_time?: string | null
           start_time: string
           updated_at?: string
         }
         Update: {
+          absent_cutoff_time?: string | null
           academic_year_id?: string
           created_at?: string
           end_time?: string
           id?: string
           is_active?: boolean
+          late_threshold_time?: string | null
           name?: string
           name_bn?: string | null
+          sms_trigger_time?: string | null
           start_time?: string
           updated_at?: string
         }
@@ -565,7 +584,7 @@ export type Database = {
           is_active: boolean
           name: string
           name_bn: string | null
-          panel_id: string
+          panel_id: string | null
           photo_url: string | null
           section_id: string
           shift_id: string
@@ -582,7 +601,7 @@ export type Database = {
           is_active?: boolean
           name: string
           name_bn?: string | null
-          panel_id: string
+          panel_id?: string | null
           photo_url?: string | null
           section_id: string
           shift_id: string
@@ -599,7 +618,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           name_bn?: string | null
-          panel_id?: string
+          panel_id?: string | null
           photo_url?: string | null
           section_id?: string
           shift_id?: string
@@ -755,7 +774,7 @@ export type Database = {
           mobile: string
           name: string
           name_bn: string | null
-          panel_id: string
+          panel_id: string | null
           photo_url: string | null
           shift_id: string
           updated_at: string
@@ -770,7 +789,7 @@ export type Database = {
           mobile: string
           name: string
           name_bn?: string | null
-          panel_id: string
+          panel_id?: string | null
           photo_url?: string | null
           shift_id: string
           updated_at?: string
@@ -785,7 +804,7 @@ export type Database = {
           mobile?: string
           name?: string
           name_bn?: string | null
-          panel_id?: string
+          panel_id?: string | null
           photo_url?: string | null
           shift_id?: string
           updated_at?: string

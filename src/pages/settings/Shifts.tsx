@@ -28,6 +28,9 @@ interface Shift {
   name_bn: string | null;
   start_time: string;
   end_time: string;
+  late_threshold_time: string | null;
+  absent_cutoff_time: string | null;
+  sms_trigger_time: string | null;
   is_active: boolean;
   academic_year_id: string;
 }
@@ -44,6 +47,9 @@ export default function ShiftsPage() {
     name_bn: '',
     start_time: '08:00',
     end_time: '14:00',
+    late_threshold_time: '08:30',
+    absent_cutoff_time: '09:00',
+    sms_trigger_time: '09:30',
   });
 
   useEffect(() => {
@@ -85,15 +91,20 @@ export default function ShiftsPage() {
     }
 
     try {
+      const shiftData = {
+        name: formData.name,
+        name_bn: formData.name_bn || null,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        late_threshold_time: formData.late_threshold_time,
+        absent_cutoff_time: formData.absent_cutoff_time,
+        sms_trigger_time: formData.sms_trigger_time,
+      };
+
       if (editingShift) {
         const { error } = await supabase
           .from('shifts')
-          .update({
-            name: formData.name,
-            name_bn: formData.name_bn || null,
-            start_time: formData.start_time,
-            end_time: formData.end_time,
-          })
+          .update(shiftData)
           .eq('id', editingShift.id);
 
         if (error) throw error;
@@ -102,10 +113,7 @@ export default function ShiftsPage() {
         const { error } = await supabase
           .from('shifts')
           .insert({
-            name: formData.name,
-            name_bn: formData.name_bn || null,
-            start_time: formData.start_time,
-            end_time: formData.end_time,
+            ...shiftData,
             academic_year_id: selectedYearId,
           });
 
@@ -115,11 +123,23 @@ export default function ShiftsPage() {
 
       setIsDialogOpen(false);
       setEditingShift(null);
-      setFormData({ name: '', name_bn: '', start_time: '08:00', end_time: '14:00' });
+      resetForm();
       fetchShifts();
     } catch (error: any) {
       toast.error(error.message || 'Operation failed');
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      name_bn: '',
+      start_time: '08:00',
+      end_time: '14:00',
+      late_threshold_time: '08:30',
+      absent_cutoff_time: '09:00',
+      sms_trigger_time: '09:30',
+    });
   };
 
   const handleDelete = async (shiftId: string) => {
@@ -146,6 +166,9 @@ export default function ShiftsPage() {
       name_bn: shift.name_bn || '',
       start_time: shift.start_time,
       end_time: shift.end_time,
+      late_threshold_time: shift.late_threshold_time || '08:30',
+      absent_cutoff_time: shift.absent_cutoff_time || '09:00',
+      sms_trigger_time: shift.sms_trigger_time || '09:30',
     });
     setIsDialogOpen(true);
   };
@@ -160,7 +183,7 @@ export default function ShiftsPage() {
           </div>
           <div>
             <h2 className="text-xl font-semibold">Shifts</h2>
-            <p className="text-sm text-muted-foreground font-bengali">শিফট পরিচালনা</p>
+            <p className="text-sm text-muted-foreground font-bengali">শিফট ও সময়সূচী পরিচালনা</p>
           </div>
         </div>
 
@@ -182,7 +205,7 @@ export default function ShiftsPage() {
             setIsDialogOpen(open);
             if (!open) {
               setEditingShift(null);
-              setFormData({ name: '', name_bn: '', start_time: '08:00', end_time: '14:00' });
+              resetForm();
             }
           }}>
             <DialogTrigger asChild>
@@ -191,7 +214,7 @@ export default function ShiftsPage() {
                 Add Shift
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingShift ? 'Edit Shift' : 'Add New Shift'}</DialogTitle>
               </DialogHeader>
@@ -214,9 +237,10 @@ export default function ShiftsPage() {
                     />
                   </div>
                 </div>
+                
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Start Time</Label>
+                    <Label>Start Time / শুরুর সময়</Label>
                     <Input
                       type="time"
                       value={formData.start_time}
@@ -224,7 +248,7 @@ export default function ShiftsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>End Time</Label>
+                    <Label>End Time / শেষের সময়</Label>
                     <Input
                       type="time"
                       value={formData.end_time}
@@ -232,6 +256,40 @@ export default function ShiftsPage() {
                     />
                   </div>
                 </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium mb-3">Attendance Timing / উপস্থিতির সময়সূচী</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Late Threshold</Label>
+                      <Input
+                        type="time"
+                        value={formData.late_threshold_time}
+                        onChange={(e) => setFormData({ ...formData, late_threshold_time: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground font-bengali">বিলম্বের সময়সীমা</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Absent Cut-off</Label>
+                      <Input
+                        type="time"
+                        value={formData.absent_cutoff_time}
+                        onChange={(e) => setFormData({ ...formData, absent_cutoff_time: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground font-bengali">অনুপস্থিত সীমা</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">SMS Trigger</Label>
+                      <Input
+                        type="time"
+                        value={formData.sms_trigger_time}
+                        onChange={(e) => setFormData({ ...formData, sms_trigger_time: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground font-bengali">SMS পাঠানোর সময়</p>
+                    </div>
+                  </div>
+                </div>
+
                 <Button onClick={handleSubmit} className="w-full">
                   {editingShift ? 'Update' : 'Create'} Shift
                 </Button>
@@ -247,19 +305,28 @@ export default function ShiftsPage() {
           <thead>
             <tr>
               <th>Shift Name</th>
-              <th>শিফটের নাম</th>
               <th>Start Time</th>
               <th>End Time</th>
+              <th>Late Threshold</th>
+              <th>Absent Cut-off</th>
+              <th>SMS Trigger</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {shifts.map((shift) => (
               <tr key={shift.id}>
-                <td className="font-medium">{shift.name}</td>
-                <td className="font-bengali">{shift.name_bn || '-'}</td>
+                <td>
+                  <div>
+                    <p className="font-medium">{shift.name}</p>
+                    <p className="text-sm text-muted-foreground font-bengali">{shift.name_bn || '-'}</p>
+                  </div>
+                </td>
                 <td>{shift.start_time}</td>
                 <td>{shift.end_time}</td>
+                <td>{shift.late_threshold_time || '-'}</td>
+                <td>{shift.absent_cutoff_time || '-'}</td>
+                <td>{shift.sms_trigger_time || '-'}</td>
                 <td className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEditDialog(shift)}>
                     <Edit className="w-4 h-4" />
