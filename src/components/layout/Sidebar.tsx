@@ -46,7 +46,6 @@ const navItems: NavItem[] = [
     icon: Building2,
     children: [
       { label: 'Shifts', labelBn: 'শিফট', icon: ChevronRight, href: '/shifts' },
-      { label: 'Panels', labelBn: 'প্যানেল', icon: ChevronRight, href: '/panels' },
       { label: 'Classes', labelBn: 'শ্রেণী', icon: ChevronRight, href: '/classes' },
       { label: 'Sections', labelBn: 'শাখা', icon: ChevronRight, href: '/sections' },
     ],

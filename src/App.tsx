@@ -19,7 +19,6 @@ import OfficeMonitor from "./pages/monitor/OfficeMonitor";
 import DeviceManagement from "./pages/devices/DeviceManagement";
 import AcademicYearPage from "./pages/settings/AcademicYear";
 import ShiftsPage from "./pages/settings/Shifts";
-import PanelsPage from "./pages/settings/Panels";
 import ClassesPage from "./pages/settings/Classes";
 import SectionsPage from "./pages/settings/Sections";
 import SmsSettings from "./pages/settings/SmsSettings";
@@ -92,11 +91,6 @@ const App = () => (
               <Route path="/shifts" element={
                 <ProtectedRoute requireAdmin>
                   <ShiftsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/panels" element={
-                <ProtectedRoute requireAdmin>
-                  <PanelsPage />
                 </ProtectedRoute>
               } />
               <Route path="/classes" element={

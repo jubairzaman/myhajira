@@ -20,10 +20,12 @@ import {
 import { BookOpen, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 
-interface Panel {
+interface Shift {
   id: string;
   name: string;
+  name_bn: string | null;
 }
 
 interface Class {
@@ -31,13 +33,14 @@ interface Class {
   name: string;
   name_bn: string | null;
   grade_order: number;
-  panel_id: string;
-  panels?: Panel;
+  shift_id: string | null;
+  shifts?: Shift | null;
 }
 
 export default function ClassesPage() {
+  const { activeYear } = useAcademicYear();
   const [classes, setClasses] = useState<Class[]>([]);
-  const [panels, setPanels] = useState<Panel[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -45,20 +48,24 @@ export default function ClassesPage() {
     name: '',
     name_bn: '',
     grade_order: 0,
-    panel_id: '',
+    shift_id: '',
   });
 
-  const fetchPanels = async () => {
+  const fetchShifts = async () => {
+    if (!activeYear) return;
+    
     try {
       const { data, error } = await supabase
-        .from('panels')
-        .select('id, name')
-        .order('name');
+        .from('shifts')
+        .select('id, name, name_bn')
+        .eq('academic_year_id', activeYear.id)
+        .eq('is_active', true)
+        .order('start_time');
 
       if (error) throw error;
-      setPanels(data || []);
+      setShifts(data || []);
     } catch (error) {
-      console.error('Error fetching panels:', error);
+      console.error('Error fetching shifts:', error);
     }
   };
 
@@ -66,7 +73,7 @@ export default function ClassesPage() {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('*, panels(id, name)')
+        .select('*, shifts(id, name, name_bn)')
         .order('grade_order');
 
       if (error) throw error;
@@ -80,13 +87,15 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
-    fetchPanels();
+    if (activeYear) {
+      fetchShifts();
+    }
     fetchClasses();
-  }, []);
+  }, [activeYear]);
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.panel_id) {
-      toast.error('Please fill all required fields');
+    if (!formData.name) {
+      toast.error('Please fill class name');
       return;
     }
 
@@ -95,7 +104,7 @@ export default function ClassesPage() {
         name: formData.name,
         name_bn: formData.name_bn || null,
         grade_order: formData.grade_order,
-        panel_id: formData.panel_id,
+        shift_id: formData.shift_id || null,
       };
 
       if (editingClass) {
@@ -117,7 +126,7 @@ export default function ClassesPage() {
 
       setIsDialogOpen(false);
       setEditingClass(null);
-      setFormData({ name: '', name_bn: '', grade_order: 0, panel_id: '' });
+      setFormData({ name: '', name_bn: '', grade_order: 0, shift_id: '' });
       fetchClasses();
     } catch (error: any) {
       toast.error(error.message || 'Operation failed');
@@ -147,7 +156,7 @@ export default function ClassesPage() {
       name: cls.name,
       name_bn: cls.name_bn || '',
       grade_order: cls.grade_order,
-      panel_id: cls.panel_id,
+      shift_id: cls.shift_id || '',
     });
     setIsDialogOpen(true);
   };
@@ -170,7 +179,7 @@ export default function ClassesPage() {
           setIsDialogOpen(open);
           if (!open) {
             setEditingClass(null);
-            setFormData({ name: '', name_bn: '', grade_order: 0, panel_id: '' });
+            setFormData({ name: '', name_bn: '', grade_order: 0, shift_id: '' });
           }
         }}>
           <DialogTrigger asChild>
@@ -204,15 +213,16 @@ export default function ClassesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Panel</Label>
-                  <Select value={formData.panel_id} onValueChange={(v) => setFormData({ ...formData, panel_id: v })}>
+                  <Label>Shift (Optional)</Label>
+                  <Select value={formData.shift_id} onValueChange={(v) => setFormData({ ...formData, shift_id: v })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Panel" />
+                      <SelectValue placeholder="Select Shift" />
                     </SelectTrigger>
                     <SelectContent>
-                      {panels.map((panel) => (
-                        <SelectItem key={panel.id} value={panel.id}>
-                          {panel.name}
+                      <SelectItem value="">All Shifts</SelectItem>
+                      {shifts.map((shift) => (
+                        <SelectItem key={shift.id} value={shift.id}>
+                          {shift.name} {shift.name_bn && `(${shift.name_bn})`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -242,7 +252,7 @@ export default function ClassesPage() {
             <tr>
               <th>Class Name</th>
               <th>শ্রেণীর নাম</th>
-              <th>Panel</th>
+              <th>Shift</th>
               <th>Order</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -252,7 +262,15 @@ export default function ClassesPage() {
               <tr key={cls.id}>
                 <td className="font-medium">{cls.name}</td>
                 <td className="font-bengali">{cls.name_bn || '-'}</td>
-                <td>{cls.panels?.name || '-'}</td>
+                <td>
+                  {cls.shifts ? (
+                    <span>
+                      {cls.shifts.name} {cls.shifts.name_bn && `(${cls.shifts.name_bn})`}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">All Shifts</span>
+                  )}
+                </td>
                 <td>{cls.grade_order}</td>
                 <td className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEditDialog(cls)}>

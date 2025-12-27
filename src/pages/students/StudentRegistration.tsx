@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PhotoCapture } from '@/components/forms/PhotoCapture';
 import { RfidEnroll } from '@/components/forms/RfidEnroll';
@@ -12,48 +12,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { GraduationCap, Save, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { GraduationCap, Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 
-const shifts = [
-  { id: '1', name: 'Morning Shift', nameBn: 'প্রভাতী শিফট' },
-  { id: '2', name: 'Day Shift', nameBn: 'দিবা শিফট' },
-];
+interface Shift {
+  id: string;
+  name: string;
+  name_bn: string | null;
+}
 
-const panels = [
-  { id: '1', name: 'Primary Panel', nameBn: 'প্রাথমিক প্যানেল' },
-  { id: '2', name: 'Boys Panel', nameBn: 'বালক প্যানেল' },
-  { id: '3', name: 'Girls Panel', nameBn: 'বালিকা প্যানেল' },
-];
+interface Class {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  shift_id: string | null;
+}
 
-const classes = [
-  { id: '1', name: 'Class 1', nameBn: 'প্রথম শ্রেণী' },
-  { id: '2', name: 'Class 2', nameBn: 'দ্বিতীয় শ্রেণী' },
-  { id: '3', name: 'Class 3', nameBn: 'তৃতীয় শ্রেণী' },
-  { id: '4', name: 'Class 4', nameBn: 'চতুর্থ শ্রেণী' },
-  { id: '5', name: 'Class 5', nameBn: 'পঞ্চম শ্রেণী' },
-  { id: '6', name: 'Class 6', nameBn: 'ষষ্ঠ শ্রেণী' },
-  { id: '7', name: 'Class 7', nameBn: 'সপ্তম শ্রেণী' },
-  { id: '8', name: 'Class 8', nameBn: 'অষ্টম শ্রেণী' },
-  { id: '9', name: 'Class 9', nameBn: 'নবম শ্রেণী' },
-  { id: '10', name: 'Class 10', nameBn: 'দশম শ্রেণী' },
-];
-
-const sections = [
-  { id: '1', name: 'Section A', nameBn: 'শাখা ক' },
-  { id: '2', name: 'Section B', nameBn: 'শাখা খ' },
-  { id: '3', name: 'Section C', nameBn: 'শাখা গ' },
-];
+interface Section {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  class_id: string;
+}
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function StudentRegistration() {
+  const navigate = useNavigate();
+  const { activeYear } = useAcademicYear();
+  const [loading, setLoading] = useState(false);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
+  const [filteredSections, setFilteredSections] = useState<Section[]>([]);
+
   const [formData, setFormData] = useState({
     nameEnglish: '',
     nameBangla: '',
+    studentIdNumber: '',
     shiftId: '',
-    panelId: '',
     classId: '',
     sectionId: '',
     guardianMobile: '',
@@ -62,20 +63,182 @@ export default function StudentRegistration() {
     rfidCardId: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch shifts, classes, sections
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!activeYear) return;
+
+      try {
+        // Fetch shifts
+        const { data: shiftsData } = await supabase
+          .from('shifts')
+          .select('id, name, name_bn')
+          .eq('academic_year_id', activeYear.id)
+          .eq('is_active', true)
+          .order('start_time');
+        setShifts(shiftsData || []);
+
+        // Fetch classes
+        const { data: classesData } = await supabase
+          .from('classes')
+          .select('id, name, name_bn, shift_id')
+          .eq('is_active', true)
+          .order('grade_order');
+        setClasses(classesData || []);
+
+        // Fetch sections
+        const { data: sectionsData } = await supabase
+          .from('sections')
+          .select('id, name, name_bn, class_id')
+          .eq('is_active', true)
+          .order('name');
+        setSections(sectionsData || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+  }, [activeYear]);
+
+  // Filter classes when shift changes
+  useEffect(() => {
+    if (formData.shiftId) {
+      const filtered = classes.filter(c => c.shift_id === formData.shiftId || !c.shift_id);
+      setFilteredClasses(filtered);
+      // Reset class and section if current selection is not valid
+      if (formData.classId && !filtered.find(c => c.id === formData.classId)) {
+        updateField('classId', '');
+        updateField('sectionId', '');
+      }
+    } else {
+      setFilteredClasses(classes);
+    }
+  }, [formData.shiftId, classes]);
+
+  // Filter sections when class changes
+  useEffect(() => {
+    if (formData.classId) {
+      const filtered = sections.filter(s => s.class_id === formData.classId);
+      setFilteredSections(filtered);
+      // Reset section if current selection is not valid
+      if (formData.sectionId && !filtered.find(s => s.id === formData.sectionId)) {
+        updateField('sectionId', '');
+      }
+    } else {
+      setFilteredSections([]);
+    }
+  }, [formData.classId, sections]);
+
+  const uploadPhoto = async (base64Photo: string): Promise<string | null> => {
+    if (!base64Photo || !base64Photo.startsWith('data:image')) {
+      return null;
+    }
+
+    try {
+      // Convert base64 to blob
+      const response = await fetch(base64Photo);
+      const blob = await response.blob();
+      
+      // Generate unique filename
+      const fileName = `students/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('photos')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(data.path);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.nameEnglish || !formData.nameBangla || !formData.shiftId || 
-        !formData.panelId || !formData.classId || !formData.sectionId || 
-        !formData.guardianMobile || !formData.rfidCardId) {
+    if (!formData.nameEnglish || !formData.shiftId || 
+        !formData.classId || !formData.sectionId || 
+        !formData.guardianMobile) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    // In production, this would save to database
-    console.log('Student data:', formData);
-    toast.success('Student registered successfully!');
+    // Validate mobile number format
+    if (!/^01\d{9}$/.test(formData.guardianMobile)) {
+      toast.error('Please enter a valid mobile number (e.g., 01XXXXXXXXX)');
+      return;
+    }
+
+    if (!activeYear) {
+      toast.error('No active academic year');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Upload photo if provided
+      let photoUrl: string | null = null;
+      if (formData.photoUrl) {
+        photoUrl = await uploadPhoto(formData.photoUrl);
+      }
+
+      // Insert student
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .insert({
+          name: formData.nameEnglish,
+          name_bn: formData.nameBangla || null,
+          student_id_number: formData.studentIdNumber || null,
+          shift_id: formData.shiftId,
+          class_id: formData.classId,
+          section_id: formData.sectionId,
+          guardian_mobile: formData.guardianMobile,
+          blood_group: formData.bloodGroup || null,
+          photo_url: photoUrl,
+          academic_year_id: activeYear.id,
+        })
+        .select()
+        .single();
+
+      if (studentError) throw studentError;
+
+      // If RFID card is enrolled, create the RFID record
+      if (formData.rfidCardId && student) {
+        const { error: rfidError } = await supabase
+          .from('rfid_cards_students')
+          .insert({
+            student_id: student.id,
+            card_number: formData.rfidCardId,
+          });
+
+        if (rfidError) {
+          console.error('RFID enrollment error:', rfidError);
+          toast.warning('Student saved, but RFID card enrollment failed');
+        }
+      }
+
+      toast.success('Student registered successfully!');
+      navigate('/students');
+    } catch (error: any) {
+      console.error('Error saving student:', error);
+      toast.error(error.message || 'Failed to save student');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateField = (field: string, value: string) => {
@@ -146,12 +309,21 @@ export default function StudentRegistration() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="form-label-required font-bengali">শিক্ষার্থীর নাম (বাংলা)</Label>
+                    <Label className="font-bengali">শিক্ষার্থীর নাম (বাংলা)</Label>
                     <Input
                       placeholder="বাংলায় নাম লিখুন"
                       className="font-bengali"
                       value={formData.nameBangla}
                       onChange={(e) => updateField('nameBangla', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Student ID Number</Label>
+                    <Input
+                      placeholder="Optional ID number"
+                      value={formData.studentIdNumber}
+                      onChange={(e) => updateField('studentIdNumber', e.target.value)}
                     />
                   </div>
                 </div>
@@ -172,23 +344,7 @@ export default function StudentRegistration() {
                       <SelectContent>
                         {shifts.map((shift) => (
                           <SelectItem key={shift.id} value={shift.id}>
-                            {shift.name} ({shift.nameBn})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="form-label-required">Panel / প্যানেল</Label>
-                    <Select value={formData.panelId} onValueChange={(v) => updateField('panelId', v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Panel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {panels.map((panel) => (
-                          <SelectItem key={panel.id} value={panel.id}>
-                            {panel.name} ({panel.nameBn})
+                            {shift.name} {shift.name_bn && `(${shift.name_bn})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -197,14 +353,18 @@ export default function StudentRegistration() {
 
                   <div className="space-y-2">
                     <Label className="form-label-required">Class / শ্রেণী</Label>
-                    <Select value={formData.classId} onValueChange={(v) => updateField('classId', v)}>
+                    <Select 
+                      value={formData.classId} 
+                      onValueChange={(v) => updateField('classId', v)}
+                      disabled={!formData.shiftId}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Class" />
                       </SelectTrigger>
                       <SelectContent>
-                        {classes.map((cls) => (
+                        {filteredClasses.map((cls) => (
                           <SelectItem key={cls.id} value={cls.id}>
-                            {cls.name} ({cls.nameBn})
+                            {cls.name} {cls.name_bn && `(${cls.name_bn})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -213,14 +373,18 @@ export default function StudentRegistration() {
 
                   <div className="space-y-2">
                     <Label className="form-label-required">Section / শাখা</Label>
-                    <Select value={formData.sectionId} onValueChange={(v) => updateField('sectionId', v)}>
+                    <Select 
+                      value={formData.sectionId} 
+                      onValueChange={(v) => updateField('sectionId', v)}
+                      disabled={!formData.classId}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Section" />
                       </SelectTrigger>
                       <SelectContent>
-                        {sections.map((section) => (
+                        {filteredSections.map((section) => (
                           <SelectItem key={section.id} value={section.id}>
-                            {section.name} ({section.nameBn})
+                            {section.name} {section.name_bn && `(${section.name_bn})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -270,8 +434,12 @@ export default function StudentRegistration() {
                     Cancel
                   </Button>
                 </Link>
-                <Button type="submit" variant="hero" className="gap-2">
-                  <Save className="w-4 h-4" />
+                <Button type="submit" variant="hero" className="gap-2" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
                   <span>Save Student</span>
                   <span className="font-bengali">/ সংরক্ষণ করুন</span>
                 </Button>
