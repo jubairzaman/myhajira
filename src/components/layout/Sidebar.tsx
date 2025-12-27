@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -17,6 +17,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NavItem {
   label: string;
@@ -109,7 +110,14 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>(['Structure', 'Attendance', 'Live Monitor']);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -202,7 +210,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">
-        <button className="nav-item w-full text-red-300 hover:text-red-200 hover:bg-red-500/20">
+        <button onClick={handleLogout} className="nav-item w-full text-red-300 hover:text-red-200 hover:bg-red-500/20">
           <LogOut className="w-5 h-5" />
           <span>Logout</span>
         </button>
