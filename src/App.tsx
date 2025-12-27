@@ -26,6 +26,11 @@ import Reports from "./pages/reports/Reports";
 import Settings from "./pages/settings/Settings";
 import NotFound from "./pages/NotFound";
 
+// Attendance Pages
+import StudentAttendance from "./pages/attendance/StudentAttendance";
+import TeacherAttendance from "./pages/attendance/TeacherAttendance";
+import ManualEntry from "./pages/attendance/ManualEntry";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -68,6 +73,23 @@ const App = () => (
               <Route path="/teachers/new" element={
                 <ProtectedRoute requireAdmin>
                   <TeacherRegistration />
+                </ProtectedRoute>
+              } />
+
+              {/* Attendance */}
+              <Route path="/attendance/students" element={
+                <ProtectedRoute>
+                  <StudentAttendance />
+                </ProtectedRoute>
+              } />
+              <Route path="/attendance/teachers" element={
+                <ProtectedRoute>
+                  <TeacherAttendance />
+                </ProtectedRoute>
+              } />
+              <Route path="/attendance/manual" element={
+                <ProtectedRoute requireAdmin>
+                  <ManualEntry />
                 </ProtectedRoute>
               } />
               
