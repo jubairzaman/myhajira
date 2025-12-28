@@ -1,53 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Clock, UserCheck, Trophy, ArrowRight } from 'lucide-react';
+import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 
-// Mock live punch data
-const mockPunches = [
-  {
-    id: '1',
-    name: 'Mohammad Rafiq',
-    nameBangla: 'মোহাম্মদ রফিক',
-    photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rafiq',
-    class: 'Class 10-A',
-    time: '08:15 AM',
-    status: 'present' as const,
-  },
-  {
-    id: '2',
-    name: 'Fatima Akter',
-    nameBangla: 'ফাতিমা আক্তার',
-    photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fatima2',
-    class: 'Class 9-B',
-    time: '08:35 AM',
-    status: 'late' as const,
-    lateMinutes: 5,
-  },
-  {
-    id: '3',
-    name: 'Abdul Karim',
-    nameBangla: 'আব্দুল করিম',
-    photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=karim2',
-    class: 'Class 8-A',
-    time: '08:20 AM',
-    status: 'present' as const,
-  },
-];
+interface PunchRecord {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  photo_url: string | null;
+  class_name: string | null;
+  section_name: string | null;
+  punch_time: string;
+  status: string;
+}
 
-// Top attendance students
-const topStudents = [
-  { id: '1', name: 'Sakib Rahman', nameBangla: 'সাকিব রহমান', photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sakib', class: 'Class 10-A', presentDays: 98 },
-  { id: '2', name: 'Nusrat Jahan', nameBangla: 'নুসরাত জাহান', photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nusrat', class: 'Class 9-A', presentDays: 97 },
-  { id: '3', name: 'Imran Hossain', nameBangla: 'ইমরান হোসাইন', photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=imran', class: 'Class 10-B', presentDays: 96 },
-  { id: '4', name: 'Ayesha Siddiqua', nameBangla: 'আয়েশা সিদ্দিকা', photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ayesha', class: 'Class 8-A', presentDays: 95 },
-  { id: '5', name: 'Tanvir Ahmed', nameBangla: 'তানভীর আহমেদ', photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=tanvir', class: 'Class 9-B', presentDays: 95 },
-];
+interface TopStudent {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  photo_url: string | null;
+  class_name: string | null;
+  present_days: number;
+}
 
 export default function GateMonitor() {
+  const { activeYear } = useAcademicYear();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [latestPunch, setLatestPunch] = useState(mockPunches[0]);
+  const [latestPunches, setLatestPunches] = useState<PunchRecord[]>([]);
+  const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Update time every second
   useEffect(() => {
@@ -57,23 +40,149 @@ export default function GateMonitor() {
     return () => clearInterval(timer);
   }, []);
 
-  // Simulate idle mode after 5 seconds (for demo)
+  // Fetch initial data
   useEffect(() => {
-    const idleTimer = setTimeout(() => {
-      setIsIdle(true);
-    }, 10000);
-    return () => clearTimeout(idleTimer);
-  }, [latestPunch]);
-
-  // Auto-slide for top students
-  useEffect(() => {
-    if (isIdle) {
-      const slideTimer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % Math.ceil(topStudents.length / 5));
-      }, 5000);
-      return () => clearInterval(slideTimer);
+    if (activeYear) {
+      fetchLatestPunches();
+      fetchTopStudents();
     }
-  }, [isIdle]);
+  }, [activeYear]);
+
+  // Real-time subscription for new punches
+  useEffect(() => {
+    if (!activeYear) return;
+
+    const channel = supabase
+      .channel('attendance-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'student_attendance',
+        },
+        () => {
+          fetchLatestPunches();
+          resetIdleTimer();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeYear]);
+
+  // Idle timer management
+  useEffect(() => {
+    resetIdleTimer();
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+    };
+  }, []);
+
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    setIsIdle(false);
+    const timer = setTimeout(() => {
+      setIsIdle(true);
+    }, 30000); // 30 seconds idle
+    setIdleTimer(timer);
+  };
+
+  const fetchLatestPunches = async () => {
+    if (!activeYear) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('student_attendance')
+        .select(`
+          id, punch_time, status,
+          student:students(
+            id, name, name_bn, photo_url,
+            class:classes(name),
+            section:sections(name)
+          )
+        `)
+        .eq('academic_year_id', activeYear.id)
+        .eq('attendance_date', today)
+        .order('punch_time', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      const punches: PunchRecord[] = (data || []).map((record: any) => ({
+        id: record.id,
+        name: record.student?.name || 'Unknown',
+        name_bn: record.student?.name_bn,
+        photo_url: record.student?.photo_url,
+        class_name: record.student?.class?.name,
+        section_name: record.student?.section?.name,
+        punch_time: record.punch_time,
+        status: record.status,
+      }));
+
+      setLatestPunches(punches);
+    } catch (error) {
+      console.error('Error fetching punches:', error);
+    }
+  };
+
+  const fetchTopStudents = async () => {
+    if (!activeYear) return;
+
+    try {
+      // Get attendance counts for this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      
+      const { data, error } = await supabase
+        .from('student_attendance')
+        .select(`
+          student_id,
+          student:students(
+            id, name, name_bn, photo_url,
+            class:classes(name)
+          )
+        `)
+        .eq('academic_year_id', activeYear.id)
+        .gte('attendance_date', startOfMonth.toISOString().split('T')[0])
+        .in('status', ['present', 'late']);
+
+      if (error) throw error;
+
+      // Count attendance per student
+      const attendanceCount: Record<string, { student: any; count: number }> = {};
+      (data || []).forEach((record: any) => {
+        if (record.student) {
+          const studentId = record.student_id;
+          if (!attendanceCount[studentId]) {
+            attendanceCount[studentId] = { student: record.student, count: 0 };
+          }
+          attendanceCount[studentId].count++;
+        }
+      });
+
+      // Sort by attendance count and take top 5
+      const topList: TopStudent[] = Object.values(attendanceCount)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map((item) => ({
+          id: item.student.id,
+          name: item.student.name,
+          name_bn: item.student.name_bn,
+          photo_url: item.student.photo_url,
+          class_name: item.student.class?.name,
+          present_days: item.count,
+        }));
+
+      setTopStudents(topList);
+    } catch (error) {
+      console.error('Error fetching top students:', error);
+    }
+  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
@@ -92,6 +201,16 @@ export default function GateMonitor() {
       day: 'numeric',
     });
   };
+
+  const formatPunchTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const latestPunch = latestPunches[0];
 
   return (
     <div className="monitor-display">
@@ -115,7 +234,7 @@ export default function GateMonitor() {
 
       {/* Main Content */}
       <main className="p-8">
-        {!isIdle ? (
+        {!isIdle && latestPunch ? (
           // Real-time Punch Display
           <div className="max-w-2xl mx-auto">
             <div
@@ -127,9 +246,9 @@ export default function GateMonitor() {
               {/* Photo */}
               <div className="relative inline-block mb-6">
                 <img
-                  src={latestPunch.photo}
+                  src={latestPunch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${latestPunch.id}`}
                   alt={latestPunch.name}
-                  className="w-40 h-40 rounded-full border-4 border-white/20 shadow-2xl"
+                  className="w-40 h-40 rounded-full border-4 border-white/20 shadow-2xl object-cover bg-white/10"
                 />
                 <div
                   className={cn(
@@ -147,15 +266,22 @@ export default function GateMonitor() {
 
               {/* Name */}
               <h2 className="text-4xl font-bold text-white mb-2">{latestPunch.name}</h2>
-              <p className="text-2xl text-white/80 font-bengali mb-4">{latestPunch.nameBangla}</p>
+              {latestPunch.name_bn && (
+                <p className="text-2xl text-white/80 font-bengali mb-4">{latestPunch.name_bn}</p>
+              )}
 
               {/* Class */}
-              <p className="text-xl text-white/60 mb-6">{latestPunch.class}</p>
+              <p className="text-xl text-white/60 mb-6">
+                {latestPunch.class_name || 'Unknown Class'} 
+                {latestPunch.section_name && ` - ${latestPunch.section_name}`}
+              </p>
 
               {/* Time & Status */}
               <div className="flex items-center justify-center gap-8">
                 <div className="text-center">
-                  <p className="text-3xl font-bold font-mono text-white">{latestPunch.time}</p>
+                  <p className="text-3xl font-bold font-mono text-white">
+                    {formatPunchTime(latestPunch.punch_time)}
+                  </p>
                   <p className="text-white/60">Punch Time</p>
                 </div>
                 <div className="w-px h-12 bg-white/20" />
@@ -166,7 +292,7 @@ export default function GateMonitor() {
                       latestPunch.status === 'present' ? 'text-success' : 'text-warning'
                     )}
                   >
-                    {latestPunch.status === 'present' ? 'উপস্থিত' : `${latestPunch.lateMinutes} মিনিট বিলম্ব`}
+                    {latestPunch.status === 'present' ? 'উপস্থিত' : 'বিলম্ব'}
                   </p>
                   <p className="text-white/60">
                     {latestPunch.status === 'present' ? 'Present' : 'Late'}
@@ -174,8 +300,36 @@ export default function GateMonitor() {
                 </div>
               </div>
             </div>
+
+            {/* Recent Punches */}
+            {latestPunches.length > 1 && (
+              <div className="mt-8">
+                <h3 className="text-white/60 text-center mb-4">Recent Arrivals</h3>
+                <div className="flex justify-center gap-4 flex-wrap">
+                  {latestPunches.slice(1, 6).map((punch) => (
+                    <div
+                      key={punch.id}
+                      className="flex items-center gap-2 bg-white/5 rounded-full px-4 py-2"
+                    >
+                      <img
+                        src={punch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${punch.id}`}
+                        alt={punch.name}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <span className="text-white/80 text-sm">{punch.name}</span>
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded-full',
+                        punch.status === 'present' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
+                      )}>
+                        {formatPunchTime(punch.punch_time)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        ) : (
+        ) : isIdle && topStudents.length > 0 ? (
           // Idle Mode - Top Attendance Students
           <div>
             <div className="text-center mb-8">
@@ -197,23 +351,37 @@ export default function GateMonitor() {
                 >
                   <div className="relative inline-block mb-4">
                     <img
-                      src={student.photo}
+                      src={student.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
                       alt={student.name}
-                      className="w-24 h-24 rounded-full border-2 border-warning/50"
+                      className="w-24 h-24 rounded-full border-2 border-warning/50 object-cover bg-white/10"
                     />
                     <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-warning text-warning-foreground flex items-center justify-center font-bold text-lg">
                       {index + 1}
                     </div>
                   </div>
                   <h3 className="font-semibold text-white text-lg">{student.name}</h3>
-                  <p className="text-white/60 font-bengali text-sm mb-2">{student.nameBangla}</p>
-                  <p className="text-white/40 text-sm mb-3">{student.class}</p>
+                  {student.name_bn && (
+                    <p className="text-white/60 font-bengali text-sm mb-2">{student.name_bn}</p>
+                  )}
+                  <p className="text-white/40 text-sm mb-3">{student.class_name || 'Unknown'}</p>
                   <div className="bg-success/20 rounded-lg px-3 py-2">
-                    <p className="text-success font-bold">{student.presentDays} Days</p>
+                    <p className="text-success font-bold">{student.present_days} Days</p>
                     <p className="text-success/70 text-xs font-bengali">উপস্থিতি</p>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        ) : (
+          // No data state
+          <div className="text-center">
+            <div className="monitor-card max-w-md mx-auto p-12">
+              <RefreshCw className="w-16 h-16 text-white/40 mx-auto mb-6" />
+              <h2 className="text-2xl font-bold text-white mb-2">Waiting for Punches</h2>
+              <p className="text-white/60 font-bengali">পাঞ্চের জন্য অপেক্ষা করা হচ্ছে...</p>
+              <p className="text-white/40 text-sm mt-4">
+                Students will appear here when they punch their RFID cards
+              </p>
             </div>
           </div>
         )}
@@ -225,6 +393,9 @@ export default function GateMonitor() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
             <span className="text-white/60 text-sm">System Online</span>
+            <span className="text-white/40 text-sm ml-4">
+              Today: {latestPunches.length} punches
+            </span>
           </div>
           <p className="text-white/40 text-sm">Developed by Jubair Zaman</p>
           <button
