@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Cpu, 
   Plus, 
@@ -23,81 +30,141 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock devices
-const mockDevices = [
-  {
-    id: '1',
-    name: 'Main Gate Device',
-    ipAddress: '192.168.1.100',
-    port: 4370,
-    location: 'Main Gate',
-    isOnline: true,
-    lastSync: '2024-01-15 08:30:00',
-    totalPunches: 1250,
-  },
-  {
-    id: '2',
-    name: 'Back Gate Device',
-    ipAddress: '192.168.1.101',
-    port: 4370,
-    location: 'Back Gate',
-    isOnline: true,
-    lastSync: '2024-01-15 08:28:00',
-    totalPunches: 450,
-  },
-  {
-    id: '3',
-    name: 'Office Device',
-    ipAddress: '192.168.1.102',
-    port: 4370,
-    location: 'Principal Office',
-    isOnline: false,
-    lastSync: '2024-01-14 17:00:00',
-    totalPunches: 120,
-  },
-];
+interface Device {
+  id: string;
+  name: string;
+  ip_address: string;
+  port: number;
+  location: string | null;
+  device_type: string | null;
+  is_online: boolean;
+  is_active: boolean;
+  last_sync_at: string | null;
+}
 
 export default function DeviceManagement() {
-  const [devices, setDevices] = useState(mockDevices);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
   const [newDevice, setNewDevice] = useState({
     name: '',
-    ipAddress: '',
+    ip_address: '',
     port: '4370',
     location: '',
+    device_type: 'zkteco',
   });
 
-  const handleAddDevice = () => {
-    if (!newDevice.name || !newDevice.ipAddress || !newDevice.port || !newDevice.location) {
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const fetchDevices = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDevices(data || []);
+    } catch (error) {
+      console.error('Error fetching devices:', error);
+      toast.error('Failed to load devices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddDevice = async () => {
+    if (!newDevice.name || !newDevice.ip_address || !newDevice.port || !newDevice.location) {
       toast.error('Please fill all fields');
       return;
     }
 
-    const device = {
-      id: Date.now().toString(),
-      ...newDevice,
-      port: parseInt(newDevice.port),
-      isOnline: false,
-      lastSync: '-',
-      totalPunches: 0,
-    };
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .insert({
+          name: newDevice.name,
+          ip_address: newDevice.ip_address,
+          port: parseInt(newDevice.port),
+          location: newDevice.location,
+          device_type: newDevice.device_type,
+          is_online: false,
+          is_active: true,
+        })
+        .select()
+        .single();
 
-    setDevices([...devices, device]);
-    setNewDevice({ name: '', ipAddress: '', port: '4370', location: '' });
-    setIsAddDialogOpen(false);
-    toast.success('Device added successfully');
+      if (error) throw error;
+
+      setDevices([data, ...devices]);
+      setNewDevice({ name: '', ip_address: '', port: '4370', location: '', device_type: 'zkteco' });
+      setIsAddDialogOpen(false);
+      toast.success('Device added successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add device');
+    }
   };
 
-  const handleSync = (deviceId: string) => {
-    toast.success('Syncing device...');
-    // In production, this would trigger actual sync with ZKTeco device
+  const handleSync = async (deviceId: string) => {
+    setSyncing(deviceId);
+    try {
+      // Update last sync time
+      const { error } = await supabase
+        .from('devices')
+        .update({ 
+          last_sync_at: new Date().toISOString(),
+          is_online: true 
+        })
+        .eq('id', deviceId);
+
+      if (error) throw error;
+
+      // Refresh devices list
+      await fetchDevices();
+      toast.success('Device synced successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to sync device');
+    } finally {
+      setSyncing(null);
+    }
   };
 
-  const handleDelete = (deviceId: string) => {
-    setDevices(devices.filter((d) => d.id !== deviceId));
-    toast.success('Device removed');
+  const handleDelete = async (deviceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .update({ is_active: false })
+        .eq('id', deviceId);
+
+      if (error) throw error;
+
+      setDevices(devices.filter((d) => d.id !== deviceId));
+      toast.success('Device removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove device');
+    }
   };
+
+  const formatLastSync = (lastSync: string | null) => {
+    if (!lastSync) return 'Never';
+    return new Date(lastSync).toLocaleString();
+  };
+
+  if (loading) {
+    return (
+      <MainLayout title="Device Management" titleBn="ডিভাইস ব্যবস্থাপনা">
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout title="Device Management" titleBn="ডিভাইস ব্যবস্থাপনা">
@@ -139,8 +206,8 @@ export default function DeviceManagement() {
                   <Label>IP Address</Label>
                   <Input
                     placeholder="192.168.1.100"
-                    value={newDevice.ipAddress}
-                    onChange={(e) => setNewDevice({ ...newDevice, ipAddress: e.target.value })}
+                    value={newDevice.ip_address}
+                    onChange={(e) => setNewDevice({ ...newDevice, ip_address: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -159,6 +226,22 @@ export default function DeviceManagement() {
                   value={newDevice.location}
                   onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Device Type</Label>
+                <Select 
+                  value={newDevice.device_type} 
+                  onValueChange={(value) => setNewDevice({ ...newDevice, device_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="zkteco">ZKTeco</SelectItem>
+                    <SelectItem value="hikvision">Hikvision</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button onClick={handleAddDevice} className="w-full">
                 Add Device
@@ -180,18 +263,18 @@ export default function DeviceManagement() {
             <div className="flex items-start justify-between mb-4">
               <div className={cn(
                 'w-12 h-12 rounded-xl flex items-center justify-center',
-                device.isOnline ? 'bg-success/10' : 'bg-destructive/10'
+                device.is_online ? 'bg-success/10' : 'bg-destructive/10'
               )}>
                 <Cpu className={cn(
                   'w-6 h-6',
-                  device.isOnline ? 'text-success' : 'text-destructive'
+                  device.is_online ? 'text-success' : 'text-destructive'
                 )} />
               </div>
               <div className={cn(
                 'flex items-center gap-2 px-3 py-1 rounded-full text-sm',
-                device.isOnline ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                device.is_online ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
               )}>
-                {device.isOnline ? (
+                {device.is_online ? (
                   <>
                     <Wifi className="w-4 h-4" />
                     <span>Online</span>
@@ -209,25 +292,22 @@ export default function DeviceManagement() {
             <h3 className="text-lg font-semibold text-foreground mb-1">{device.name}</h3>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <MapPin className="w-4 h-4" />
-              <span>{device.location}</span>
+              <span>{device.location || 'No location'}</span>
             </div>
 
             {/* Stats */}
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">IP Address</span>
-                <span className="font-mono">{device.ipAddress}:{device.port}</span>
+                <span className="font-mono">{device.ip_address}:{device.port}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Device Type</span>
+                <span className="capitalize">{device.device_type || 'ZKTeco'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Last Sync</span>
-                <span>{device.lastSync}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Punches</span>
-                <span className="flex items-center gap-1">
-                  <Activity className="w-4 h-4 text-primary" />
-                  {device.totalPunches}
-                </span>
+                <span>{formatLastSync(device.last_sync_at)}</span>
               </div>
             </div>
 
@@ -238,9 +318,10 @@ export default function DeviceManagement() {
                 size="sm"
                 className="flex-1 gap-2"
                 onClick={() => handleSync(device.id)}
+                disabled={syncing === device.id}
               >
-                <RefreshCw className="w-4 h-4" />
-                Sync
+                <RefreshCw className={cn("w-4 h-4", syncing === device.id && "animate-spin")} />
+                {syncing === device.id ? 'Syncing...' : 'Sync'}
               </Button>
               <Button variant="outline" size="icon">
                 <Settings className="w-4 h-4" />
