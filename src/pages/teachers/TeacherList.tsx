@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,8 @@ import {
   Edit,
   Trash2,
   CreditCard,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -19,56 +20,96 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { toast } from 'sonner';
 
-// Mock data
-const teachers = [
-  {
-    id: '1',
-    name: 'Dr. Mohammad Hasan',
-    designation: 'Head Teacher',
-    shift: 'Morning',
-    mobile: '01712345678',
-    rfidCardId: 'RFID-TCH001',
-    photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hasan',
-    bloodGroup: 'A+',
-  },
-  {
-    id: '2',
-    name: 'Fatima Begum',
-    designation: 'Senior Teacher',
-    shift: 'Morning',
-    mobile: '01812345678',
-    rfidCardId: 'RFID-TCH002',
-    photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fatimab',
-    bloodGroup: 'B+',
-  },
-  {
-    id: '3',
-    name: 'Shahidul Islam',
-    designation: 'Assistant Teacher',
-    shift: 'Day',
-    mobile: '01912345678',
-    rfidCardId: 'RFID-TCH003',
-    photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shahid',
-    bloodGroup: 'O+',
-  },
-  {
-    id: '4',
-    name: 'Rukhsana Akter',
-    designation: 'Junior Teacher',
-    shift: 'Morning',
-    mobile: '01612345678',
-    rfidCardId: null,
-    photoUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rukhsana',
-    bloodGroup: 'AB+',
-  },
-];
+const designationLabels: Record<string, string> = {
+  head_teacher: 'Head Teacher',
+  assistant_head: 'Assistant Head Teacher',
+  senior_teacher: 'Senior Teacher',
+  assistant_teacher: 'Assistant Teacher',
+  junior_teacher: 'Junior Teacher',
+};
+
+interface Teacher {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  designation: string;
+  mobile: string;
+  blood_group: string | null;
+  photo_url: string | null;
+  is_active: boolean;
+  shift: { id: string; name: string } | null;
+  rfid_card: { card_number: string } | null;
+}
 
 export default function TeacherList() {
+  const { activeYear } = useAcademicYear();
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    fetchTeachers();
+  }, [activeYear]);
+
+  const fetchTeachers = async () => {
+    if (!activeYear) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select(`
+          id, name, name_bn, designation, mobile, blood_group, photo_url, is_active,
+          shift:shifts(id, name),
+          rfid_card:rfid_cards_teachers(card_number)
+        `)
+        .eq('academic_year_id', activeYear.id)
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+
+      // Transform data to handle array returns from joins
+      const transformedData = (data || []).map(teacher => ({
+        ...teacher,
+        shift: Array.isArray(teacher.shift) ? teacher.shift[0] : teacher.shift,
+        rfid_card: Array.isArray(teacher.rfid_card) ? teacher.rfid_card[0] : teacher.rfid_card,
+      }));
+
+      setTeachers(transformedData as Teacher[]);
+    } catch (error: any) {
+      console.error('Error fetching teachers:', error);
+      toast.error('Failed to load teachers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (teacherId: string) => {
+    if (!confirm('Are you sure you want to deactivate this teacher?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('teachers')
+        .update({ is_active: false })
+        .eq('id', teacherId);
+
+      if (error) throw error;
+      
+      toast.success('Teacher deactivated');
+      fetchTeachers();
+    } catch (error: any) {
+      toast.error('Failed to deactivate teacher');
+    }
+  };
+
   const filteredTeachers = teachers.filter((teacher) =>
-    teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
+    teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (teacher.name_bn && teacher.name_bn.includes(searchQuery))
   );
 
   return (
@@ -80,7 +121,7 @@ export default function TeacherList() {
             <Users className="w-6 h-6 text-info" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">All Teachers</h2>
+            <h2 className="text-xl font-semibold">All Teachers ({teachers.length})</h2>
             <p className="text-sm text-muted-foreground font-bengali">সকল শিক্ষকের তালিকা</p>
           </div>
         </div>
@@ -107,80 +148,93 @@ export default function TeacherList() {
         </div>
       </div>
 
-      {/* Teacher Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredTeachers.map((teacher, index) => (
-          <div
-            key={teacher.id}
-            className="card-elevated p-6 animate-fade-in-up"
-            style={{ animationDelay: `${index * 50}ms` }}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <img
-                src={teacher.photoUrl}
-                alt={teacher.name}
-                className="w-16 h-16 rounded-full bg-muted"
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Details
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    {teacher.rfidCardId ? 'Change Card' : 'Enroll Card'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+      {/* Loading State */}
+      {loading ? (
+        <div className="card-elevated p-12 text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-4" />
+          <p className="text-muted-foreground">Loading teachers...</p>
+        </div>
+      ) : (
+        /* Teacher Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredTeachers.map((teacher, index) => (
+            <div
+              key={teacher.id}
+              className="card-elevated p-6 animate-fade-in-up"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <img
+                  src={teacher.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${teacher.id}`}
+                  alt={teacher.name}
+                  className="w-16 h-16 rounded-full bg-muted"
+                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      {teacher.rfid_card ? 'Change Card' : 'Enroll Card'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-destructive"
+                      onClick={() => handleDelete(teacher.id)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Deactivate
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <h3 className="font-semibold text-lg text-foreground mb-1">{teacher.name}</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                {designationLabels[teacher.designation] || teacher.designation}
+              </p>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Shift</span>
+                  <span className="font-medium">{teacher.shift?.name || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mobile</span>
+                  <span className="font-mono">{teacher.mobile}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Blood Group</span>
+                  <span className="font-medium text-destructive">{teacher.blood_group || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">RFID Card</span>
+                  {teacher.rfid_card?.card_number ? (
+                    <span className="text-success flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" />
+                      Enrolled
+                    </span>
+                  ) : (
+                    <span className="text-warning">Not enrolled</span>
+                  )}
+                </div>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            <h3 className="font-semibold text-lg text-foreground mb-1">{teacher.name}</h3>
-            <p className="text-sm text-muted-foreground mb-3">{teacher.designation}</p>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shift</span>
-                <span className="font-medium">{teacher.shift}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Mobile</span>
-                <span className="font-mono">{teacher.mobile}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Blood Group</span>
-                <span className="font-medium text-destructive">{teacher.bloodGroup}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">RFID Card</span>
-                {teacher.rfidCardId ? (
-                  <span className="text-success flex items-center gap-1">
-                    <CreditCard className="w-3 h-3" />
-                    Enrolled
-                  </span>
-                ) : (
-                  <span className="text-warning">Not enrolled</span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filteredTeachers.length === 0 && (
+      {!loading && filteredTeachers.length === 0 && (
         <div className="card-elevated text-center py-12">
           <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-lg font-medium text-foreground">No teachers found</p>
