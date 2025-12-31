@@ -57,7 +57,7 @@ serve(async (req) => {
 
     if (studentCard) {
       console.log('Found student card:', studentCard);
-      return await processStudentPunch(supabase, studentCard.student_id, punchTimestamp, punchDate, punchTimeStr, deviceId);
+      return await processStudentPunch(supabase, studentCard.student_id, punchTimestamp, punchDate, punchTimeStr, deviceId, card_number);
     }
 
     // Try to find teacher RFID card
@@ -70,7 +70,7 @@ serve(async (req) => {
 
     if (teacherCard) {
       console.log('Found teacher card:', teacherCard);
-      return await processTeacherPunch(supabase, teacherCard.teacher_id, punchTimestamp, punchDate, punchTimeStr, deviceId);
+      return await processTeacherPunch(supabase, teacherCard.teacher_id, punchTimestamp, punchDate, punchTimeStr, deviceId, card_number);
     }
 
     console.log('Card not found:', card_number);
@@ -95,12 +95,34 @@ async function processStudentPunch(
   punchTimestamp: Date,
   punchDate: string,
   punchTimeStr: string,
-  deviceId: string | null
+  deviceId: string | null,
+  cardNumber: string
 ) {
+  // RULE 1: Always save punch log first (unlimited punches allowed)
+  const { error: punchLogError } = await supabase
+    .from('punch_logs')
+    .insert({
+      person_id: studentId,
+      person_type: 'student',
+      punch_date: punchDate,
+      punch_time: punchTimestamp.toISOString(),
+      device_id: deviceId,
+      card_number: cardNumber,
+    });
+
+  if (punchLogError) {
+    console.error('Error saving punch log:', punchLogError);
+  }
+
   // Get student with shift info
   const { data: student, error: studentError } = await supabase
     .from('students')
-    .select('*, shifts(id, start_time, late_threshold_time, absent_cutoff_time)')
+    .select(`
+      id, name, name_bn, photo_url, academic_year_id,
+      shifts(id, start_time, late_threshold_time, absent_cutoff_time),
+      classes(id, name),
+      sections(id, name)
+    `)
     .eq('id', studentId)
     .single();
 
@@ -112,41 +134,63 @@ async function processStudentPunch(
     );
   }
 
-  // Check if already punched today
-  const { data: existingPunch } = await supabase
+  // RULE 4: Check if attendance already exists for this person and date
+  const { data: existingAttendance } = await supabase
     .from('student_attendance')
-    .select('id')
+    .select('id, status')
     .eq('student_id', studentId)
     .eq('attendance_date', punchDate)
     .maybeSingle();
 
-  if (existingPunch) {
-    console.log('Already punched today:', existingPunch);
+  // If attendance already exists, only save punch event (already done above)
+  if (existingAttendance) {
+    console.log('Attendance already exists, punch logged only:', existingAttendance);
     return new Response(
-      JSON.stringify({ message: 'Already recorded', student_name: student.name }),
+      JSON.stringify({
+        success: true,
+        type: 'student',
+        name: student.name,
+        name_bn: student.name_bn,
+        photo_url: student.photo_url,
+        class_name: student.classes?.name,
+        section_name: student.sections?.name,
+        status: existingAttendance.status,
+        punch_time: punchTimeStr,
+        is_first_punch: false,
+        message: 'Punch recorded (attendance already marked)'
+      }),
       { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
     );
   }
 
-  // Determine status based on shift timing
+  // RULE 5: First punch of the day - create attendance record
   let status = 'present';
   const shift = student.shifts;
   
   if (shift) {
     const punchMinutes = timeToMinutes(punchTimeStr);
+    const startMinutes = timeToMinutes(shift.start_time);
     const lateThreshold = timeToMinutes(shift.late_threshold_time || shift.start_time);
     const absentCutoff = timeToMinutes(shift.absent_cutoff_time || '23:59');
 
-    if (punchMinutes > absentCutoff) {
+    // Status determination rules (RULE 5):
+    // Punch ≤ Shift Start → Present
+    // Punch > Shift Start and ≤ Late Time → Late
+    // Punch > Late Time → Absent (but still creating record since they punched)
+    if (punchMinutes <= startMinutes) {
+      status = 'present';
+    } else if (punchMinutes <= lateThreshold) {
+      status = 'late';
+    } else if (punchMinutes > absentCutoff) {
       status = 'absent';
-    } else if (punchMinutes > lateThreshold) {
+    } else {
       status = 'late';
     }
   }
 
-  console.log('Recording attendance:', { studentId, status, punchTimeStr });
+  console.log('Recording first attendance:', { studentId, status, punchTimeStr });
 
-  // Insert attendance record
+  // Insert attendance record (first punch only)
   const { data: attendance, error: insertError } = await supabase
     .from('student_attendance')
     .insert({
@@ -174,9 +218,13 @@ async function processStudentPunch(
       type: 'student',
       name: student.name,
       name_bn: student.name_bn,
+      photo_url: student.photo_url,
+      class_name: student.classes?.name,
+      section_name: student.sections?.name,
       status,
       punch_time: punchTimeStr,
-      photo_url: student.photo_url,
+      is_first_punch: true,
+      message: 'First punch - attendance recorded'
     }),
     { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
   );
@@ -188,12 +236,32 @@ async function processTeacherPunch(
   punchTimestamp: Date,
   punchDate: string,
   punchTimeStr: string,
-  deviceId: string | null
+  deviceId: string | null,
+  cardNumber: string
 ) {
+  // RULE 1: Always save punch log first (unlimited punches allowed)
+  const { error: punchLogError } = await supabase
+    .from('punch_logs')
+    .insert({
+      person_id: teacherId,
+      person_type: 'teacher',
+      punch_date: punchDate,
+      punch_time: punchTimestamp.toISOString(),
+      device_id: deviceId,
+      card_number: cardNumber,
+    });
+
+  if (punchLogError) {
+    console.error('Error saving punch log:', punchLogError);
+  }
+
   // Get teacher with shift info
   const { data: teacher, error: teacherError } = await supabase
     .from('teachers')
-    .select('*, shifts(id, start_time, late_threshold_time)')
+    .select(`
+      id, name, name_bn, photo_url, designation, academic_year_id,
+      shifts(id, start_time, late_threshold_time, absent_cutoff_time)
+    `)
     .eq('id', teacherId)
     .single();
 
@@ -206,20 +274,21 @@ async function processTeacherPunch(
   }
 
   // Check existing attendance for today
-  const { data: existingPunch } = await supabase
+  const { data: existingAttendance } = await supabase
     .from('teacher_attendance')
-    .select('id, punch_in_time')
+    .select('id, punch_in_time, punch_out_time, status')
     .eq('teacher_id', teacherId)
     .eq('attendance_date', punchDate)
     .maybeSingle();
 
-  if (existingPunch) {
-    // This is a punch-out
-    if (existingPunch.punch_in_time && !existingPunch.punch_out_time) {
+  if (existingAttendance) {
+    // Attendance already exists - this is a punch-out or additional punch
+    // Update punch_out_time if punch_in exists
+    if (existingAttendance.punch_in_time && !existingAttendance.punch_out_time) {
       const { error: updateError } = await supabase
         .from('teacher_attendance')
         .update({ punch_out_time: punchTimestamp.toISOString() })
-        .eq('id', existingPunch.id);
+        .eq('id', existingAttendance.id);
 
       if (updateError) {
         console.error('Error updating punch-out:', updateError);
@@ -231,36 +300,59 @@ async function processTeacherPunch(
           type: 'teacher',
           name: teacher.name,
           name_bn: teacher.name_bn,
+          photo_url: teacher.photo_url,
+          designation: teacher.designation,
+          status: existingAttendance.status,
           action: 'punch_out',
           punch_time: punchTimeStr,
-          photo_url: teacher.photo_url,
+          is_first_punch: false,
+          message: 'Punch out recorded'
         }),
         { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
+    // Already has both punch in and out - just log additional punch
     return new Response(
-      JSON.stringify({ message: 'Already recorded', teacher_name: teacher.name }),
+      JSON.stringify({
+        success: true,
+        type: 'teacher',
+        name: teacher.name,
+        name_bn: teacher.name_bn,
+        photo_url: teacher.photo_url,
+        designation: teacher.designation,
+        status: existingAttendance.status,
+        action: 'additional_punch',
+        punch_time: punchTimeStr,
+        is_first_punch: false,
+        message: 'Additional punch recorded'
+      }),
       { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
     );
   }
 
-  // Determine status based on shift timing
+  // First punch of the day - create attendance record
   let status = 'present';
   let lateMinutes = 0;
   const shift = teacher.shifts;
 
   if (shift) {
     const punchMinutes = timeToMinutes(punchTimeStr);
+    const startMinutes = timeToMinutes(shift.start_time);
     const lateThreshold = timeToMinutes(shift.late_threshold_time || shift.start_time);
 
-    if (punchMinutes > lateThreshold) {
+    if (punchMinutes <= startMinutes) {
+      status = 'present';
+    } else if (punchMinutes > lateThreshold) {
       status = 'late';
-      lateMinutes = punchMinutes - lateThreshold;
+      lateMinutes = punchMinutes - startMinutes;
+    } else {
+      status = 'late';
+      lateMinutes = punchMinutes - startMinutes;
     }
   }
 
-  console.log('Recording teacher attendance:', { teacherId, status, punchTimeStr });
+  console.log('Recording first teacher attendance:', { teacherId, status, punchTimeStr, lateMinutes });
 
   // Insert attendance record
   const { data: attendance, error: insertError } = await supabase
@@ -291,10 +383,14 @@ async function processTeacherPunch(
       type: 'teacher',
       name: teacher.name,
       name_bn: teacher.name_bn,
+      photo_url: teacher.photo_url,
+      designation: teacher.designation,
       status,
       action: 'punch_in',
       punch_time: punchTimeStr,
-      photo_url: teacher.photo_url,
+      late_minutes: lateMinutes,
+      is_first_punch: true,
+      message: 'First punch - attendance recorded'
     }),
     { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
   );

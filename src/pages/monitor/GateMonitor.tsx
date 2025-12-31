@@ -3,16 +3,19 @@ import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { format } from 'date-fns';
 
 interface PunchRecord {
   id: string;
+  person_id: string;
+  person_type: string;
   name: string;
   name_bn: string | null;
   photo_url: string | null;
   class_name: string | null;
   section_name: string | null;
   punch_time: string;
-  status: string;
+  status?: string;
 }
 
 interface TopStudent {
@@ -42,27 +45,26 @@ export default function GateMonitor() {
 
   // Fetch initial data
   useEffect(() => {
-    if (activeYear) {
-      fetchLatestPunches();
-      fetchTopStudents();
-    }
+    fetchLatestPunches();
+    fetchTopStudents();
   }, [activeYear]);
 
-  // Real-time subscription for new punches
+  // RULE 3: Real-time subscription for new punches from punch_logs table
+  // Every punch event must appear instantly - no filtering, no deduplication
   useEffect(() => {
-    if (!activeYear) return;
-
     const channel = supabase
-      .channel('attendance-changes')
+      .channel('punch-logs-realtime')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'student_attendance',
+          table: 'punch_logs',
         },
-        () => {
-          fetchLatestPunches();
+        async (payload) => {
+          console.log('New punch received:', payload);
+          // Fetch full details and add to display immediately
+          await fetchPunchDetails(payload.new as any);
           resetIdleTimer();
         }
       )
@@ -90,39 +92,102 @@ export default function GateMonitor() {
     setIdleTimer(timer);
   };
 
-  const fetchLatestPunches = async () => {
-    if (!activeYear) return;
+  const fetchPunchDetails = async (punchLog: any) => {
+    if (punchLog.person_type !== 'student') return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { data, error } = await supabase
-        .from('student_attendance')
+      const { data: student } = await supabase
+        .from('students')
         .select(`
-          id, punch_time, status,
-          student:students(
-            id, name, name_bn, photo_url,
-            class:classes(name),
-            section:sections(name)
-          )
+          id, name, name_bn, photo_url,
+          classes(name),
+          sections(name)
         `)
-        .eq('academic_year_id', activeYear.id)
-        .eq('attendance_date', today)
+        .eq('id', punchLog.person_id)
+        .single();
+
+      if (student) {
+        // Get the attendance status for this student today
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const { data: attendance } = await supabase
+          .from('student_attendance')
+          .select('status')
+          .eq('student_id', student.id)
+          .eq('attendance_date', today)
+          .maybeSingle();
+
+        const newPunch: PunchRecord = {
+          id: punchLog.id,
+          person_id: punchLog.person_id,
+          person_type: 'student',
+          name: student.name,
+          name_bn: student.name_bn,
+          photo_url: student.photo_url,
+          class_name: (student as any).classes?.name,
+          section_name: (student as any).sections?.name,
+          punch_time: punchLog.punch_time,
+          status: attendance?.status || 'present',
+        };
+
+        // Add to beginning of list (no deduplication - show every punch)
+        setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
+      }
+    } catch (error) {
+      console.error('Error fetching punch details:', error);
+    }
+  };
+
+  const fetchLatestPunches = async () => {
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      // RULE 3: Monitor data comes from punch_logs table (all punches, no filtering)
+      const { data: punchLogs, error } = await supabase
+        .from('punch_logs')
+        .select('*')
+        .eq('punch_date', today)
+        .eq('person_type', 'student')
         .order('punch_time', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
 
-      const punches: PunchRecord[] = (data || []).map((record: any) => ({
-        id: record.id,
-        name: record.student?.name || 'Unknown',
-        name_bn: record.student?.name_bn,
-        photo_url: record.student?.photo_url,
-        class_name: record.student?.class?.name,
-        section_name: record.student?.section?.name,
-        punch_time: record.punch_time,
-        status: record.status,
-      }));
+      // Fetch student details for each punch
+      const punches: PunchRecord[] = [];
+      for (const log of punchLogs || []) {
+        const { data: student } = await supabase
+          .from('students')
+          .select(`
+            id, name, name_bn, photo_url,
+            classes(name),
+            sections(name)
+          `)
+          .eq('id', log.person_id)
+          .single();
+
+        if (student) {
+          // Get attendance status
+          const { data: attendance } = await supabase
+            .from('student_attendance')
+            .select('status')
+            .eq('student_id', student.id)
+            .eq('attendance_date', today)
+            .maybeSingle();
+
+          punches.push({
+            id: log.id,
+            person_id: log.person_id,
+            person_type: 'student',
+            name: student.name,
+            name_bn: student.name_bn,
+            photo_url: student.photo_url,
+            class_name: (student as any).classes?.name,
+            section_name: (student as any).sections?.name,
+            punch_time: log.punch_time,
+            status: attendance?.status || 'present',
+          });
+        }
+      }
 
       setLatestPunches(punches);
     } catch (error) {
@@ -134,7 +199,6 @@ export default function GateMonitor() {
     if (!activeYear) return;
 
     try {
-      // Get attendance counts for this month
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       
@@ -148,7 +212,7 @@ export default function GateMonitor() {
           )
         `)
         .eq('academic_year_id', activeYear.id)
-        .gte('attendance_date', startOfMonth.toISOString().split('T')[0])
+        .gte('attendance_date', format(startOfMonth, 'yyyy-MM-dd'))
         .in('status', ['present', 'late']);
 
       if (error) throw error;
@@ -206,6 +270,7 @@ export default function GateMonitor() {
     return new Date(timestamp).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hour12: true,
     });
   };
@@ -235,25 +300,27 @@ export default function GateMonitor() {
       {/* Main Content */}
       <main className="p-4 sm:p-8 pb-24">
         {!isIdle && latestPunch ? (
-          // Real-time Punch Display
+          // Real-time Punch Display - RULE 3: Every punch appears instantly
           <div className="max-w-2xl mx-auto">
             <div
               className={cn(
                 'rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-center animate-scale-in',
-                latestPunch.status === 'present' ? 'monitor-card-success' : 'monitor-card-warning'
+                latestPunch.status === 'present' ? 'monitor-card-success' : 
+                latestPunch.status === 'late' ? 'monitor-card-warning' : 'monitor-card'
               )}
             >
               {/* Photo */}
               <div className="relative inline-block mb-4 sm:mb-6">
                 <img
-                  src={latestPunch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${latestPunch.id}`}
+                  src={latestPunch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${latestPunch.person_id}`}
                   alt={latestPunch.name}
                   className="w-24 h-24 sm:w-40 sm:h-40 rounded-full border-4 border-white/20 shadow-2xl object-cover bg-white/10"
                 />
                 <div
                   className={cn(
                     'absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center',
-                    latestPunch.status === 'present' ? 'bg-success' : 'bg-warning'
+                    latestPunch.status === 'present' ? 'bg-success' : 
+                    latestPunch.status === 'late' ? 'bg-warning' : 'bg-destructive'
                   )}
                 >
                   {latestPunch.status === 'present' ? (
@@ -289,37 +356,41 @@ export default function GateMonitor() {
                   <p
                     className={cn(
                       'text-lg sm:text-2xl font-bold',
-                      latestPunch.status === 'present' ? 'text-success' : 'text-warning'
+                      latestPunch.status === 'present' ? 'text-success' : 
+                      latestPunch.status === 'late' ? 'text-warning' : 'text-destructive'
                     )}
                   >
-                    {latestPunch.status === 'present' ? 'উপস্থিত' : 'বিলম্ব'}
+                    {latestPunch.status === 'present' ? 'উপস্থিত' : 
+                     latestPunch.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত'}
                   </p>
                   <p className="text-white/60 text-xs sm:text-base">
-                    {latestPunch.status === 'present' ? 'Present' : 'Late'}
+                    {latestPunch.status === 'present' ? 'Present' : 
+                     latestPunch.status === 'late' ? 'Late' : 'Absent'}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Recent Punches */}
+            {/* Recent Punches - RULE 3: All punches shown, no deduplication */}
             {latestPunches.length > 1 && (
               <div className="mt-6 sm:mt-8">
-                <h3 className="text-white/60 text-center mb-3 sm:mb-4 text-sm sm:text-base">Recent Arrivals</h3>
+                <h3 className="text-white/60 text-center mb-3 sm:mb-4 text-sm sm:text-base">Recent Punches</h3>
                 <div className="flex justify-center gap-2 sm:gap-4 flex-wrap">
-                  {latestPunches.slice(1, 6).map((punch) => (
+                  {latestPunches.slice(1, 8).map((punch, index) => (
                     <div
-                      key={punch.id}
+                      key={`${punch.id}-${index}`}
                       className="flex items-center gap-1.5 sm:gap-2 bg-white/5 rounded-full px-2 sm:px-4 py-1.5 sm:py-2"
                     >
                       <img
-                        src={punch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${punch.id}`}
+                        src={punch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${punch.person_id}`}
                         alt={punch.name}
                         className="w-6 h-6 sm:w-8 sm:h-8 rounded-full"
                       />
                       <span className="text-white/80 text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{punch.name}</span>
                       <span className={cn(
                         'text-xs px-1.5 sm:px-2 py-0.5 rounded-full hidden sm:inline',
-                        punch.status === 'present' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
+                        punch.status === 'present' ? 'bg-success/20 text-success' : 
+                        punch.status === 'late' ? 'bg-warning/20 text-warning' : 'bg-destructive/20 text-destructive'
                       )}>
                         {formatPunchTime(punch.punch_time)}
                       </span>
