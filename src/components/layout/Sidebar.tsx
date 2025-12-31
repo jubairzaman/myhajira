@@ -15,6 +15,7 @@ import {
   ChevronRight,
   LogOut,
   Building2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -107,7 +108,12 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -127,6 +133,12 @@ export function Sidebar() {
   const isActive = (href?: string) => {
     if (!href) return false;
     return location.pathname === href;
+  };
+
+  const handleNavClick = () => {
+    if (onClose) {
+      onClose();
+    }
   };
 
   const renderNavItem = (item: NavItem, level = 0) => {
@@ -170,6 +182,7 @@ export function Sidebar() {
       <Link
         key={item.label}
         to={item.href || '#'}
+        onClick={handleNavClick}
         className={cn(
           'nav-item',
           level > 0 && 'pl-10',
@@ -188,17 +201,32 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar text-sidebar-foreground flex flex-col z-50">
+    <aside className={cn(
+      "fixed left-0 top-0 h-full w-64 bg-sidebar text-sidebar-foreground flex flex-col z-50 transition-transform duration-300",
+      // Mobile: hidden by default, shown when isOpen
+      "lg:translate-x-0",
+      isOpen ? "translate-x-0" : "-translate-x-full"
+    )}>
       {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-            <UserCheck className="w-6 h-6" />
+      <div className="p-4 sm:p-6 border-b border-sidebar-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg">আমার হাজিরা</h1>
+              <p className="text-xs opacity-70">Amar Hajira</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg">আমার হাজিরা</h1>
-            <p className="text-xs opacity-70">Amar Hajira</p>
-          </div>
+          {/* Close button for mobile */}
+          <button
+            onClick={onClose}
+            className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
