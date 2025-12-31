@@ -11,379 +11,394 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Edit, Search, Save, GraduationCap, Users, Loader2 } from 'lucide-react';
+import { Edit, Save, Loader2, Check, X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface Student {
   id: string;
   name: string;
   name_bn: string | null;
+  photo_url: string | null;
   student_id_number: string | null;
-  classes: { name: string } | null;
-  sections: { name: string } | null;
+  attendance_status: 'present' | 'late' | 'absent' | 'not_marked';
+  attendance_id?: string;
 }
 
-interface Teacher {
+interface Shift {
   id: string;
   name: string;
-  name_bn: string | null;
-  designation: string;
+}
+
+interface Class {
+  id: string;
+  name: string;
+}
+
+interface Section {
+  id: string;
+  name: string;
 }
 
 export default function ManualEntry() {
   const { activeYear } = useAcademicYear();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [selectedPerson, setSelectedPerson] = useState<Student | Teacher | null>(null);
-  const [personType, setPersonType] = useState<'student' | 'teacher'>('student');
+  const [saving, setSaving] = useState<string | null>(null);
   
-  const [formData, setFormData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    time: format(new Date(), 'HH:mm'),
-    status: 'present',
-    reason: '',
-  });
+  // Filters
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [selectedShift, setSelectedShift] = useState<string>('');
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedSection, setSelectedSection] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  
+  // Students list
+  const [students, setStudents] = useState<Student[]>([]);
+  const [reason, setReason] = useState('');
 
-  const searchPeople = async (query: string, type: 'student' | 'teacher') => {
-    if (!query || query.length < 2 || !activeYear) return;
-
-    try {
-      if (type === 'student') {
-        const { data } = await supabase
-          .from('students')
-          .select('id, name, name_bn, student_id_number, classes(name), sections(name)')
-          .eq('academic_year_id', activeYear.id)
-          .eq('is_active', true)
-          .or(`name.ilike.%${query}%,name_bn.ilike.%${query}%,student_id_number.ilike.%${query}%`)
-          .limit(10);
-        setStudents((data as Student[]) || []);
-      } else {
-        const { data } = await supabase
-          .from('teachers')
-          .select('id, name, name_bn, designation')
-          .eq('academic_year_id', activeYear.id)
-          .eq('is_active', true)
-          .or(`name.ilike.%${query}%,name_bn.ilike.%${query}%`)
-          .limit(10);
-        setTeachers((data as Teacher[]) || []);
-      }
-    } catch (error) {
-      console.error('Error searching:', error);
+  // Fetch shifts on load
+  useEffect(() => {
+    if (activeYear) {
+      fetchShifts();
     }
+  }, [activeYear]);
+
+  // Fetch classes when shift changes
+  useEffect(() => {
+    if (selectedShift) {
+      fetchClasses();
+    }
+  }, [selectedShift]);
+
+  // Fetch sections when class changes
+  useEffect(() => {
+    if (selectedClass) {
+      fetchSections();
+    }
+  }, [selectedClass]);
+
+  // Fetch students when all filters are selected
+  useEffect(() => {
+    if (selectedShift && selectedClass && selectedSection && selectedDate) {
+      fetchStudents();
+    }
+  }, [selectedShift, selectedClass, selectedSection, selectedDate]);
+
+  const fetchShifts = async () => {
+    if (!activeYear) return;
+    const { data } = await supabase
+      .from('shifts')
+      .select('id, name')
+      .eq('academic_year_id', activeYear.id)
+      .eq('is_active', true);
+    setShifts(data || []);
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery) {
-        searchPeople(searchQuery, personType);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, personType]);
+  const fetchClasses = async () => {
+    const { data } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('shift_id', selectedShift)
+      .eq('is_active', true)
+      .order('grade_order');
+    setClasses(data || []);
+    setSelectedClass('');
+    setSections([]);
+    setStudents([]);
+  };
 
-  const handleSubmit = async () => {
-    if (!selectedPerson || !activeYear || !user) {
-      toast.error('Please select a person first');
-      return;
-    }
+  const fetchSections = async () => {
+    const { data } = await supabase
+      .from('sections')
+      .select('id, name')
+      .eq('class_id', selectedClass)
+      .eq('is_active', true);
+    setSections(data || []);
+    setSelectedSection('');
+    setStudents([]);
+  };
 
-    if (!formData.reason) {
-      toast.error('Please provide a reason for manual entry');
-      return;
-    }
-
+  const fetchStudents = async () => {
+    if (!activeYear) return;
     setLoading(true);
 
     try {
-      const punchTime = new Date(`${formData.date}T${formData.time}`);
+      // Get all students for the selected class/section
+      const { data: studentList, error } = await supabase
+        .from('students')
+        .select('id, name, name_bn, photo_url, student_id_number')
+        .eq('academic_year_id', activeYear.id)
+        .eq('shift_id', selectedShift)
+        .eq('class_id', selectedClass)
+        .eq('section_id', selectedSection)
+        .eq('is_active', true)
+        .order('name');
 
-      if (personType === 'student') {
-        // Check if record exists
-        const { data: existing } = await supabase
-          .from('student_attendance')
-          .select('id')
-          .eq('student_id', selectedPerson.id)
-          .eq('attendance_date', formData.date)
-          .maybeSingle();
+      if (error) throw error;
 
-        if (existing) {
-          // Update existing record
-          const { error } = await supabase
-            .from('student_attendance')
-            .update({
-              status: formData.status,
-              punch_time: punchTime.toISOString(),
-              is_manual: true,
-              manual_by: user.id,
-              manual_reason: formData.reason,
-            })
-            .eq('id', existing.id);
+      // Get attendance for selected date
+      const { data: attendanceList } = await supabase
+        .from('student_attendance')
+        .select('id, student_id, status')
+        .eq('attendance_date', selectedDate)
+        .in('student_id', (studentList || []).map(s => s.id));
 
-          if (error) throw error;
-        } else {
-          // Insert new record
-          const { error } = await supabase
-            .from('student_attendance')
-            .insert({
-              student_id: selectedPerson.id,
-              attendance_date: formData.date,
-              punch_time: punchTime.toISOString(),
-              status: formData.status,
-              academic_year_id: activeYear.id,
-              is_manual: true,
-              manual_by: user.id,
-              manual_reason: formData.reason,
-            });
+      const attendanceMap = new Map(
+        (attendanceList || []).map(a => [a.student_id, { id: a.id, status: a.status }])
+      );
 
-          if (error) throw error;
-        }
-      } else {
-        // Teacher attendance
-        const { data: existing } = await supabase
-          .from('teacher_attendance')
-          .select('id')
-          .eq('teacher_id', selectedPerson.id)
-          .eq('attendance_date', formData.date)
-          .maybeSingle();
-
-        if (existing) {
-          const { error } = await supabase
-            .from('teacher_attendance')
-            .update({
-              status: formData.status,
-              punch_in_time: punchTime.toISOString(),
-              is_manual: true,
-              manual_by: user.id,
-              manual_reason: formData.reason,
-            })
-            .eq('id', existing.id);
-
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('teacher_attendance')
-            .insert({
-              teacher_id: selectedPerson.id,
-              attendance_date: formData.date,
-              punch_in_time: punchTime.toISOString(),
-              status: formData.status,
-              academic_year_id: activeYear.id,
-              is_manual: true,
-              manual_by: user.id,
-              manual_reason: formData.reason,
-            });
-
-          if (error) throw error;
-        }
-      }
-
-      toast.success('Attendance recorded successfully');
-      setSelectedPerson(null);
-      setSearchQuery('');
-      setFormData({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        time: format(new Date(), 'HH:mm'),
-        status: 'present',
-        reason: '',
+      // Map students with their attendance status
+      const studentsWithStatus: Student[] = (studentList || []).map(s => {
+        const attendance = attendanceMap.get(s.id);
+        return {
+          ...s,
+          attendance_status: attendance?.status as any || 'not_marked',
+          attendance_id: attendance?.id,
+        };
       });
-    } catch (error: any) {
-      console.error('Error saving attendance:', error);
-      toast.error(error.message || 'Failed to save attendance');
+
+      setStudents(studentsWithStatus);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast.error('Failed to load students');
     } finally {
       setLoading(false);
     }
   };
 
+  // RULE 10 & 11: Mark attendance for a student
+  const markAttendance = async (studentId: string, newStatus: 'present' | 'late' | 'absent') => {
+    if (!activeYear || !user || !reason.trim()) {
+      toast.error('Please provide a reason for manual entry');
+      return;
+    }
+
+    setSaving(studentId);
+
+    try {
+      const student = students.find(s => s.id === studentId);
+      if (!student) return;
+
+      const oldStatus = student.attendance_status;
+      const punchTime = new Date(`${selectedDate}T${format(new Date(), 'HH:mm:ss')}`);
+
+      if (student.attendance_id) {
+        // RULE 11 Case 2: Attendance exists - allow admin override
+        const { error } = await supabase
+          .from('student_attendance')
+          .update({
+            status: newStatus,
+            punch_time: punchTime.toISOString(),
+            is_manual: true,
+            manual_by: user.id,
+            manual_reason: reason,
+          })
+          .eq('id', student.attendance_id);
+
+        if (error) throw error;
+      } else {
+        // RULE 11 Case 1: Attendance does not exist - create new
+        const { error } = await supabase
+          .from('student_attendance')
+          .insert({
+            student_id: studentId,
+            attendance_date: selectedDate,
+            punch_time: punchTime.toISOString(),
+            status: newStatus,
+            academic_year_id: activeYear.id,
+            is_manual: true,
+            manual_by: user.id,
+            manual_reason: reason,
+          });
+
+        if (error) throw error;
+      }
+
+      // Log manual action (RULE 11)
+      await supabase.from('manual_attendance_logs').insert({
+        person_id: studentId,
+        person_type: 'student',
+        attendance_date: selectedDate,
+        admin_id: user.id,
+        old_status: oldStatus === 'not_marked' ? null : oldStatus,
+        new_status: newStatus,
+        reason: reason,
+      });
+
+      toast.success(`Marked ${student.name} as ${newStatus}`);
+      fetchStudents(); // Refresh list
+    } catch (error: any) {
+      console.error('Error saving attendance:', error);
+      toast.error(error.message || 'Failed to save attendance');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'present':
+        return <span className="px-2 py-1 bg-success/20 text-success text-xs rounded-full">Present</span>;
+      case 'late':
+        return <span className="px-2 py-1 bg-warning/20 text-warning text-xs rounded-full">Late</span>;
+      case 'absent':
+        return <span className="px-2 py-1 bg-destructive/20 text-destructive text-xs rounded-full">Absent</span>;
+      default:
+        return <span className="px-2 py-1 bg-muted text-muted-foreground text-xs rounded-full">Not Marked</span>;
+    }
+  };
+
   return (
     <MainLayout title="Manual Entry" titleBn="ম্যানুয়াল এন্ট্রি">
-      <div className="max-w-2xl mx-auto">
-        <div className="card-elevated p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
-              <Edit className="w-6 h-6 text-warning" />
+      <div className="space-y-6">
+        {/* Filters Card */}
+        <div className="card-elevated p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+              <Edit className="w-5 h-5 text-warning" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Manual Attendance Entry</h2>
-              <p className="text-sm text-muted-foreground font-bengali">
-                ম্যানুয়াল উপস্থিতি এন্ট্রি
-              </p>
+              <h2 className="text-lg font-semibold">Manual Student Attendance</h2>
+              <p className="text-sm text-muted-foreground font-bengali">ম্যানুয়াল ছাত্র উপস্থিতি</p>
             </div>
           </div>
 
-          <Tabs
-            value={personType}
-            onValueChange={(v) => {
-              setPersonType(v as 'student' | 'teacher');
-              setSelectedPerson(null);
-              setSearchQuery('');
-            }}
-          >
-            <TabsList className="w-full mb-6">
-              <TabsTrigger value="student" className="flex-1 gap-2">
-                <GraduationCap className="w-4 h-4" />
-                Student
-              </TabsTrigger>
-              <TabsTrigger value="teacher" className="flex-1 gap-2">
-                <Users className="w-4 h-4" />
-                Teacher
-              </TabsTrigger>
-            </TabsList>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Shift</Label>
+              <Select value={selectedShift} onValueChange={setSelectedShift}>
+                <SelectTrigger><SelectValue placeholder="Select Shift" /></SelectTrigger>
+                <SelectContent>
+                  {shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Class</Label>
+              <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!selectedShift}>
+                <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
+                <SelectContent>
+                  {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Section</Label>
+              <Select value={selectedSection} onValueChange={setSelectedSection} disabled={!selectedClass}>
+                <SelectTrigger><SelectValue placeholder="Select Section" /></SelectTrigger>
+                <SelectContent>
+                  {sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            <TabsContent value="student" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Search Student</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name or ID..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                {students.length > 0 && !selectedPerson && (
-                  <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
-                    {students.map((student) => (
-                      <button
-                        key={student.id}
-                        onClick={() => {
-                          setSelectedPerson(student);
-                          setSearchQuery('');
-                          setStudents([]);
-                        }}
-                        className="w-full p-3 text-left hover:bg-muted transition-colors"
-                      >
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {student.classes?.name} - {student.sections?.name}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="teacher" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Search Teacher</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                {teachers.length > 0 && !selectedPerson && (
-                  <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
-                    {teachers.map((teacher) => (
-                      <button
-                        key={teacher.id}
-                        onClick={() => {
-                          setSelectedPerson(teacher);
-                          setSearchQuery('');
-                          setTeachers([]);
-                        }}
-                        className="w-full p-3 text-left hover:bg-muted transition-colors"
-                      >
-                        <p className="font-medium">{teacher.name}</p>
-                        <p className="text-sm text-muted-foreground">{teacher.designation}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {selectedPerson && (
-            <div className="mt-6 space-y-6">
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="font-medium">{selectedPerson.name}</p>
-                <p className="text-sm text-muted-foreground font-bengali">
-                  {selectedPerson.name_bn}
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setSelectedPerson(null)}
-                >
-                  Change
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Time</Label>
-                  <Input
-                    type="time"
-                    value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="present">Present / উপস্থিত</SelectItem>
-                    <SelectItem value="late">Late / বিলম্বে</SelectItem>
-                    <SelectItem value="absent">Absent / অনুপস্থিত</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="form-label-required">Reason for Manual Entry</Label>
-                <Textarea
-                  placeholder="e.g., Device was offline, Card not working..."
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              <Button
-                onClick={handleSubmit}
-                className="w-full gap-2"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save Attendance
-              </Button>
+          {students.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <Label className="form-label-required">Reason for Manual Entry</Label>
+              <Textarea
+                placeholder="e.g., Device offline, Card malfunction..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+              />
             </div>
           )}
         </div>
+
+        {/* Students List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : students.length > 0 ? (
+          <div className="card-elevated overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-3 text-sm font-medium">Student</th>
+                    <th className="text-center p-3 text-sm font-medium">Status</th>
+                    <th className="text-center p-3 text-sm font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {students.map((student) => (
+                    <tr key={student.id} className="hover:bg-muted/30">
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={student.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
+                            alt={student.name}
+                            className="w-10 h-10 rounded-full object-cover bg-muted"
+                          />
+                          <div>
+                            <p className="font-medium text-sm">{student.name}</p>
+                            {student.name_bn && <p className="text-xs text-muted-foreground font-bengali">{student.name_bn}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-center">{getStatusBadge(student.attendance_status)}</td>
+                      <td className="p-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            size="sm"
+                            variant={student.attendance_status === 'present' ? 'default' : 'outline'}
+                            className={cn("gap-1", student.attendance_status === 'present' && "bg-success hover:bg-success/90")}
+                            onClick={() => markAttendance(student.id, 'present')}
+                            disabled={saving === student.id || !reason.trim()}
+                          >
+                            {saving === student.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            <span className="hidden sm:inline">Present</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={student.attendance_status === 'late' ? 'default' : 'outline'}
+                            className={cn("gap-1", student.attendance_status === 'late' && "bg-warning hover:bg-warning/90")}
+                            onClick={() => markAttendance(student.id, 'late')}
+                            disabled={saving === student.id || !reason.trim()}
+                          >
+                            {saving === student.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                            <span className="hidden sm:inline">Late</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={student.attendance_status === 'absent' ? 'default' : 'outline'}
+                            className={cn("gap-1", student.attendance_status === 'absent' && "bg-destructive hover:bg-destructive/90")}
+                            onClick={() => markAttendance(student.id, 'absent')}
+                            disabled={saving === student.id || !reason.trim()}
+                          >
+                            {saving === student.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                            <span className="hidden sm:inline">Absent</span>
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : selectedSection ? (
+          <div className="card-elevated p-8 text-center">
+            <p className="text-muted-foreground">No students found for the selected filters</p>
+          </div>
+        ) : null}
       </div>
     </MainLayout>
   );

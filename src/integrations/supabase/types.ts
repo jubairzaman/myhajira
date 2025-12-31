@@ -176,6 +176,42 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_attendance_logs: {
+        Row: {
+          admin_id: string
+          attendance_date: string
+          created_at: string
+          id: string
+          new_status: string
+          old_status: string | null
+          person_id: string
+          person_type: string
+          reason: string | null
+        }
+        Insert: {
+          admin_id: string
+          attendance_date: string
+          created_at?: string
+          id?: string
+          new_status: string
+          old_status?: string | null
+          person_id: string
+          person_type: string
+          reason?: string | null
+        }
+        Update: {
+          admin_id?: string
+          attendance_date?: string
+          created_at?: string
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          person_id?: string
+          person_type?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       panels: {
         Row: {
           absent_cutoff_time: string
@@ -261,6 +297,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      punch_logs: {
+        Row: {
+          card_number: string | null
+          created_at: string
+          device_id: string | null
+          id: string
+          person_id: string
+          person_type: string
+          punch_date: string
+          punch_time: string
+        }
+        Insert: {
+          card_number?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          person_id: string
+          person_type: string
+          punch_date: string
+          punch_time?: string
+        }
+        Update: {
+          card_number?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          person_id?: string
+          person_type?: string
+          punch_date?: string
+          punch_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "punch_logs_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rfid_cards_students: {
         Row: {
