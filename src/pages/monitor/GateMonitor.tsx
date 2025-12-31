@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface PunchRecord {
   id: string;
@@ -34,6 +35,12 @@ export default function GateMonitor() {
   const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(false);
   const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // USB RFID Reader states
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const cardBufferRef = useRef('');
+  const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update time every second
   useEffect(() => {
@@ -74,6 +81,110 @@ export default function GateMonitor() {
       supabase.removeChannel(channel);
     };
   }, [activeYear]);
+
+  // USB RFID Reader - Process card number
+  const processCard = useCallback(async (cardNumber: string) => {
+    if (!cardNumber || cardNumber.length < 4 || isProcessing) return;
+    
+    console.log('Processing RFID card:', cardNumber);
+    setIsScanning(false);
+    setIsProcessing(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('process-punch', {
+        body: {
+          card_number: cardNumber,
+          device_ip: 'USB-READER',
+          punch_time: new Date().toISOString()
+        }
+      });
+      
+      if (error) {
+        console.error('Process punch error:', error);
+        toast.error('পাঞ্চ প্রসেস ব্যর্থ হয়েছে', {
+          description: error.message || 'Unknown error'
+        });
+        return;
+      }
+      
+      console.log('Process punch response:', data);
+      
+      if (data?.success) {
+        const statusBn = data.status === 'present' ? 'উপস্থিত' : 
+                         data.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত';
+        toast.success(`${data.name} - ${statusBn}`, {
+          description: data.message || 'Punch recorded successfully'
+        });
+      } else if (data?.error) {
+        toast.error('কার্ড পাওয়া যায়নি', {
+          description: data.error
+        });
+      }
+    } catch (err: any) {
+      console.error('Punch processing failed:', err);
+      toast.error('পাঞ্চ প্রসেস ব্যর্থ', {
+        description: err?.message || 'Network error'
+      });
+    } finally {
+      setIsProcessing(false);
+      resetIdleTimer();
+    }
+  }, [isProcessing]);
+
+  // USB RFID Reader - Keyboard listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      // Enter key = card scan complete
+      if (e.key === 'Enter') {
+        if (cardBufferRef.current.length >= 4) {
+          const cardNumber = cardBufferRef.current;
+          cardBufferRef.current = '';
+          processCard(cardNumber);
+        }
+        return;
+      }
+      
+      // Only accept alphanumeric characters (typical for RFID cards)
+      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        // Show scanning state
+        if (cardBufferRef.current.length === 0) {
+          setIsScanning(true);
+        }
+        
+        cardBufferRef.current += e.key;
+        
+        // Clear previous timeout
+        if (bufferTimeoutRef.current) {
+          clearTimeout(bufferTimeoutRef.current);
+        }
+        
+        // Auto-process after 500ms of inactivity (fallback if no Enter key)
+        bufferTimeoutRef.current = setTimeout(() => {
+          if (cardBufferRef.current.length >= 4) {
+            const cardNumber = cardBufferRef.current;
+            cardBufferRef.current = '';
+            processCard(cardNumber);
+          } else {
+            cardBufferRef.current = '';
+            setIsScanning(false);
+          }
+        }, 500);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (bufferTimeoutRef.current) {
+        clearTimeout(bufferTimeoutRef.current);
+      }
+    };
+  }, [processCard]);
 
   // Idle timer management
   useEffect(() => {
@@ -296,6 +407,27 @@ export default function GateMonitor() {
           <p className="text-white/60 font-bengali text-xs sm:text-base">{formatDate(currentTime)}</p>
         </div>
       </header>
+
+      {/* Processing/Scanning Overlay */}
+      {(isProcessing || isScanning) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="monitor-card p-8 sm:p-12 text-center animate-scale-in">
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-16 h-16 sm:w-24 sm:h-24 text-primary mx-auto mb-4 animate-spin" />
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">প্রসেস হচ্ছে...</h2>
+                <p className="text-white/60">Processing punch</p>
+              </>
+            ) : (
+              <>
+                <CreditCard className="w-16 h-16 sm:w-24 sm:h-24 text-primary mx-auto mb-4 animate-pulse" />
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">কার্ড স্ক্যান হচ্ছে...</h2>
+                <p className="text-white/60">Scanning card</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="p-4 sm:p-8 pb-24">
