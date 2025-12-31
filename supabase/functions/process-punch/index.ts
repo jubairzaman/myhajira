@@ -232,25 +232,19 @@ async function processStudentPunch(
   }
 
   // RULE 5: First punch of the day - create attendance record
+  // কার্ড পাঞ্চ করলেই উপস্থিত - absent কখনোই না (absent শুধু যখন সারাদিন কোনো পাঞ্চ নেই)
   let status = 'present';
   const shift = student.shifts;
   
   if (shift) {
     const punchMinutes = timeToMinutes(punchTimeStr);
     const startMinutes = timeToMinutes(shift.start_time);
-    const lateThreshold = timeToMinutes(shift.late_threshold_time || shift.start_time);
-    const absentCutoff = timeToMinutes(shift.absent_cutoff_time || '23:59');
 
-    // Status determination rules (RULE 5):
+    // Status determination: Punch = Present or Late (never absent)
     // Punch ≤ Shift Start → Present
-    // Punch > Shift Start and ≤ Late Time → Late
-    // Punch > Late Time → Absent (but still creating record since they punched)
+    // Punch > Shift Start → Late (still considered present, just late)
     if (punchMinutes <= startMinutes) {
       status = 'present';
-    } else if (punchMinutes <= lateThreshold) {
-      status = 'late';
-    } else if (punchMinutes > absentCutoff) {
-      status = 'absent';
     } else {
       status = 'late';
     }
