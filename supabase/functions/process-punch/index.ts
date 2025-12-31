@@ -47,26 +47,94 @@ serve(async (req) => {
       deviceId = device?.id;
     }
 
-    // Try to find student RFID card
-    const { data: studentCard } = await supabase
+    // Normalize card number - try with and without leading zeros
+    const cardNumberNormalized = card_number.replace(/^0+/, ''); // Remove leading zeros
+    const cardNumberPadded = card_number.padStart(10, '0'); // Pad to 10 digits
+    
+    console.log('Looking up card:', { 
+      original: card_number, 
+      normalized: cardNumberNormalized, 
+      padded: cardNumberPadded 
+    });
+
+    // Try to find student RFID card - multiple formats
+    let studentCard = null;
+    
+    // Try exact match first
+    const { data: exactMatch } = await supabase
       .from('rfid_cards_students')
       .select('student_id')
       .eq('card_number', card_number)
       .eq('is_active', true)
       .maybeSingle();
+    
+    if (exactMatch) {
+      studentCard = exactMatch;
+    } else {
+      // Try padded version (10 digits with leading zeros)
+      const { data: paddedMatch } = await supabase
+        .from('rfid_cards_students')
+        .select('student_id')
+        .eq('card_number', cardNumberPadded)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (paddedMatch) {
+        studentCard = paddedMatch;
+      } else if (cardNumberNormalized !== card_number) {
+        // Try normalized version (without leading zeros)
+        const { data: normalizedMatch } = await supabase
+          .from('rfid_cards_students')
+          .select('student_id')
+          .eq('card_number', cardNumberNormalized)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        studentCard = normalizedMatch;
+      }
+    }
 
     if (studentCard) {
       console.log('Found student card:', studentCard);
       return await processStudentPunch(supabase, studentCard.student_id, punchTimestamp, punchDate, punchTimeStr, deviceId, card_number);
     }
 
-    // Try to find teacher RFID card
-    const { data: teacherCard } = await supabase
+    // Try to find teacher RFID card - multiple formats
+    let teacherCard = null;
+    
+    // Try exact match first
+    const { data: exactTeacher } = await supabase
       .from('rfid_cards_teachers')
       .select('teacher_id')
       .eq('card_number', card_number)
       .eq('is_active', true)
       .maybeSingle();
+    
+    if (exactTeacher) {
+      teacherCard = exactTeacher;
+    } else {
+      // Try padded version
+      const { data: paddedTeacher } = await supabase
+        .from('rfid_cards_teachers')
+        .select('teacher_id')
+        .eq('card_number', cardNumberPadded)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (paddedTeacher) {
+        teacherCard = paddedTeacher;
+      } else if (cardNumberNormalized !== card_number) {
+        // Try normalized version
+        const { data: normalizedTeacher } = await supabase
+          .from('rfid_cards_teachers')
+          .select('teacher_id')
+          .eq('card_number', cardNumberNormalized)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        teacherCard = normalizedTeacher;
+      }
+    }
 
     if (teacherCard) {
       console.log('Found teacher card:', teacherCard);

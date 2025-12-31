@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard } from 'lucide-react';
+import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard, Bug, X, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface PunchRecord {
   id: string;
@@ -41,6 +43,14 @@ export default function GateMonitor() {
   const [isScanning, setIsScanning] = useState(false);
   const cardBufferRef = useRef('');
   const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debug state
+  const [showDebug, setShowDebug] = useState(false);
+  const [lastKeypress, setLastKeypress] = useState('');
+  const [cardBuffer, setCardBuffer] = useState('');
+  const [lastScannedCard, setLastScannedCard] = useState('');
+  const [lastApiResponse, setLastApiResponse] = useState('');
+  const [manualCardInput, setManualCardInput] = useState('');
 
   // Update time every second
   useEffect(() => {
@@ -86,7 +96,9 @@ export default function GateMonitor() {
   const processCard = useCallback(async (cardNumber: string) => {
     if (!cardNumber || cardNumber.length < 4 || isProcessing) return;
     
-    console.log('Processing RFID card:', cardNumber);
+    console.log('[GateMonitor] Processing RFID card:', cardNumber);
+    setLastScannedCard(cardNumber);
+    setLastApiResponse('প্রসেস হচ্ছে...');
     setIsScanning(false);
     setIsProcessing(true);
     
@@ -99,29 +111,33 @@ export default function GateMonitor() {
         }
       });
       
+      console.log('[GateMonitor] API Response:', data, error);
+      
       if (error) {
-        console.error('Process punch error:', error);
+        console.error('[GateMonitor] Process punch error:', error);
+        setLastApiResponse(`❌ Error: ${error.message}`);
         toast.error('পাঞ্চ প্রসেস ব্যর্থ হয়েছে', {
           description: error.message || 'Unknown error'
         });
         return;
       }
       
-      console.log('Process punch response:', data);
-      
       if (data?.success) {
         const statusBn = data.status === 'present' ? 'উপস্থিত' : 
                          data.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত';
+        setLastApiResponse(`✅ ${data.name} - ${statusBn}`);
         toast.success(`${data.name} - ${statusBn}`, {
           description: data.message || 'Punch recorded successfully'
         });
       } else if (data?.error) {
+        setLastApiResponse(`❌ ${data.error}`);
         toast.error('কার্ড পাওয়া যায়নি', {
           description: data.error
         });
       }
     } catch (err: any) {
-      console.error('Punch processing failed:', err);
+      console.error('[GateMonitor] Punch processing failed:', err);
+      setLastApiResponse(`❌ ${err?.message || 'Network error'}`);
       toast.error('পাঞ্চ প্রসেস ব্যর্থ', {
         description: err?.message || 'Network error'
       });
@@ -131,6 +147,14 @@ export default function GateMonitor() {
     }
   }, [isProcessing]);
 
+  // Manual test punch
+  const handleManualTest = () => {
+    if (manualCardInput.trim()) {
+      processCard(manualCardInput.trim());
+      setManualCardInput('');
+    }
+  };
+
   // USB RFID Reader - Keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -139,11 +163,16 @@ export default function GateMonitor() {
         return;
       }
       
+      // Log keypress for debugging
+      console.log('[GateMonitor] Keypress:', e.key);
+      setLastKeypress(e.key);
+      
       // Enter key = card scan complete
       if (e.key === 'Enter') {
         if (cardBufferRef.current.length >= 4) {
           const cardNumber = cardBufferRef.current;
           cardBufferRef.current = '';
+          setCardBuffer('');
           processCard(cardNumber);
         }
         return;
@@ -157,6 +186,8 @@ export default function GateMonitor() {
         }
         
         cardBufferRef.current += e.key;
+        setCardBuffer(cardBufferRef.current);
+        console.log('[GateMonitor] Buffer updated:', cardBufferRef.current);
         
         // Clear previous timeout
         if (bufferTimeoutRef.current) {
@@ -168,9 +199,11 @@ export default function GateMonitor() {
           if (cardBufferRef.current.length >= 4) {
             const cardNumber = cardBufferRef.current;
             cardBufferRef.current = '';
+            setCardBuffer('');
             processCard(cardNumber);
           } else {
             cardBufferRef.current = '';
+            setCardBuffer('');
             setIsScanning(false);
           }
         }, 500);
@@ -178,6 +211,8 @@ export default function GateMonitor() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
+    console.log('[GateMonitor] Keyboard listener attached');
+    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       if (bufferTimeoutRef.current) {
@@ -390,6 +425,61 @@ export default function GateMonitor() {
 
   return (
     <div className="monitor-display">
+      {/* Debug Panel Toggle */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="fixed top-4 right-4 z-50 bg-black/50 border-white/20 text-white hover:bg-black/70"
+        onClick={() => setShowDebug(!showDebug)}
+      >
+        {showDebug ? <X className="h-4 w-4 mr-1" /> : <Bug className="h-4 w-4 mr-1" />}
+        {showDebug ? 'বন্ধ করুন' : 'Debug'}
+      </Button>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="fixed top-14 right-4 z-50 w-80 bg-black/90 border border-white/20 rounded-lg shadow-lg p-4 text-white">
+          <h3 className="font-bold mb-3 flex items-center gap-2">
+            <Bug className="h-4 w-4" /> Debug Panel
+          </h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-white/60">Last Keypress:</span>
+              <code className="bg-white/10 px-2 py-0.5 rounded">{lastKeypress || '-'}</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-white/60">Card Buffer:</span>
+              <code className="bg-white/10 px-2 py-0.5 rounded">{cardBuffer || '-'}</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-white/60">Last Card:</span>
+              <code className="bg-white/10 px-2 py-0.5 rounded">{lastScannedCard || '-'}</code>
+            </div>
+            <div className="pt-2 border-t border-white/20">
+              <span className="text-white/60 block mb-1">Last Response:</span>
+              <div className="bg-white/10 px-2 py-1 rounded text-xs break-all">
+                {lastApiResponse || '-'}
+              </div>
+            </div>
+            <div className="pt-2 border-t border-white/20">
+              <span className="text-white/60 block mb-1">Manual Test:</span>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="কার্ড নম্বর"
+                  value={manualCardInput}
+                  onChange={(e) => setManualCardInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleManualTest()}
+                  className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                />
+                <Button size="sm" onClick={handleManualTest} className="h-8">
+                  <Send className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 border-b border-white/10 gap-3">
         <div className="flex items-center gap-3 sm:gap-4">
