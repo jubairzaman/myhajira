@@ -162,10 +162,18 @@ export function RfidEnroll({
     setFocusLost(false);
     
     if (inputMode === 'usb') {
-      // Focus on hidden input for USB mode
+      // Focus on hidden input for USB mode with retry
       setTimeout(() => {
-        hiddenInputRef.current?.focus();
-      }, 100);
+        if (hiddenInputRef.current) {
+          hiddenInputRef.current.focus();
+          // Verify focus and retry if needed
+          setTimeout(() => {
+            if (document.activeElement !== hiddenInputRef.current) {
+              hiddenInputRef.current?.focus();
+            }
+          }, 50);
+        }
+      }, 200);
     } else if (inputMode === 'manual' && inputRef.current) {
       inputRef.current.focus();
     }
@@ -197,21 +205,19 @@ export function RfidEnroll({
 
   return (
     <div className="space-y-4">
-      {/* Hidden input for USB RFID reader - captures all keyboard input */}
-      {status === 'waiting' && inputMode === 'usb' && (
-        <input
-          ref={hiddenInputRef}
-          type="text"
-          className="absolute -left-[9999px] opacity-0 pointer-events-none"
-          value={usbBuffer}
-          onChange={handleUsbInputChange}
-          onKeyDown={handleUsbKeyDown}
-          onBlur={handleUsbInputBlur}
-          onFocus={handleUsbInputFocus}
-          autoComplete="off"
-          aria-hidden="true"
-        />
-      )}
+      {/* Hidden input for USB RFID reader - always rendered, captures all keyboard input */}
+      <input
+        ref={hiddenInputRef}
+        type="text"
+        className="sr-only"
+        value={usbBuffer}
+        onChange={handleUsbInputChange}
+        onKeyDown={handleUsbKeyDown}
+        onBlur={handleUsbInputBlur}
+        onFocus={handleUsbInputFocus}
+        autoComplete="off"
+        tabIndex={-1}
+      />
 
       {/* Mode Selector - only show when idle and no value */}
       {status === 'idle' && !value && (
