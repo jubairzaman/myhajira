@@ -36,12 +36,6 @@ const navItems: NavItem[] = [
     href: '/',
   },
   {
-    label: 'Academic Year',
-    labelBn: 'শিক্ষাবর্ষ',
-    icon: Calendar,
-    href: '/academic-year',
-  },
-  {
     label: 'Structure',
     labelBn: 'কাঠামো',
     icon: Building2,
@@ -83,18 +77,6 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    label: 'Devices',
-    labelBn: 'ডিভাইস',
-    icon: Cpu,
-    href: '/devices',
-  },
-  {
-    label: 'SMS',
-    labelBn: 'এসএমএস',
-    icon: MessageSquare,
-    href: '/sms',
-  },
-  {
     label: 'Reports',
     labelBn: 'রিপোর্ট',
     icon: FileText,
@@ -104,7 +86,12 @@ const navItems: NavItem[] = [
     label: 'Settings',
     labelBn: 'সেটিংস',
     icon: Settings,
-    href: '/settings',
+    children: [
+      { label: 'Academic Year', labelBn: 'শিক্ষাবর্ষ', icon: Calendar, href: '/academic-year' },
+      { label: 'Devices', labelBn: 'ডিভাইস', icon: Cpu, href: '/devices' },
+      { label: 'SMS Settings', labelBn: 'এসএমএস সেটিংস', icon: MessageSquare, href: '/sms' },
+      { label: 'System Settings', labelBn: 'সিস্টেম সেটিংস', icon: Settings, href: '/settings' },
+    ],
   },
 ];
 
@@ -117,7 +104,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Structure', 'Attendance', 'Live Monitor']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Structure', 'Attendance', 'Live Monitor', 'Settings']);
 
   const handleLogout = async () => {
     await signOut();

@@ -12,8 +12,10 @@ import Index from "./pages/Index";
 import Login from "./pages/auth/Login";
 import StudentList from "./pages/students/StudentList";
 import StudentRegistration from "./pages/students/StudentRegistration";
+import StudentEdit from "./pages/students/StudentEdit";
 import TeacherList from "./pages/teachers/TeacherList";
 import TeacherRegistration from "./pages/teachers/TeacherRegistration";
+import TeacherEdit from "./pages/teachers/TeacherEdit";
 import GateMonitor from "./pages/monitor/GateMonitor";
 import OfficeMonitor from "./pages/monitor/OfficeMonitor";
 import DeviceManagement from "./pages/devices/DeviceManagement";
@@ -63,6 +65,11 @@ const App = () => (
                   <StudentRegistration />
                 </ProtectedRoute>
               } />
+              <Route path="/students/:id/edit" element={
+                <ProtectedRoute requireAdmin>
+                  <StudentEdit />
+                </ProtectedRoute>
+              } />
               
               {/* Teachers */}
               <Route path="/teachers" element={
@@ -73,6 +80,11 @@ const App = () => (
               <Route path="/teachers/new" element={
                 <ProtectedRoute requireAdmin>
                   <TeacherRegistration />
+                </ProtectedRoute>
+              } />
+              <Route path="/teachers/:id/edit" element={
+                <ProtectedRoute requireAdmin>
+                  <TeacherEdit />
                 </ProtectedRoute>
               } />
 

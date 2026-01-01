@@ -498,26 +498,7 @@ export default function GateMonitor() {
         </div>
       </header>
 
-      {/* Processing/Scanning Overlay */}
-      {(isProcessing || isScanning) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="monitor-card p-8 sm:p-12 text-center animate-scale-in">
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-16 h-16 sm:w-24 sm:h-24 text-primary mx-auto mb-4 animate-spin" />
-                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">প্রসেস হচ্ছে...</h2>
-                <p className="text-white/60">Processing punch</p>
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-16 h-16 sm:w-24 sm:h-24 text-primary mx-auto mb-4 animate-pulse" />
-                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">কার্ড স্ক্যান হচ্ছে...</h2>
-                <p className="text-white/60">Scanning card</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Processing removed - UI updates via realtime subscription */}
 
       {/* Main Content */}
       <main className="p-4 sm:p-8 pb-24">
