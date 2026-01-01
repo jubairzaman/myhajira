@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,9 @@ import {
 import { Calendar, Search, Download, Users, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { useShiftsQuery } from '@/hooks/queries/useShiftsQuery';
+import { useClassesQuery } from '@/hooks/queries/useClassesQuery';
+import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { format } from 'date-fns';
 
 interface AttendanceRecord {
@@ -25,65 +29,31 @@ interface AttendanceRecord {
     name_bn: string | null;
     student_id_number: string | null;
     photo_url: string | null;
+    shift_id: string;
+    class_id: string;
     classes: { name: string } | null;
     sections: { name: string } | null;
   };
 }
 
-interface Shift {
-  id: string;
-  name: string;
-  name_bn: string | null;
-}
-
-interface Class {
-  id: string;
-  name: string;
-}
-
 export default function StudentAttendance() {
   const { activeYear } = useAcademicYear();
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedShift, setSelectedShift] = useState<string>('all');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
 
-  useEffect(() => {
-    if (activeYear) {
-      fetchShiftsAndClasses();
-    }
-  }, [activeYear]);
+  // Use cached queries for shifts and classes
+  const { data: shifts = [] } = useShiftsQuery(activeYear?.id);
+  const { data: classes = [] } = useClassesQuery();
 
-  useEffect(() => {
-    if (activeYear && selectedDate) {
-      fetchAttendance();
-    }
-  }, [activeYear, selectedDate, selectedShift, selectedClass]);
+  // Fetch attendance with React Query
+  const { data: records = [], isLoading, isFetching } = useQuery({
+    queryKey: ['student-attendance', activeYear?.id, selectedDate],
+    queryFn: async () => {
+      if (!activeYear) return [];
 
-  const fetchShiftsAndClasses = async () => {
-    if (!activeYear) return;
-
-    const [shiftsRes, classesRes] = await Promise.all([
-      supabase.from('shifts').select('id, name, name_bn').eq('academic_year_id', activeYear.id),
-      supabase.from('classes').select('id, name').eq('is_active', true).order('grade_order'),
-    ]);
-
-    setShifts(shiftsRes.data || []);
-    setClasses(classesRes.data || []);
-  };
-
-  const fetchAttendance = async () => {
-    if (!activeYear) return;
-    setLoading(true);
-
-    try {
-      // Build query
-      let query = supabase
+      const { data, error } = await supabase
         .from('student_attendance')
         .select(`
           id,
@@ -106,49 +76,48 @@ export default function StudentAttendance() {
         .eq('academic_year_id', activeYear.id)
         .order('punch_time', { ascending: true });
 
-      const { data, error } = await query;
-
       if (error) throw error;
-
-      let filteredData = data || [];
-
-      // Apply filters
-      if (selectedShift !== 'all') {
-        filteredData = filteredData.filter((r: any) => r.students?.shift_id === selectedShift);
-      }
-      if (selectedClass !== 'all') {
-        filteredData = filteredData.filter((r: any) => r.students?.class_id === selectedClass);
-      }
-
-      setRecords(filteredData as AttendanceRecord[]);
-
-      // Calculate stats
-      const present = filteredData.filter((r: any) => r.status === 'present').length;
-      const late = filteredData.filter((r: any) => r.status === 'late').length;
-      const absent = filteredData.filter((r: any) => r.status === 'absent').length;
-
-      setStats({
-        total: filteredData.length,
-        present,
-        late,
-        absent,
-      });
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredRecords = records.filter((record) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      record.students?.name.toLowerCase().includes(query) ||
-      record.students?.name_bn?.toLowerCase().includes(query) ||
-      record.students?.student_id_number?.toLowerCase().includes(query)
-    );
+      return data as AttendanceRecord[];
+    },
+    enabled: !!activeYear?.id && !!selectedDate,
+    staleTime: 30 * 1000, // 30 seconds - attendance changes frequently
+    placeholderData: (previousData) => previousData,
   });
+
+  // Filter and calculate stats using useMemo for performance
+  const { filteredRecords, stats } = useMemo(() => {
+    let filtered = records;
+
+    // Apply shift filter
+    if (selectedShift !== 'all') {
+      filtered = filtered.filter((r) => r.students?.shift_id === selectedShift);
+    }
+
+    // Apply class filter
+    if (selectedClass !== 'all') {
+      filtered = filtered.filter((r) => r.students?.class_id === selectedClass);
+    }
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((record) =>
+        record.students?.name.toLowerCase().includes(query) ||
+        record.students?.name_bn?.toLowerCase().includes(query) ||
+        record.students?.student_id_number?.toLowerCase().includes(query)
+      );
+    }
+
+    // Calculate stats
+    const present = filtered.filter((r) => r.status === 'present').length;
+    const late = filtered.filter((r) => r.status === 'late').length;
+    const absent = filtered.filter((r) => r.status === 'absent').length;
+
+    return {
+      filteredRecords: filtered,
+      stats: { total: filtered.length, present, late, absent },
+    };
+  }, [records, selectedShift, selectedClass, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -181,7 +150,7 @@ export default function StudentAttendance() {
   return (
     <MainLayout title="Student Attendance" titleBn="শিক্ষার্থী উপস্থিতি">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 ${isFetching ? 'opacity-70' : ''}`}>
         <div className="card-elevated p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -289,69 +258,73 @@ export default function StudentAttendance() {
       </div>
 
       {/* Attendance Table */}
-      <div className="card-elevated overflow-hidden">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Photo</th>
-              <th>Student Name</th>
-              <th>ID</th>
-              <th>Class</th>
-              <th>Section</th>
-              <th>Punch Time</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRecords.map((record) => (
-              <tr key={record.id}>
-                <td>
-                  <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-                    {record.students?.photo_url ? (
-                      <img
-                        src={record.students.photo_url}
-                        alt={record.students.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                        {record.students?.name?.charAt(0) || '?'}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div>
-                    <p className="font-medium">{record.students?.name}</p>
-                    <p className="text-sm text-muted-foreground font-bengali">
-                      {record.students?.name_bn}
-                    </p>
-                  </div>
-                </td>
-                <td>{record.students?.student_id_number || '-'}</td>
-                <td>{record.students?.classes?.name || '-'}</td>
-                <td>{record.students?.sections?.name || '-'}</td>
-                <td>
-                  {record.punch_time
-                    ? format(new Date(record.punch_time), 'hh:mm a')
-                    : '-'}
-                </td>
-                <td>{getStatusBadge(record.status)}</td>
+      {isLoading ? (
+        <TableSkeleton rows={10} columns={7} />
+      ) : (
+        <div className="card-elevated overflow-hidden">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Photo</th>
+                <th>Student Name</th>
+                <th>ID</th>
+                <th>Class</th>
+                <th>Section</th>
+                <th>Punch Time</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredRecords.map((record) => (
+                <tr key={record.id}>
+                  <td>
+                    <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
+                      {record.students?.photo_url ? (
+                        <img
+                          src={record.students.photo_url}
+                          alt={record.students.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                          {record.students?.name?.charAt(0) || '?'}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div>
+                      <p className="font-medium">{record.students?.name}</p>
+                      <p className="text-sm text-muted-foreground font-bengali">
+                        {record.students?.name_bn}
+                      </p>
+                    </div>
+                  </td>
+                  <td>{record.students?.student_id_number || '-'}</td>
+                  <td>{record.students?.classes?.name || '-'}</td>
+                  <td>{record.students?.sections?.name || '-'}</td>
+                  <td>
+                    {record.punch_time
+                      ? format(new Date(record.punch_time), 'hh:mm a')
+                      : '-'}
+                  </td>
+                  <td>{getStatusBadge(record.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {filteredRecords.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">No attendance records</p>
-            <p className="text-sm text-muted-foreground font-bengali">
-              এই তারিখে কোন উপস্থিতি রেকর্ড নেই
-            </p>
-          </div>
-        )}
-      </div>
+          {filteredRecords.length === 0 && !isLoading && (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg font-medium">No attendance records</p>
+              <p className="text-sm text-muted-foreground font-bengali">
+                এই তারিখে কোন উপস্থিতি রেকর্ড নেই
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </MainLayout>
   );
 }

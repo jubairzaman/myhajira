@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import {
   Trash2,
   CreditCard,
   Eye,
-  Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -22,7 +21,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { useTeachersQuery, Teacher } from '@/hooks/queries/useTeachersQuery';
+import { CardGridSkeleton } from '@/components/skeletons/TableSkeleton';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const designationLabels: Record<string, string> = {
   head_teacher: 'Head Teacher',
@@ -32,63 +34,12 @@ const designationLabels: Record<string, string> = {
   junior_teacher: 'Junior Teacher',
 };
 
-interface Teacher {
-  id: string;
-  name: string;
-  name_bn: string | null;
-  designation: string;
-  mobile: string;
-  blood_group: string | null;
-  photo_url: string | null;
-  is_active: boolean;
-  shift: { id: string; name: string } | null;
-  rfid_card: { card_number: string } | null;
-}
-
 export default function TeacherList() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { activeYear } = useAcademicYear();
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: teachers = [], isLoading, isFetching } = useTeachersQuery(activeYear?.id);
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchTeachers();
-  }, [activeYear]);
-
-  const fetchTeachers = async () => {
-    if (!activeYear) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select(`
-          id, name, name_bn, designation, mobile, blood_group, photo_url, is_active,
-          shift:shifts(id, name),
-          rfid_card:rfid_cards_teachers(card_number)
-        `)
-        .eq('academic_year_id', activeYear.id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-
-      // Transform data to handle array returns from joins
-      const transformedData = (data || []).map(teacher => ({
-        ...teacher,
-        shift: Array.isArray(teacher.shift) ? teacher.shift[0] : teacher.shift,
-        rfid_card: Array.isArray(teacher.rfid_card) ? teacher.rfid_card[0] : teacher.rfid_card,
-      }));
-
-      setTeachers(transformedData as Teacher[]);
-    } catch (error: any) {
-      console.error('Error fetching teachers:', error);
-      toast.error('Failed to load teachers');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDelete = async (teacherId: string) => {
     if (!confirm('Are you sure you want to deactivate this teacher?')) return;
@@ -102,7 +53,8 @@ export default function TeacherList() {
       if (error) throw error;
       
       toast.success('Teacher deactivated');
-      fetchTeachers();
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['teachers', activeYear?.id] });
     } catch (error: any) {
       toast.error('Failed to deactivate teacher');
     }
@@ -149,15 +101,12 @@ export default function TeacherList() {
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading ? (
-        <div className="card-elevated p-12 text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-4" />
-          <p className="text-muted-foreground">Loading teachers...</p>
-        </div>
+      {/* Loading State - Skeleton */}
+      {isLoading ? (
+        <CardGridSkeleton count={8} />
       ) : (
         /* Teacher Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${isFetching ? 'opacity-70' : ''}`}>
           {filteredTeachers.map((teacher, index) => (
             <div
               key={teacher.id}
@@ -235,7 +184,7 @@ export default function TeacherList() {
         </div>
       )}
 
-      {!loading && filteredTeachers.length === 0 && (
+      {!isLoading && filteredTeachers.length === 0 && (
         <div className="card-elevated text-center py-12">
           <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-lg font-medium text-foreground">No teachers found</p>

@@ -33,7 +33,17 @@ import StudentAttendance from "./pages/attendance/StudentAttendance";
 import TeacherAttendance from "./pages/attendance/TeacherAttendance";
 import ManualEntry from "./pages/attendance/ManualEntry";
 
-const queryClient = new QueryClient();
+// Optimized QueryClient with caching
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data won't refetch if younger
+      gcTime: 30 * 60 * 1000, // 30 minutes - keep unused data in cache
+      refetchOnWindowFocus: false, // Don't refetch on tab focus
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

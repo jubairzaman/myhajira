@@ -3,13 +3,16 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { AttendanceChart } from '@/components/dashboard/AttendanceChart';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-import { Users, GraduationCap, UserCheck, Clock, XCircle, TrendingUp, Loader2 } from 'lucide-react';
+import { Users, GraduationCap, UserCheck, Clock, XCircle, TrendingUp } from 'lucide-react';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useDashboardStats } from '@/hooks/queries/useDashboardStats';
+import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 
 export default function Dashboard() {
-  const { activeYear } = useAcademicYear();
-  const { data: stats, isLoading } = useDashboardStats(activeYear?.id);
+  const { activeYear, loading: yearLoading } = useAcademicYear();
+  const { data: stats, isLoading: statsLoading, isFetching } = useDashboardStats(activeYear?.id);
+
+  const isInitialLoad = yearLoading || (statsLoading && !stats);
 
   const statCards = [
     {
@@ -56,12 +59,11 @@ export default function Dashboard() {
     },
   ];
 
-  if (isLoading) {
+  // Show skeleton only on initial load
+  if (isInitialLoad) {
     return (
       <MainLayout title="Dashboard" titleBn="ড্যাশবোর্ড">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
+        <DashboardSkeleton />
       </MainLayout>
     );
   }
@@ -69,7 +71,7 @@ export default function Dashboard() {
   return (
     <MainLayout title="Dashboard" titleBn="ড্যাশবোর্ড">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8 stagger-children">
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8 stagger-children ${isFetching ? 'opacity-70' : ''}`}>
         {statCards.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}

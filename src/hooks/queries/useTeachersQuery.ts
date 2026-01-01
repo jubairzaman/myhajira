@@ -42,5 +42,6 @@ export function useTeachersQuery(academicYearId: string | undefined) {
     },
     enabled: !!academicYearId,
     staleTime: 5 * 60 * 1000, // 5 minutes cache
+    placeholderData: (previousData) => previousData,
   });
 }
