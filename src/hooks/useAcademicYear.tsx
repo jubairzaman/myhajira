@@ -32,7 +32,9 @@ export function AcademicYearProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       return data as AcademicYear[];
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes cache - academic years rarely change
+    staleTime: 30 * 60 * 1000, // 30 minutes cache - academic years rarely change
+    gcTime: 60 * 60 * 1000, // 1 hour garbage collection
+    placeholderData: (previousData) => previousData, // Keep showing old data while refetching
   });
 
   const activeYear = academicYears.find((y) => y.is_active) || null;

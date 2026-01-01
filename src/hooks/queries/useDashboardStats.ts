@@ -56,5 +56,13 @@ export function useDashboardStats(academicYearId: string | undefined) {
     enabled: !!academicYearId,
     staleTime: 2 * 60 * 1000, // 2 minutes cache
     refetchInterval: 60 * 1000, // Refetch every minute
+    placeholderData: {
+      totalStudents: 0,
+      totalTeachers: 0,
+      presentCount: 0,
+      lateCount: 0,
+      absentCount: 0,
+      attendanceRate: 0,
+    },
   });
 }
