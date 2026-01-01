@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -30,94 +30,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { useStudentsQuery, useClassesQuery, Student } from '@/hooks/queries/useStudentsQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-
-interface Student {
-  id: string;
-  name: string;
-  name_bn: string | null;
-  student_id_number: string | null;
-  guardian_mobile: string;
-  blood_group: string | null;
-  photo_url: string | null;
-  is_active: boolean;
-  shift: { id: string; name: string } | null;
-  class: { id: string; name: string } | null;
-  section: { id: string; name: string } | null;
-  rfid_card: { card_number: string } | null;
-}
-
-interface ClassOption {
-  id: string;
-  name: string;
-}
 
 export default function StudentList() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { activeYear } = useAcademicYear();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState('all');
 
-  useEffect(() => {
-    fetchStudents();
-    fetchClasses();
-  }, [activeYear]);
+  const { data: students = [], isLoading: studentsLoading } = useStudentsQuery(activeYear?.id);
+  const { data: classes = [] } = useClassesQuery();
 
-  const fetchStudents = async () => {
-    if (!activeYear) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .select(`
-          id, name, name_bn, student_id_number, guardian_mobile, blood_group, photo_url, is_active,
-          shift:shifts(id, name),
-          class:classes(id, name),
-          section:sections(id, name),
-          rfid_card:rfid_cards_students(card_number)
-        `)
-        .eq('academic_year_id', activeYear.id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-
-      // Transform data to handle array returns from joins
-      const transformedData = (data || []).map(student => ({
-        ...student,
-        shift: Array.isArray(student.shift) ? student.shift[0] : student.shift,
-        class: Array.isArray(student.class) ? student.class[0] : student.class,
-        section: Array.isArray(student.section) ? student.section[0] : student.section,
-        rfid_card: Array.isArray(student.rfid_card) ? student.rfid_card[0] : student.rfid_card,
-      }));
-
-      setStudents(transformedData as Student[]);
-    } catch (error: any) {
-      console.error('Error fetching students:', error);
-      toast.error('Failed to load students');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchClasses = async () => {
-    try {
-      const { data } = await supabase
-        .from('classes')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('grade_order');
-      setClasses(data || []);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-    }
-  };
-
-  const handleDelete = async (studentId: string) => {
+  const handleDelete = useCallback(async (studentId: string) => {
     if (!confirm('Are you sure you want to deactivate this student?')) return;
     
     try {
@@ -129,19 +56,22 @@ export default function StudentList() {
       if (error) throw error;
       
       toast.success('Student deactivated');
-      fetchStudents();
+      // Invalidate and refetch students
+      queryClient.invalidateQueries({ queryKey: ['students', activeYear?.id] });
     } catch (error: any) {
       toast.error('Failed to deactivate student');
     }
-  };
+  }, [activeYear?.id, queryClient]);
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch = 
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (student.name_bn && student.name_bn.includes(searchQuery));
-    const matchesClass = classFilter === 'all' || student.class?.id === classFilter;
-    return matchesSearch && matchesClass;
-  });
+  const filteredStudents = useMemo(() => {
+    return students.filter((student: Student) => {
+      const matchesSearch = 
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (student.name_bn && student.name_bn.includes(searchQuery));
+      const matchesClass = classFilter === 'all' || student.class?.id === classFilter;
+      return matchesSearch && matchesClass;
+    });
+  }, [students, searchQuery, classFilter]);
 
   return (
     <MainLayout title="Students" titleBn="শিক্ষার্থী">
@@ -199,7 +129,7 @@ export default function StudentList() {
       </div>
 
       {/* Loading State */}
-      {loading ? (
+      {studentsLoading ? (
         <div className="card-elevated p-12 text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-4" />
           <p className="text-muted-foreground">Loading students...</p>
@@ -223,7 +153,7 @@ export default function StudentList() {
                 <tr 
                   key={student.id}
                   className="animate-fade-in-up"
-                  style={{ animationDelay: `${index * 50}ms` }}
+                  style={{ animationDelay: `${Math.min(index, 10) * 50}ms` }}
                 >
                   <td>
                     <div className="flex items-center gap-3">
@@ -231,6 +161,7 @@ export default function StudentList() {
                         src={student.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
                         alt={student.name}
                         className="w-10 h-10 rounded-full bg-muted"
+                        loading="lazy"
                       />
                       <div>
                         <p className="font-medium text-foreground">{student.name}</p>
