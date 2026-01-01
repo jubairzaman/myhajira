@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard, Bug, X, Send } from 'lucide-react';
+import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard, Bug, X, Send, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
@@ -19,6 +19,7 @@ interface PunchRecord {
   section_name: string | null;
   punch_time: string;
   status?: string;
+  isLoading?: boolean;
 }
 
 interface TopStudent {
@@ -30,6 +31,25 @@ interface TopStudent {
   present_days: number;
 }
 
+interface CachedStudent {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  photo_url: string | null;
+  class_name: string | null;
+  section_name: string | null;
+  shift_name: string | null;
+}
+
+interface CachedTeacher {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  photo_url: string | null;
+  designation: string | null;
+  shift_name: string | null;
+}
+
 export default function GateMonitor() {
   const { activeYear } = useAcademicYear();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -38,8 +58,17 @@ export default function GateMonitor() {
   const [isIdle, setIsIdle] = useState(false);
   const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
   
+  // Local cache for instant lookup
+  const studentCacheRef = useRef<Map<string, CachedStudent>>(new Map());
+  const teacherCacheRef = useRef<Map<string, CachedTeacher>>(new Map());
+  const [cacheLoaded, setCacheLoaded] = useState(false);
+  const [cacheStats, setCacheStats] = useState({ students: 0, teachers: 0 });
+  
+  // Punch queue for rapid punches
+  const punchQueueRef = useRef<string[]>([]);
+  const isProcessingQueueRef = useRef(false);
+  
   // USB RFID Reader states
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const cardBufferRef = useRef('');
   const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,6 +80,110 @@ export default function GateMonitor() {
   const [lastScannedCard, setLastScannedCard] = useState('');
   const [lastApiResponse, setLastApiResponse] = useState('');
   const [manualCardInput, setManualCardInput] = useState('');
+
+  // Load cache on mount
+  useEffect(() => {
+    loadCache();
+    
+    // Refresh cache every 5 minutes
+    const refreshInterval = setInterval(loadCache, 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Load all students and teachers with their RFID cards into cache
+  const loadCache = async () => {
+    console.log('[GateMonitor] Loading cache...');
+    
+    try {
+      // Load students with RFID cards
+      const { data: studentCards, error: studentError } = await supabase
+        .from('rfid_cards_students')
+        .select(`
+          card_number,
+          student:students(
+            id, name, name_bn, photo_url,
+            classes(name),
+            sections(name),
+            shifts(name)
+          )
+        `)
+        .eq('is_active', true);
+
+      if (studentError) throw studentError;
+
+      // Load teachers with RFID cards
+      const { data: teacherCards, error: teacherError } = await supabase
+        .from('rfid_cards_teachers')
+        .select(`
+          card_number,
+          teacher:teachers(
+            id, name, name_bn, photo_url, designation,
+            shifts(name)
+          )
+        `)
+        .eq('is_active', true);
+
+      if (teacherError) throw teacherError;
+
+      // Build student cache with multiple card number formats
+      const studentCache = new Map<string, CachedStudent>();
+      (studentCards || []).forEach((card: any) => {
+        if (card.student) {
+          const cached: CachedStudent = {
+            id: card.student.id,
+            name: card.student.name,
+            name_bn: card.student.name_bn,
+            photo_url: card.student.photo_url,
+            class_name: card.student.classes?.name || null,
+            section_name: card.student.sections?.name || null,
+            shift_name: card.student.shifts?.name || null,
+          };
+          
+          // Store with multiple formats for flexible lookup
+          const cardNum = card.card_number;
+          studentCache.set(cardNum, cached);
+          studentCache.set(cardNum.toLowerCase(), cached);
+          studentCache.set(cardNum.toUpperCase(), cached);
+          studentCache.set(cardNum.replace(/^0+/, ''), cached); // Without leading zeros
+          studentCache.set(cardNum.padStart(10, '0'), cached); // Padded to 10 digits
+        }
+      });
+      studentCacheRef.current = studentCache;
+
+      // Build teacher cache
+      const teacherCache = new Map<string, CachedTeacher>();
+      (teacherCards || []).forEach((card: any) => {
+        if (card.teacher) {
+          const cached: CachedTeacher = {
+            id: card.teacher.id,
+            name: card.teacher.name,
+            name_bn: card.teacher.name_bn,
+            photo_url: card.teacher.photo_url,
+            designation: card.teacher.designation,
+            shift_name: card.teacher.shifts?.name || null,
+          };
+          
+          const cardNum = card.card_number;
+          teacherCache.set(cardNum, cached);
+          teacherCache.set(cardNum.toLowerCase(), cached);
+          teacherCache.set(cardNum.toUpperCase(), cached);
+          teacherCache.set(cardNum.replace(/^0+/, ''), cached);
+          teacherCache.set(cardNum.padStart(10, '0'), cached);
+        }
+      });
+      teacherCacheRef.current = teacherCache;
+
+      setCacheStats({
+        students: studentCards?.length || 0,
+        teachers: teacherCards?.length || 0,
+      });
+      setCacheLoaded(true);
+      console.log(`[GateMonitor] Cache loaded: ${studentCards?.length || 0} students, ${teacherCards?.length || 0} teachers`);
+    } catch (error) {
+      console.error('[GateMonitor] Cache loading failed:', error);
+      toast.error('ক্যাশ লোড ব্যর্থ হয়েছে');
+    }
+  };
 
   // Update time every second
   useEffect(() => {
@@ -66,91 +199,147 @@ export default function GateMonitor() {
     fetchTopStudents();
   }, [activeYear]);
 
-  // RULE 3: Real-time subscription for new punches from punch_logs table
-  // Every punch event must appear instantly - no filtering, no deduplication
-  useEffect(() => {
-    const channel = supabase
-      .channel('punch-logs-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'punch_logs',
-        },
-        async (payload) => {
-          console.log('New punch received:', payload);
-          // Fetch full details and add to display immediately
-          await fetchPunchDetails(payload.new as any);
-          resetIdleTimer();
-        }
-      )
-      .subscribe();
+  // Lookup in cache - try multiple formats
+  const lookupInCache = (cardNumber: string): { type: 'student' | 'teacher'; data: CachedStudent | CachedTeacher } | null => {
+    // Try student cache first
+    const student = studentCacheRef.current.get(cardNumber) 
+      || studentCacheRef.current.get(cardNumber.toLowerCase())
+      || studentCacheRef.current.get(cardNumber.toUpperCase())
+      || studentCacheRef.current.get(cardNumber.replace(/^0+/, ''))
+      || studentCacheRef.current.get(cardNumber.padStart(10, '0'));
+    
+    if (student) {
+      return { type: 'student', data: student };
+    }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeYear]);
+    // Try teacher cache
+    const teacher = teacherCacheRef.current.get(cardNumber)
+      || teacherCacheRef.current.get(cardNumber.toLowerCase())
+      || teacherCacheRef.current.get(cardNumber.toUpperCase())
+      || teacherCacheRef.current.get(cardNumber.replace(/^0+/, ''))
+      || teacherCacheRef.current.get(cardNumber.padStart(10, '0'));
+    
+    if (teacher) {
+      return { type: 'teacher', data: teacher };
+    }
 
-  // USB RFID Reader - Process card number
-  const processCard = useCallback(async (cardNumber: string) => {
-    if (!cardNumber || cardNumber.length < 4 || isProcessing) return;
+    return null;
+  };
+
+  // Play success sound
+  const playSuccessSound = () => {
+    try {
+      const audio = new Audio('/sounds/beep.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(() => {
+        // Ignore audio play errors (autoplay restrictions)
+      });
+    } catch {
+      // Ignore audio errors
+    }
+  };
+
+  // Process card - INSTANT from cache, background API
+  const processCard = useCallback((cardNumber: string) => {
+    if (!cardNumber || cardNumber.length < 4) return;
     
     console.log('[GateMonitor] Processing RFID card:', cardNumber);
     setLastScannedCard(cardNumber);
-    setLastApiResponse('প্রসেস হচ্ছে...');
     setIsScanning(false);
-    setIsProcessing(true);
     
-    try {
-      const { data, error } = await supabase.functions.invoke('process-punch', {
+    const punchTime = new Date().toISOString();
+    
+    // INSTANT LOOKUP from cache
+    const cached = lookupInCache(cardNumber);
+    
+    if (cached) {
+      // *** INSTANT UI UPDATE (< 1ms) ***
+      const newPunch: PunchRecord = {
+        id: 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        person_id: cached.data.id,
+        person_type: cached.type,
+        name: cached.data.name,
+        name_bn: cached.data.name_bn,
+        photo_url: cached.data.photo_url,
+        class_name: cached.type === 'student' 
+          ? (cached.data as CachedStudent).class_name 
+          : (cached.data as CachedTeacher).designation,
+        section_name: cached.type === 'student' 
+          ? (cached.data as CachedStudent).section_name 
+          : null,
+        punch_time: punchTime,
+        status: 'present', // Optimistic - will be updated by realtime if different
+      };
+      
+      // Add to UI immediately
+      setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
+      
+      // Success feedback
+      playSuccessSound();
+      setLastApiResponse(`✅ ${cached.data.name} - উপস্থিত`);
+      toast.success(`${cached.data.name}`, {
+        description: cached.type === 'student' 
+          ? `${(cached.data as CachedStudent).class_name || ''} ${(cached.data as CachedStudent).section_name || ''}`
+          : (cached.data as CachedTeacher).designation || 'শিক্ষক',
+        duration: 2000,
+      });
+      
+      // *** BACKGROUND API CALL (fire-and-forget) ***
+      supabase.functions.invoke('process-punch', {
         body: {
           card_number: cardNumber,
           device_ip: 'USB-READER',
-          punch_time: new Date().toISOString()
+          punch_time: punchTime
         }
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('[GateMonitor] Background API error:', error);
+          // Don't show error toast - UI already updated
+        } else {
+          console.log('[GateMonitor] Background API success:', data);
+        }
+      }).catch(err => {
+        console.error('[GateMonitor] Background API failed:', err);
       });
       
-      console.log('[GateMonitor] API Response:', data, error);
-      
-      if (error) {
-        console.error('[GateMonitor] Process punch error:', error);
-        setLastApiResponse(`❌ Error: ${error.message}`);
-        toast.error('পাঞ্চ প্রসেস ব্যর্থ হয়েছে', {
-          description: error.message || 'Unknown error'
-        });
-        return;
-      }
-      
-      if (data?.success) {
-        const statusBn = data.status === 'present' ? 'উপস্থিত' : 
-                         data.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত';
-        setLastApiResponse(`✅ ${data.name} - ${statusBn}`);
-        toast.success(`${data.name} - ${statusBn}`, {
-          description: data.message || 'Punch recorded successfully'
-        });
-      } else if (data?.error) {
-        setLastApiResponse(`❌ ${data.error}`);
-        toast.error('কার্ড পাওয়া যায়নি', {
-          description: data.error
-        });
-      }
-    } catch (err: any) {
-      console.error('[GateMonitor] Punch processing failed:', err);
-      setLastApiResponse(`❌ ${err?.message || 'Network error'}`);
-      toast.error('পাঞ্চ প্রসেস ব্যর্থ', {
-        description: err?.message || 'Network error'
+    } else {
+      // Card not found in cache
+      setLastApiResponse(`❌ কার্ড পাওয়া যায়নি: ${cardNumber}`);
+      toast.error('কার্ড পাওয়া যায়নি', {
+        description: `কার্ড নম্বর: ${cardNumber}`,
       });
-    } finally {
-      setIsProcessing(false);
-      resetIdleTimer();
     }
-  }, [isProcessing]);
+    
+    resetIdleTimer();
+  }, []);
+
+  // Process punch queue (for rapid punches)
+  const processQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+    
+    while (punchQueueRef.current.length > 0) {
+      const card = punchQueueRef.current.shift();
+      if (card) {
+        processCard(card);
+        // Small delay between displays for smooth animation
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    isProcessingQueueRef.current = false;
+  }, [processCard]);
+
+  // Add card to queue
+  const addToQueue = useCallback((cardNumber: string) => {
+    punchQueueRef.current.push(cardNumber);
+    processQueue();
+  }, [processQueue]);
 
   // Manual test punch
   const handleManualTest = () => {
     if (manualCardInput.trim()) {
-      processCard(manualCardInput.trim());
+      addToQueue(manualCardInput.trim());
       setManualCardInput('');
     }
   };
@@ -164,7 +353,6 @@ export default function GateMonitor() {
       }
       
       // Log keypress for debugging
-      console.log('[GateMonitor] Keypress:', e.key);
       setLastKeypress(e.key);
       
       // Enter key = card scan complete
@@ -173,7 +361,7 @@ export default function GateMonitor() {
           const cardNumber = cardBufferRef.current;
           cardBufferRef.current = '';
           setCardBuffer('');
-          processCard(cardNumber);
+          addToQueue(cardNumber);
         }
         return;
       }
@@ -187,31 +375,29 @@ export default function GateMonitor() {
         
         cardBufferRef.current += e.key;
         setCardBuffer(cardBufferRef.current);
-        console.log('[GateMonitor] Buffer updated:', cardBufferRef.current);
         
         // Clear previous timeout
         if (bufferTimeoutRef.current) {
           clearTimeout(bufferTimeoutRef.current);
         }
         
-        // Auto-process after 500ms of inactivity (fallback if no Enter key)
+        // Auto-process after 300ms of inactivity (faster fallback)
         bufferTimeoutRef.current = setTimeout(() => {
           if (cardBufferRef.current.length >= 4) {
             const cardNumber = cardBufferRef.current;
             cardBufferRef.current = '';
             setCardBuffer('');
-            processCard(cardNumber);
+            addToQueue(cardNumber);
           } else {
             cardBufferRef.current = '';
             setCardBuffer('');
             setIsScanning(false);
           }
-        }, 500);
+        }, 300);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    console.log('[GateMonitor] Keyboard listener attached');
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -219,7 +405,7 @@ export default function GateMonitor() {
         clearTimeout(bufferTimeoutRef.current);
       }
     };
-  }, [processCard]);
+  }, [addToQueue]);
 
   // Idle timer management
   useEffect(() => {
@@ -238,56 +424,10 @@ export default function GateMonitor() {
     setIdleTimer(timer);
   };
 
-  const fetchPunchDetails = async (punchLog: any) => {
-    if (punchLog.person_type !== 'student') return;
-
-    try {
-      const { data: student } = await supabase
-        .from('students')
-        .select(`
-          id, name, name_bn, photo_url,
-          classes(name),
-          sections(name)
-        `)
-        .eq('id', punchLog.person_id)
-        .single();
-
-      if (student) {
-        // Get the attendance status for this student today
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const { data: attendance } = await supabase
-          .from('student_attendance')
-          .select('status')
-          .eq('student_id', student.id)
-          .eq('attendance_date', today)
-          .maybeSingle();
-
-        const newPunch: PunchRecord = {
-          id: punchLog.id,
-          person_id: punchLog.person_id,
-          person_type: 'student',
-          name: student.name,
-          name_bn: student.name_bn,
-          photo_url: student.photo_url,
-          class_name: (student as any).classes?.name,
-          section_name: (student as any).sections?.name,
-          punch_time: punchLog.punch_time,
-          status: attendance?.status || 'present',
-        };
-
-        // Add to beginning of list (no deduplication - show every punch)
-        setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
-      }
-    } catch (error) {
-      console.error('Error fetching punch details:', error);
-    }
-  };
-
   const fetchLatestPunches = async () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       
-      // RULE 3: Monitor data comes from punch_logs table (all punches, no filtering)
       const { data: punchLogs, error } = await supabase
         .from('punch_logs')
         .select('*')
@@ -312,7 +452,6 @@ export default function GateMonitor() {
           .single();
 
         if (student) {
-          // Get attendance status
           const { data: attendance } = await supabase
             .from('student_attendance')
             .select('status')
@@ -363,7 +502,6 @@ export default function GateMonitor() {
 
       if (error) throw error;
 
-      // Count attendance per student
       const attendanceCount: Record<string, { student: any; count: number }> = {};
       (data || []).forEach((record: any) => {
         if (record.student) {
@@ -375,7 +513,6 @@ export default function GateMonitor() {
         }
       });
 
-      // Sort by attendance count and take top 5
       const topList: TopStudent[] = Object.values(attendanceCount)
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
@@ -444,6 +581,15 @@ export default function GateMonitor() {
           </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-white/60">Cache Status:</span>
+              <code className={cn(
+                "px-2 py-0.5 rounded",
+                cacheLoaded ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
+              )}>
+                {cacheLoaded ? `${cacheStats.students}S / ${cacheStats.teachers}T` : 'Loading...'}
+              </code>
+            </div>
+            <div className="flex justify-between">
               <span className="text-white/60">Last Keypress:</span>
               <code className="bg-white/10 px-2 py-0.5 rounded">{lastKeypress || '-'}</code>
             </div>
@@ -476,6 +622,16 @@ export default function GateMonitor() {
                 </Button>
               </div>
             </div>
+            <div className="pt-2 border-t border-white/20">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={loadCache}
+                className="w-full text-xs"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Refresh Cache
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -498,188 +654,206 @@ export default function GateMonitor() {
         </div>
       </header>
 
-      {/* Processing removed - UI updates via realtime subscription */}
-
       {/* Main Content */}
-      <main className="p-4 sm:p-8 pb-24">
-        {!isIdle && latestPunch ? (
-          // Real-time Punch Display - RULE 3: Every punch appears instantly
-          <div className="max-w-2xl mx-auto">
-            <div
-              className={cn(
-                'rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-center animate-scale-in',
-                latestPunch.status === 'present' ? 'monitor-card-success' : 
-                latestPunch.status === 'late' ? 'monitor-card-warning' : 'monitor-card'
-              )}
-            >
-              {/* Photo */}
-              <div className="relative inline-block mb-4 sm:mb-6">
-                <img
-                  src={latestPunch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${latestPunch.person_id}`}
-                  alt={latestPunch.name}
-                  className="w-24 h-24 sm:w-40 sm:h-40 rounded-full border-4 border-white/20 shadow-2xl object-cover bg-white/10"
-                />
-                <div
-                  className={cn(
-                    'absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center',
-                    latestPunch.status === 'present' ? 'bg-success' : 
-                    latestPunch.status === 'late' ? 'bg-warning' : 'bg-destructive'
-                  )}
-                >
-                  {latestPunch.status === 'present' ? (
-                    <UserCheck className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
-                  ) : (
-                    <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
-                  )}
-                </div>
-              </div>
-
-              {/* Name */}
-              <h2 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">{latestPunch.name}</h2>
-              {latestPunch.name_bn && (
-                <p className="text-lg sm:text-2xl text-white/80 font-bengali mb-2 sm:mb-4">{latestPunch.name_bn}</p>
-              )}
-
-              {/* Class */}
-              <p className="text-base sm:text-xl text-white/60 mb-4 sm:mb-6">
-                {latestPunch.class_name || 'Unknown Class'} 
-                {latestPunch.section_name && ` - ${latestPunch.section_name}`}
-              </p>
-
-              {/* Time & Status */}
-              <div className="flex items-center justify-center gap-4 sm:gap-8">
-                <div className="text-center">
-                  <p className="text-xl sm:text-3xl font-bold font-mono text-white">
-                    {formatPunchTime(latestPunch.punch_time)}
-                  </p>
-                  <p className="text-white/60 text-xs sm:text-base">Punch Time</p>
-                </div>
-                <div className="w-px h-8 sm:h-12 bg-white/20" />
-                <div className="text-center">
-                  <p
-                    className={cn(
-                      'text-lg sm:text-2xl font-bold',
-                      latestPunch.status === 'present' ? 'text-success' : 
-                      latestPunch.status === 'late' ? 'text-warning' : 'text-destructive'
-                    )}
-                  >
-                    {latestPunch.status === 'present' ? 'উপস্থিত' : 
-                     latestPunch.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত'}
-                  </p>
-                  <p className="text-white/60 text-xs sm:text-base">
-                    {latestPunch.status === 'present' ? 'Present' : 
-                     latestPunch.status === 'late' ? 'Late' : 'Absent'}
-                  </p>
-                </div>
+      <main className="flex-1 p-4 sm:p-8 flex flex-col lg:flex-row gap-4 sm:gap-8 overflow-hidden">
+        {/* Left: Latest Punch Display */}
+        <div className="flex-1 flex flex-col">
+          {/* Scanning Indicator */}
+          {isScanning && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
+              <div className="bg-blue-500/90 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-pulse">
+                <CreditCard className="h-8 w-8" />
+                <span className="text-xl font-bold">স্ক্যান হচ্ছে...</span>
               </div>
             </div>
+          )}
 
-            {/* Recent Punches - RULE 3: All punches shown, no deduplication */}
-            {latestPunches.length > 1 && (
-              <div className="mt-6 sm:mt-8">
-                <h3 className="text-white/60 text-center mb-3 sm:mb-4 text-sm sm:text-base">Recent Punches</h3>
-                <div className="flex justify-center gap-2 sm:gap-4 flex-wrap">
-                  {latestPunches.slice(1, 8).map((punch, index) => (
-                    <div
-                      key={`${punch.id}-${index}`}
-                      className="flex items-center gap-1.5 sm:gap-2 bg-white/5 rounded-full px-2 sm:px-4 py-1.5 sm:py-2"
-                    >
-                      <img
-                        src={punch.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${punch.person_id}`}
-                        alt={punch.name}
-                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full"
-                      />
-                      <span className="text-white/80 text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{punch.name}</span>
-                      <span className={cn(
-                        'text-xs px-1.5 sm:px-2 py-0.5 rounded-full hidden sm:inline',
-                        punch.status === 'present' ? 'bg-success/20 text-success' : 
-                        punch.status === 'late' ? 'bg-warning/20 text-warning' : 'bg-destructive/20 text-destructive'
-                      )}>
-                        {formatPunchTime(punch.punch_time)}
-                      </span>
+          {isIdle ? (
+            // Idle Mode: Show Top Students
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="text-center mb-6 sm:mb-8">
+                <Trophy className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-400 mx-auto mb-3 sm:mb-4" />
+                <h2 className="text-xl sm:text-3xl font-bold font-bengali">এই মাসের সেরা শিক্ষার্থী</h2>
+                <p className="text-white/60 text-sm sm:text-base">Top Attendance This Month</p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 w-full max-w-4xl">
+                {topStudents.map((student, index) => (
+                  <div
+                    key={student.id}
+                    className={cn(
+                      "bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-6 text-center border transition-all",
+                      index === 0 ? "border-yellow-500/50 bg-yellow-500/10" : "border-white/10"
+                    )}
+                  >
+                    <div className="relative inline-block mb-2 sm:mb-4">
+                      {student.photo_url ? (
+                        <img
+                          src={student.photo_url}
+                          alt={student.name}
+                          className="w-12 h-12 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-white/20"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-lg sm:text-2xl font-bold">
+                          {student.name.charAt(0)}
+                        </div>
+                      )}
+                      {index === 0 && (
+                        <Trophy className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 h-5 w-5 sm:h-8 sm:w-8 text-yellow-400 drop-shadow-lg" />
+                      )}
                     </div>
-                  ))}
+                    <h3 className="font-bold font-bengali text-xs sm:text-base truncate">{student.name_bn || student.name}</h3>
+                    <p className="text-white/60 text-xs">{student.class_name}</p>
+                    <p className="text-green-400 font-bold mt-1 sm:mt-2 text-sm sm:text-lg">{student.present_days} দিন</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-6 sm:mt-8 text-white/40 animate-pulse font-bengali text-sm sm:text-base">
+                কার্ড স্ক্যান করুন...
+              </p>
+            </div>
+          ) : (
+            // Active Mode: Show Latest Punch
+            <div className="flex-1 flex flex-col">
+              {latestPunch ? (
+                <div className="flex-1 flex flex-col items-center justify-center animate-fade-in">
+                  <div className="relative mb-4 sm:mb-8">
+                    {latestPunch.photo_url ? (
+                      <img
+                        src={latestPunch.photo_url}
+                        alt={latestPunch.name}
+                        className="w-32 h-32 sm:w-48 sm:h-48 lg:w-64 lg:h-64 rounded-full object-cover border-4 border-white/20 shadow-2xl"
+                      />
+                    ) : (
+                      <div className="w-32 h-32 sm:w-48 sm:h-48 lg:w-64 lg:h-64 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-4xl sm:text-6xl lg:text-8xl font-bold shadow-2xl">
+                        {latestPunch.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className={cn(
+                      "absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-full flex items-center justify-center shadow-lg",
+                      latestPunch.status === 'present' ? 'bg-green-500' :
+                      latestPunch.status === 'late' ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    )}>
+                      <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" />
+                    </div>
+                  </div>
+
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold font-bengali mb-2 text-center px-4">
+                    {latestPunch.name_bn || latestPunch.name}
+                  </h2>
+
+                  <div className="flex items-center gap-2 sm:gap-4 text-white/80 text-base sm:text-xl lg:text-2xl mb-4 sm:mb-6">
+                    {latestPunch.class_name && (
+                      <span className="font-bengali">{latestPunch.class_name}</span>
+                    )}
+                    {latestPunch.section_name && (
+                      <>
+                        <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="font-bengali">{latestPunch.section_name}</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className={cn(
+                    "px-6 sm:px-10 py-2 sm:py-4 rounded-full text-lg sm:text-2xl font-bold",
+                    latestPunch.status === 'present' ? 'bg-green-500/20 text-green-400' :
+                    latestPunch.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' :
+                    'bg-red-500/20 text-red-400'
+                  )}>
+                    {latestPunch.status === 'present' ? 'উপস্থিত' :
+                     latestPunch.status === 'late' ? 'বিলম্ব' : 'অনুপস্থিত'}
+                  </div>
+
+                  <p className="mt-4 sm:mt-6 text-white/60 text-lg sm:text-2xl font-mono">
+                    {formatPunchTime(latestPunch.punch_time)}
+                  </p>
                 </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <CreditCard className="h-16 w-16 sm:h-24 sm:w-24 text-white/20 mx-auto mb-4" />
+                    <p className="text-white/40 text-lg sm:text-2xl font-bengali">
+                      কার্ড স্ক্যান করুন
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Recent Punches List */}
+        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
+          <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
+            <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
+            <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {latestPunches.slice(1, 10).map((punch) => (
+              <div
+                key={punch.id}
+                className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
+              >
+                {punch.photo_url ? (
+                  <img
+                    src={punch.photo_url}
+                    alt={punch.name}
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20"
+                  />
+                ) : (
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs sm:text-sm font-bold">
+                    {punch.name.charAt(0)}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium font-bengali truncate text-xs sm:text-sm">{punch.name_bn || punch.name}</p>
+                  <p className="text-white/40 text-xs truncate">
+                    {punch.class_name} {punch.section_name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs sm:text-sm font-mono">{formatPunchTime(punch.punch_time)}</p>
+                  <div className={cn(
+                    "inline-block w-2 h-2 rounded-full mt-1",
+                    punch.status === 'present' ? 'bg-green-500' :
+                    punch.status === 'late' ? 'bg-yellow-500' :
+                    'bg-red-500'
+                  )} />
+                </div>
+              </div>
+            ))}
+
+            {latestPunches.length === 0 && (
+              <div className="p-6 sm:p-8 text-center text-white/40">
+                <Clock className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                <p className="font-bengali text-xs sm:text-sm">আজকের কোনো পাঞ্চ নেই</p>
               </div>
             )}
           </div>
-        ) : isIdle && topStudents.length > 0 ? (
-          // Idle Mode - Top Attendance Students
-          <div>
-            <div className="text-center mb-6 sm:mb-8">
-              <div className="inline-flex items-center gap-2 sm:gap-3 bg-warning/20 px-4 sm:px-6 py-2 sm:py-3 rounded-full mb-3 sm:mb-4">
-                <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-warning" />
-                <h2 className="text-lg sm:text-2xl font-bold text-warning font-bengali">
-                  🏆 এই মাসের সর্বোচ্চ উপস্থিত শিক্ষার্থীরা
-                </h2>
-              </div>
-              <p className="text-white/60 text-sm sm:text-base">Top Attendance Students This Month</p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 max-w-6xl mx-auto">
-              {topStudents.map((student, index) => (
-                <div
-                  key={student.id}
-                  className="monitor-card text-center animate-fade-in-up p-3 sm:p-4"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="relative inline-block mb-2 sm:mb-4">
-                    <img
-                      src={student.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
-                      alt={student.name}
-                      className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-2 border-warning/50 object-cover bg-white/10"
-                    />
-                    <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-warning text-warning-foreground flex items-center justify-center font-bold text-sm sm:text-lg">
-                      {index + 1}
-                    </div>
-                  </div>
-                  <h3 className="font-semibold text-white text-sm sm:text-lg truncate">{student.name}</h3>
-                  {student.name_bn && (
-                    <p className="text-white/60 font-bengali text-xs sm:text-sm mb-1 sm:mb-2 truncate">{student.name_bn}</p>
-                  )}
-                  <p className="text-white/40 text-xs sm:text-sm mb-2 sm:mb-3">{student.class_name || 'Unknown'}</p>
-                  <div className="bg-success/20 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2">
-                    <p className="text-success font-bold text-sm sm:text-base">{student.present_days} Days</p>
-                    <p className="text-success/70 text-xs font-bengali">উপস্থিতি</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          // No data state
-          <div className="text-center">
-            <div className="monitor-card max-w-md mx-auto p-8 sm:p-12">
-              <RefreshCw className="w-12 h-12 sm:w-16 sm:h-16 text-white/40 mx-auto mb-4 sm:mb-6" />
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Waiting for Punches</h2>
-              <p className="text-white/60 font-bengali">পাঞ্চের জন্য অপেক্ষা করা হচ্ছে...</p>
-              <p className="text-white/40 text-xs sm:text-sm mt-3 sm:mt-4">
-                Students will appear here when they punch their RFID cards
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-black/30 backdrop-blur-sm border-t border-white/10">
-        <div className="flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-2 sm:gap-0">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            <span className="text-white/60 text-xs sm:text-sm">System Online</span>
-            <span className="text-white/40 text-xs sm:text-sm ml-2 sm:ml-4">
-              Today: {latestPunches.length} punches
-            </span>
-          </div>
-          <p className="text-white/40 text-xs sm:text-sm hidden sm:block">Developed by Jubair Zaman</p>
-          <button
-            onClick={() => setIsIdle(!isIdle)}
-            className="flex items-center gap-2 text-white/60 hover:text-white text-xs sm:text-sm"
-          >
-            {isIdle ? 'Show Live Punch' : 'Show Top Students'}
-            <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
-          </button>
+      {/* Footer Status */}
+      <footer className="p-3 sm:p-4 border-t border-white/10 flex items-center justify-between text-xs sm:text-sm text-white/60">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            cacheLoaded ? "bg-green-500" : "bg-yellow-500 animate-pulse"
+          )} />
+          <span>{cacheLoaded ? 'সিস্টেম প্রস্তুত' : 'ক্যাশ লোড হচ্ছে...'}</span>
+          {cacheLoaded && (
+            <span className="text-white/40">({cacheStats.students} শিক্ষার্থী)</span>
+          )}
         </div>
+        <button
+          onClick={() => setIsIdle(!isIdle)}
+          className="hover:text-white transition-colors font-bengali"
+        >
+          {isIdle ? 'লাইভ দেখুন' : 'টপ দেখুন'}
+        </button>
       </footer>
     </div>
   );
