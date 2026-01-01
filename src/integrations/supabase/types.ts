@@ -502,8 +502,10 @@ export type Database = {
       }
       sms_logs: {
         Row: {
+          channel: string | null
           created_at: string
           error_message: string | null
+          fallback_used: boolean | null
           id: string
           message: string
           mobile_number: string
@@ -512,10 +514,13 @@ export type Database = {
           sms_type: string
           status: string
           student_id: string | null
+          whatsapp_message_id: string | null
         }
         Insert: {
+          channel?: string | null
           created_at?: string
           error_message?: string | null
+          fallback_used?: boolean | null
           id?: string
           message: string
           mobile_number: string
@@ -524,10 +529,13 @@ export type Database = {
           sms_type: string
           status: string
           student_id?: string | null
+          whatsapp_message_id?: string | null
         }
         Update: {
+          channel?: string | null
           created_at?: string
           error_message?: string | null
+          fallback_used?: boolean | null
           id?: string
           message?: string
           mobile_number?: string
@@ -536,6 +544,7 @@ export type Database = {
           sms_type?: string
           status?: string
           student_id?: string | null
+          whatsapp_message_id?: string | null
         }
         Relationships: [
           {
@@ -555,10 +564,20 @@ export type Database = {
           created_at: string
           id: string
           is_enabled: boolean
+          late_sms_enabled: boolean | null
+          late_sms_template: string | null
           monthly_summary_enabled: boolean
+          preferred_channel: string | null
+          punch_sms_enabled: boolean | null
+          punch_sms_template: string | null
           sender_id: string | null
           sms_template: string | null
           updated_at: string
+          whatsapp_access_token: string | null
+          whatsapp_business_account_id: string | null
+          whatsapp_enabled: boolean | null
+          whatsapp_fallback_to_sms: boolean | null
+          whatsapp_phone_number_id: string | null
         }
         Insert: {
           absent_sms_enabled?: boolean
@@ -567,10 +586,20 @@ export type Database = {
           created_at?: string
           id?: string
           is_enabled?: boolean
+          late_sms_enabled?: boolean | null
+          late_sms_template?: string | null
           monthly_summary_enabled?: boolean
+          preferred_channel?: string | null
+          punch_sms_enabled?: boolean | null
+          punch_sms_template?: string | null
           sender_id?: string | null
           sms_template?: string | null
           updated_at?: string
+          whatsapp_access_token?: string | null
+          whatsapp_business_account_id?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_fallback_to_sms?: boolean | null
+          whatsapp_phone_number_id?: string | null
         }
         Update: {
           absent_sms_enabled?: boolean
@@ -579,10 +608,20 @@ export type Database = {
           created_at?: string
           id?: string
           is_enabled?: boolean
+          late_sms_enabled?: boolean | null
+          late_sms_template?: string | null
           monthly_summary_enabled?: boolean
+          preferred_channel?: string | null
+          punch_sms_enabled?: boolean | null
+          punch_sms_template?: string | null
           sender_id?: string | null
           sms_template?: string | null
           updated_at?: string
+          whatsapp_access_token?: string | null
+          whatsapp_business_account_id?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_fallback_to_sms?: boolean | null
+          whatsapp_phone_number_id?: string | null
         }
         Relationships: []
       }

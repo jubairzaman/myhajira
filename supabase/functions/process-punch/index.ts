@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<any>) => void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -13,10 +18,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
     console.log('Received punch data:', body);
@@ -96,7 +100,7 @@ serve(async (req) => {
 
     if (studentCard) {
       console.log('Found student card:', studentCard);
-      return await processStudentPunch(supabase, studentCard.student_id, punchTimestamp, punchDate, punchTimeStr, deviceId, card_number);
+      return await processStudentPunch(supabase, supabaseUrl, supabaseKey, studentCard.student_id, punchTimestamp, punchDate, punchTimeStr, deviceId, card_number);
     }
 
     // Try to find teacher RFID card - multiple formats
@@ -157,8 +161,36 @@ serve(async (req) => {
   }
 });
 
+// Background task to send SMS
+async function triggerSms(supabaseUrl: string, supabaseKey: string, smsType: string, studentId: string, punchTime: string, lateMinutes?: number) {
+  try {
+    console.log(`Triggering ${smsType} SMS for student:`, studentId);
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        sms_type: smsType,
+        student_id: studentId,
+        punch_time: punchTime,
+        late_minutes: lateMinutes,
+      }),
+    });
+    
+    const result = await response.json();
+    console.log(`${smsType} SMS result:`, result);
+  } catch (error) {
+    console.error(`Failed to send ${smsType} SMS:`, error);
+  }
+}
+
 async function processStudentPunch(
   supabase: any,
+  supabaseUrl: string,
+  supabaseKey: string,
   studentId: string,
   punchTimestamp: Date,
   punchDate: string,
@@ -234,6 +266,7 @@ async function processStudentPunch(
   // RULE 5: First punch of the day - create attendance record
   // কার্ড পাঞ্চ করলেই উপস্থিত - absent কখনোই না (absent শুধু যখন সারাদিন কোনো পাঞ্চ নেই)
   let status = 'present';
+  let lateMinutes = 0;
   const shift = student.shifts;
   
   if (shift) {
@@ -247,10 +280,11 @@ async function processStudentPunch(
       status = 'present';
     } else {
       status = 'late';
+      lateMinutes = punchMinutes - startMinutes;
     }
   }
 
-  console.log('Recording first attendance:', { studentId, status, punchTimeStr });
+  console.log('Recording first attendance:', { studentId, status, punchTimeStr, lateMinutes });
 
   // Insert attendance record (first punch only)
   const { data: attendance, error: insertError } = await supabase
@@ -274,6 +308,15 @@ async function processStudentPunch(
     );
   }
 
+  // Trigger SMS in background (non-blocking)
+  // Send punch SMS for all first punches
+  EdgeRuntime.waitUntil(triggerSms(supabaseUrl, supabaseKey, 'punch', studentId, punchTimestamp.toISOString()));
+  
+  // Send late SMS if status is late
+  if (status === 'late') {
+    EdgeRuntime.waitUntil(triggerSms(supabaseUrl, supabaseKey, 'late', studentId, punchTimestamp.toISOString(), lateMinutes));
+  }
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -285,6 +328,7 @@ async function processStudentPunch(
       section_name: student.sections?.name,
       status,
       punch_time: punchTimeStr,
+      late_minutes: lateMinutes,
       is_first_punch: true,
       message: 'First punch - attendance recorded'
     }),
