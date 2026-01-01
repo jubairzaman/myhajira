@@ -975,6 +975,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_dashboard_stats: {
+        Args: { p_academic_year_id: string; p_date: string }
+        Returns: Json
+      }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {

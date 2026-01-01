@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AcademicYear {
@@ -14,46 +15,35 @@ interface AcademicYearContextType {
   academicYears: AcademicYear[];
   activeYear: AcademicYear | null;
   loading: boolean;
-  refetch: () => Promise<void>;
+  refetch: () => void;
 }
 
 const AcademicYearContext = createContext<AcademicYearContextType | undefined>(undefined);
 
 export function AcademicYearProvider({ children }: { children: ReactNode }) {
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [activeYear, setActiveYear] = useState<AcademicYear | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchAcademicYears = async () => {
-    try {
+  const { data: academicYears = [], isLoading, refetch } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('academic_years')
         .select('*')
         .order('start_date', { ascending: false });
 
       if (error) throw error;
+      return data as AcademicYear[];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes cache - academic years rarely change
+  });
 
-      setAcademicYears(data || []);
-      const active = data?.find((y) => y.is_active) || null;
-      setActiveYear(active);
-    } catch (error) {
-      console.error('Error fetching academic years:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAcademicYears();
-  }, []);
+  const activeYear = academicYears.find((y) => y.is_active) || null;
 
   return (
     <AcademicYearContext.Provider
       value={{
         academicYears,
         activeYear,
-        loading,
-        refetch: fetchAcademicYears,
+        loading: isLoading,
+        refetch,
       }}
     >
       {children}

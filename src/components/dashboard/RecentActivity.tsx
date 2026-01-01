@@ -1,20 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Clock, UserCheck, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { useRecentActivity, Activity } from '@/hooks/queries/useRecentActivity';
 import { format } from 'date-fns';
-
-interface Activity {
-  id: string;
-  name: string;
-  nameBn: string | null;
-  type: 'student' | 'teacher';
-  status: 'present' | 'late' | 'absent';
-  time: string;
-  class?: string;
-  designation?: string;
-}
+import { useQueryClient } from '@tanstack/react-query';
 
 const statusConfig = {
   present: {
@@ -42,21 +33,15 @@ const statusConfig = {
 
 export function RecentActivity() {
   const { activeYear } = useAcademicYear();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: activities = [], isLoading } = useRecentActivity(activeYear?.id);
 
-  useEffect(() => {
-    if (activeYear) {
-      fetchRecentActivity();
-    }
-  }, [activeYear]);
-
-  // Real-time subscription
+  // Optimized real-time subscription - just invalidate cache instead of refetching
   useEffect(() => {
     if (!activeYear) return;
 
-    const studentChannel = supabase
-      .channel('student-attendance-realtime')
+    const channel = supabase
+      .channel('attendance-realtime')
       .on(
         'postgres_changes',
         {
@@ -65,13 +50,10 @@ export function RecentActivity() {
           table: 'student_attendance',
         },
         () => {
-          fetchRecentActivity();
+          // Invalidate the query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: ['recent-activity', activeYear.id] });
         }
       )
-      .subscribe();
-
-    const teacherChannel = supabase
-      .channel('teacher-attendance-realtime')
       .on(
         'postgres_changes',
         {
@@ -80,80 +62,17 @@ export function RecentActivity() {
           table: 'teacher_attendance',
         },
         () => {
-          fetchRecentActivity();
+          queryClient.invalidateQueries({ queryKey: ['recent-activity', activeYear.id] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(studentChannel);
-      supabase.removeChannel(teacherChannel);
+      supabase.removeChannel(channel);
     };
-  }, [activeYear]);
+  }, [activeYear, queryClient]);
 
-  const fetchRecentActivity = async () => {
-    if (!activeYear) return;
-
-    try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-
-      // Fetch recent student attendance
-      const { data: studentData } = await supabase
-        .from('student_attendance')
-        .select(`
-          id, punch_time, status,
-          student:students(name, name_bn, classes(name))
-        `)
-        .eq('academic_year_id', activeYear.id)
-        .eq('attendance_date', today)
-        .order('punch_time', { ascending: false })
-        .limit(5);
-
-      // Fetch recent teacher attendance
-      const { data: teacherData } = await supabase
-        .from('teacher_attendance')
-        .select(`
-          id, punch_in_time, status,
-          teacher:teachers(name, name_bn, designation)
-        `)
-        .eq('academic_year_id', activeYear.id)
-        .eq('attendance_date', today)
-        .order('punch_in_time', { ascending: false })
-        .limit(5);
-
-      const studentActivities: Activity[] = (studentData || []).map((record: any) => ({
-        id: `student-${record.id}`,
-        name: record.student?.name || 'Unknown',
-        nameBn: record.student?.name_bn,
-        type: 'student' as const,
-        status: record.status as 'present' | 'late' | 'absent',
-        time: format(new Date(record.punch_time), 'hh:mm a'),
-        class: record.student?.classes?.name,
-      }));
-
-      const teacherActivities: Activity[] = (teacherData || []).map((record: any) => ({
-        id: `teacher-${record.id}`,
-        name: record.teacher?.name || 'Unknown',
-        nameBn: record.teacher?.name_bn,
-        type: 'teacher' as const,
-        status: record.status as 'present' | 'late' | 'absent',
-        time: record.punch_in_time ? format(new Date(record.punch_in_time), 'hh:mm a') : '-',
-        designation: record.teacher?.designation,
-      }));
-
-      // Combine and sort by most recent
-      const combined = [...studentActivities, ...teacherActivities]
-        .slice(0, 8);
-
-      setActivities(combined);
-    } catch (error) {
-      console.error('Error fetching recent activity:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="card-elevated p-6">
         <div className="flex items-center justify-center py-10">
