@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Clock, UserCheck, Trophy, ArrowRight, RefreshCw, Loader2, CreditCard, Bug, X, Send, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -73,9 +73,43 @@ interface VideoItem {
   video_url: string;
 }
 
+// Memoized TimeDisplay component - prevents entire GateMonitor from re-rendering every second
+const TimeDisplay = memo(function TimeDisplay() {
+  const [time, setTime] = useState(new Date());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('bn-BD', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  return (
+    <div className="text-left sm:text-right">
+      <p className="text-2xl sm:text-4xl font-bold font-mono">{formatTime(time)}</p>
+      <p className="text-white/60 font-bengali text-xs sm:text-base">{formatDate(time)}</p>
+    </div>
+  );
+});
+
 export default function GateMonitor() {
   const { activeYear } = useAcademicYear();
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [latestPunches, setLatestPunches] = useState<PunchRecord[]>([]);
   const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(false);
@@ -278,12 +312,59 @@ export default function GateMonitor() {
     }
   };
 
-  // Update time every second
+  // Realtime subscription for instant punch updates
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    const channel = supabase
+      .channel('punch_logs_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'punch_logs',
+          filter: `punch_date=eq.${today}`
+        },
+        async (payload) => {
+          console.log('[GateMonitor] Realtime punch received:', payload);
+          const log = payload.new as any;
+          
+          // Only process student punches
+          if (log.person_type !== 'student') return;
+          
+          // Try cache first for instant update
+          const cached = lookupInCache(log.card_number);
+          if (cached && cached.type === 'student') {
+            const studentData = cached.data as CachedStudent;
+            const newPunch: PunchRecord = {
+              id: log.id,
+              person_id: log.person_id,
+              person_type: 'student',
+              name: studentData.name,
+              name_bn: studentData.name_bn,
+              photo_url: studentData.photo_url,
+              class_name: studentData.class_name,
+              section_name: studentData.section_name,
+              punch_time: log.punch_time,
+              status: 'present',
+            };
+            
+            // Add to front, avoid duplicates by ID prefix
+            setLatestPunches(prev => {
+              const filtered = prev.filter(p => 
+                !p.id.startsWith('local-') || p.person_id !== log.person_id
+              );
+              return [newPunch, ...filtered].slice(0, 20);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Fetch initial data
@@ -666,13 +747,21 @@ export default function GateMonitor() {
     setIdleTimer(timer);
   };
 
+  // OPTIMIZED: Single query with joins instead of N+1
   const fetchLatestPunches = async () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       
+      // Single optimized query with joins - replaces 40+ sequential calls
       const { data: punchLogs, error } = await supabase
         .from('punch_logs')
-        .select('*')
+        .select(`
+          id,
+          person_id,
+          person_type,
+          punch_time,
+          punch_date
+        `)
         .eq('punch_date', today)
         .eq('person_type', 'student')
         .order('punch_time', { ascending: false })
@@ -680,41 +769,55 @@ export default function GateMonitor() {
 
       if (error) throw error;
 
-      // Fetch student details for each punch
-      const punches: PunchRecord[] = [];
-      for (const log of punchLogs || []) {
-        const { data: student } = await supabase
-          .from('students')
-          .select(`
-            id, name, name_bn, photo_url,
-            classes(name),
-            sections(name)
-          `)
-          .eq('id', log.person_id)
-          .single();
+      if (!punchLogs || punchLogs.length === 0) {
+        setLatestPunches([]);
+        return;
+      }
 
-        if (student) {
-          const { data: attendance } = await supabase
-            .from('student_attendance')
-            .select('status')
-            .eq('student_id', student.id)
-            .eq('attendance_date', today)
-            .maybeSingle();
+      // Get unique student IDs
+      const studentIds = [...new Set(punchLogs.map(log => log.person_id))];
 
-          punches.push({
+      // Single query for all students
+      const { data: students } = await supabase
+        .from('students')
+        .select(`
+          id, name, name_bn, photo_url,
+          classes(name),
+          sections(name)
+        `)
+        .in('id', studentIds);
+
+      // Single query for all attendance records
+      const { data: attendanceRecords } = await supabase
+        .from('student_attendance')
+        .select('student_id, status')
+        .in('student_id', studentIds)
+        .eq('attendance_date', today);
+
+      // Build lookup maps
+      const studentMap = new Map((students || []).map(s => [s.id, s]));
+      const attendanceMap = new Map((attendanceRecords || []).map(a => [a.student_id, a.status]));
+
+      // Build punches array
+      const punches: PunchRecord[] = punchLogs
+        .map(log => {
+          const student = studentMap.get(log.person_id);
+          if (!student) return null;
+
+          return {
             id: log.id,
             person_id: log.person_id,
             person_type: 'student',
             name: student.name,
             name_bn: student.name_bn,
             photo_url: student.photo_url,
-            class_name: (student as any).classes?.name,
-            section_name: (student as any).sections?.name,
+            class_name: (student as any).classes?.name || null,
+            section_name: (student as any).sections?.name || null,
             punch_time: log.punch_time,
-            status: attendance?.status || 'present',
-          });
-        }
-      }
+            status: attendanceMap.get(log.person_id) || 'present',
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null) as PunchRecord[];
 
       setLatestPunches(punches);
     } catch (error) {
@@ -904,10 +1007,7 @@ export default function GateMonitor() {
           </div>
         </div>
 
-        <div className="text-left sm:text-right">
-          <p className="text-2xl sm:text-4xl font-bold font-mono">{formatTime(currentTime)}</p>
-          <p className="text-white/60 font-bengali text-xs sm:text-base">{formatDate(currentTime)}</p>
-        </div>
+        <TimeDisplay />
       </header>
 
       {/* Main Content */}

@@ -26,6 +26,11 @@ function extractGoogleDriveFileId(url: string): string | null {
   return null;
 }
 
+// Check if URL is a Google Drive link
+function isGoogleDriveUrl(url: string): boolean {
+  return url.includes('drive.google.com') || url.includes('docs.google.com');
+}
+
 // Best-effort direct URL for HTML5 video (may fail due to Drive restrictions)
 function convertToDirectUrl(url: string): string {
   const fileId = extractGoogleDriveFileId(url);
@@ -62,11 +67,15 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
       }
     }, [currentIndex, videos.length, onVideoEnd]);
 
-    // Reset when video changes
+    // Reset when video changes - use iframe immediately for Google Drive
     useEffect(() => {
+      const currentVideo = videos[currentIndex];
+      const shouldUseIframe = currentVideo && isGoogleDriveUrl(currentVideo.video_url);
+      
       setIsLoading(true);
       setHasError(false);
-      setUseIframeFallback(false);
+      // Skip failed direct URL attempt for Google Drive - use iframe immediately
+      setUseIframeFallback(shouldUseIframe);
 
       // Auto-advance fallback timer (60 seconds)
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -77,7 +86,7 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
       return () => {
         if (timerRef.current) clearTimeout(timerRef.current);
       };
-    }, [currentIndex, handleVideoEnd]);
+    }, [currentIndex, handleVideoEnd, videos]);
 
     // Pause/Resume only affects HTML5 video. For iframe we just show overlay.
     useEffect(() => {
