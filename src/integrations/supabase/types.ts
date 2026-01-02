@@ -83,6 +83,45 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_class_entries: {
+        Row: {
+          calendar_id: string
+          class_id: string
+          created_at: string
+          entry_type: string
+          id: string
+        }
+        Insert: {
+          calendar_id: string
+          class_id: string
+          created_at?: string
+          entry_type: string
+          id?: string
+        }
+        Update: {
+          calendar_id?: string
+          class_id?: string
+          created_at?: string
+          entry_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_class_entries_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "school_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_class_entries_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           created_at: string
@@ -405,6 +444,56 @@ export type Database = {
             columns: ["teacher_id"]
             isOneToOne: true
             referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_calendar: {
+        Row: {
+          academic_year_id: string
+          applies_to_all_classes: boolean
+          calendar_date: string
+          created_at: string
+          created_by: string | null
+          day_type: string
+          description: string | null
+          id: string
+          title: string | null
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          applies_to_all_classes?: boolean
+          calendar_date: string
+          created_at?: string
+          created_by?: string | null
+          day_type: string
+          description?: string | null
+          id?: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          applies_to_all_classes?: boolean
+          calendar_date?: string
+          created_at?: string
+          created_by?: string | null
+          day_type?: string
+          description?: string | null
+          id?: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_calendar_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
             referencedColumns: ["id"]
           },
         ]
@@ -970,6 +1059,41 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_holidays: {
+        Row: {
+          academic_year_id: string
+          created_at: string
+          day_of_week: number
+          id: string
+          is_holiday: boolean
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_holiday?: boolean
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_holiday?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_holidays_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -978,6 +1102,15 @@ export type Database = {
       get_dashboard_stats: {
         Args: { p_academic_year_id: string; p_date: string }
         Returns: Json
+      }
+      get_working_days_count: {
+        Args: {
+          p_academic_year_id: string
+          p_class_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: number
       }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -988,6 +1121,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_working_day: {
+        Args: { p_academic_year_id: string; p_class_id: string; p_date: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "teacher" | "operator"
