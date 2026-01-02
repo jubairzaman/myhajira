@@ -26,6 +26,7 @@ import SectionsPage from "./pages/settings/Sections";
 import SmsSettings from "./pages/settings/SmsSettings";
 import Reports from "./pages/reports/Reports";
 import Settings from "./pages/settings/Settings";
+import SchoolCalendar from "./pages/settings/SchoolCalendar";
 import NotFound from "./pages/NotFound";
 
 // Attendance Pages
@@ -130,6 +131,11 @@ const App = () => (
               <Route path="/academic-year" element={
                 <ProtectedRoute requireAdmin>
                   <AcademicYearPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/calendar" element={
+                <ProtectedRoute requireAdmin>
+                  <SchoolCalendar />
                 </ProtectedRoute>
               } />
               <Route path="/shifts" element={

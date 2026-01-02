@@ -88,6 +88,7 @@ const navItems: NavItem[] = [
     icon: Settings,
     children: [
       { label: 'Academic Year', labelBn: 'শিক্ষাবর্ষ', icon: Calendar, href: '/academic-year' },
+      { label: 'School Calendar', labelBn: 'স্কুল ক্যালেন্ডার', icon: Calendar, href: '/calendar' },
       { label: 'Devices', labelBn: 'ডিভাইস', icon: Cpu, href: '/devices' },
       { label: 'SMS Settings', labelBn: 'এসএমএস সেটিংস', icon: MessageSquare, href: '/sms' },
       { label: 'System Settings', labelBn: 'সিস্টেম সেটিংস', icon: Settings, href: '/settings' },
