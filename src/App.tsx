@@ -27,6 +27,7 @@ import SmsSettings from "./pages/settings/SmsSettings";
 import Reports from "./pages/reports/Reports";
 import Settings from "./pages/settings/Settings";
 import SchoolCalendar from "./pages/settings/SchoolCalendar";
+import MonitorSettings from "./pages/settings/MonitorSettings";
 import NotFound from "./pages/NotFound";
 
 // Attendance Pages
@@ -166,6 +167,11 @@ const App = () => (
               <Route path="/settings" element={
                 <ProtectedRoute requireAdmin>
                   <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings/monitor" element={
+                <ProtectedRoute requireAdmin>
+                  <MonitorSettings />
                 </ProtectedRoute>
               } />
               

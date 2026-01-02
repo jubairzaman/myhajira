@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NewsScroller } from '@/components/monitor/NewsScroller';
+import { VideoPlayer } from '@/components/monitor/VideoPlayer';
 
 interface PunchRecord {
   id: string;
@@ -50,6 +52,18 @@ interface CachedTeacher {
   shift_name: string | null;
 }
 
+interface NewsItem {
+  id: string;
+  title: string;
+  title_bn: string | null;
+}
+
+interface VideoItem {
+  id: string;
+  title: string;
+  video_url: string;
+}
+
 export default function GateMonitor() {
   const { activeYear } = useAcademicYear();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -57,6 +71,13 @@ export default function GateMonitor() {
   const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(false);
   const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // TV Display states
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
+  const [monitorLogo, setMonitorLogo] = useState<string | null>(null);
+  const [isPunchDisplay, setIsPunchDisplay] = useState(false);
+  const punchDisplayTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Local cache for instant lookup
   const studentCacheRef = useRef<Map<string, CachedStudent>>(new Map());
@@ -81,14 +102,57 @@ export default function GateMonitor() {
   const [lastApiResponse, setLastApiResponse] = useState('');
   const [manualCardInput, setManualCardInput] = useState('');
 
-  // Load cache on mount
+  // Load cache and monitor settings on mount
   useEffect(() => {
     loadCache();
+    loadMonitorSettings();
     
     // Refresh cache every 5 minutes
     const refreshInterval = setInterval(loadCache, 5 * 60 * 1000);
-    return () => clearInterval(refreshInterval);
+    // Refresh monitor settings every minute
+    const settingsInterval = setInterval(loadMonitorSettings, 60 * 1000);
+    
+    return () => {
+      clearInterval(refreshInterval);
+      clearInterval(settingsInterval);
+    };
   }, []);
+
+  // Load monitor settings (news, videos, logo)
+  const loadMonitorSettings = async () => {
+    try {
+      // Fetch logo
+      const { data: settings } = await supabase
+        .from('system_settings')
+        .select('monitor_logo_url')
+        .limit(1)
+        .maybeSingle();
+      
+      if (settings?.monitor_logo_url) {
+        setMonitorLogo(settings.monitor_logo_url);
+      }
+
+      // Fetch active news
+      const { data: news } = await supabase
+        .from('monitor_news')
+        .select('id, title, title_bn')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      
+      setNewsItems(news || []);
+
+      // Fetch active videos
+      const { data: videos } = await supabase
+        .from('monitor_videos')
+        .select('id, title, video_url')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      
+      setVideoItems(videos || []);
+    } catch (error) {
+      console.error('[GateMonitor] Error loading monitor settings:', error);
+    }
+  };
 
   // Load all students and teachers with their RFID cards into cache
   const loadCache = async () => {
@@ -239,6 +303,21 @@ export default function GateMonitor() {
     }
   };
 
+  // Show punch display for 15 seconds then resume video
+  const showPunchDisplayTemporarily = () => {
+    // Clear any existing timer
+    if (punchDisplayTimerRef.current) {
+      clearTimeout(punchDisplayTimerRef.current);
+    }
+    
+    setIsPunchDisplay(true);
+    
+    // Resume video after 15 seconds
+    punchDisplayTimerRef.current = setTimeout(() => {
+      setIsPunchDisplay(false);
+    }, 15000);
+  };
+
   // Process card - INSTANT from cache, background API
   const processCard = useCallback((cardNumber: string) => {
     if (!cardNumber || cardNumber.length < 4) return;
@@ -273,6 +352,9 @@ export default function GateMonitor() {
       
       // Add to UI immediately
       setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
+      
+      // Show punch display temporarily (pauses video for 15 seconds)
+      showPunchDisplayTemporarily();
       
       // Success feedback
       playSuccessSound();
@@ -412,6 +494,7 @@ export default function GateMonitor() {
     resetIdleTimer();
     return () => {
       if (idleTimer) clearTimeout(idleTimer);
+      if (punchDisplayTimerRef.current) clearTimeout(punchDisplayTimerRef.current);
     };
   }, []);
 
@@ -559,9 +642,11 @@ export default function GateMonitor() {
   };
 
   const latestPunch = latestPunches[0];
+  const hasVideos = videoItems.length > 0;
+  const showVideoMode = isIdle && hasVideos && !isPunchDisplay;
 
   return (
-    <div className="monitor-display">
+    <div className="monitor-display flex flex-col">
       {/* Debug Panel Toggle */}
       <Button
         variant="outline"
@@ -588,6 +673,14 @@ export default function GateMonitor() {
               )}>
                 {cacheLoaded ? `${cacheStats.students}S / ${cacheStats.teachers}T` : 'Loading...'}
               </code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-white/60">News Items:</span>
+              <code className="bg-white/10 px-2 py-0.5 rounded">{newsItems.length}</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-white/60">Video Items:</span>
+              <code className="bg-white/10 px-2 py-0.5 rounded">{videoItems.length}</code>
             </div>
             <div className="flex justify-between">
               <span className="text-white/60">Last Keypress:</span>
@@ -639,9 +732,13 @@ export default function GateMonitor() {
       {/* Header */}
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 border-b border-white/10 gap-3">
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center">
-            <UserCheck className="w-5 h-5 sm:w-8 sm:h-8 text-white" />
-          </div>
+          {monitorLogo ? (
+            <img src={monitorLogo} alt="Logo" className="h-10 sm:h-14 w-auto object-contain" />
+          ) : (
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center">
+              <UserCheck className="w-5 h-5 sm:w-8 sm:h-8 text-white" />
+            </div>
+          )}
           <div>
             <h1 className="text-lg sm:text-2xl font-bold font-bengali">আমার হাজিরা</h1>
             <p className="text-white/60 text-xs sm:text-base">Amar Hajira - Gate Monitor</p>
@@ -655,9 +752,9 @@ export default function GateMonitor() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-8 flex flex-col lg:flex-row gap-4 sm:gap-8 overflow-hidden">
-        {/* Left: Latest Punch Display */}
-        <div className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden relative">
+        {/* Left: Video/Punch Display */}
+        <div className="flex-1 flex flex-col relative">
           {/* Scanning Indicator */}
           {isScanning && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -668,9 +765,18 @@ export default function GateMonitor() {
             </div>
           )}
 
-          {isIdle ? (
-            // Idle Mode: Show Top Students
-            <div className="flex-1 flex flex-col items-center justify-center">
+          {/* Video Mode - when idle and has videos */}
+          {showVideoMode ? (
+            <div className="flex-1 relative">
+              <VideoPlayer 
+                videos={videoItems} 
+                isPaused={isPunchDisplay}
+                className="absolute inset-0"
+              />
+            </div>
+          ) : isIdle && !hasVideos ? (
+            // Idle Mode without videos: Show Top Students
+            <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
               <div className="text-center mb-6 sm:mb-8">
                 <Trophy className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-400 mx-auto mb-3 sm:mb-4" />
                 <h2 className="text-xl sm:text-3xl font-bold font-bengali">এই মাসের সেরা শিক্ষার্থী</h2>
@@ -715,7 +821,7 @@ export default function GateMonitor() {
             </div>
           ) : (
             // Active Mode: Show Latest Punch
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col p-4 sm:p-8">
               {latestPunch ? (
                 <div className="flex-1 flex flex-col items-center justify-center animate-fade-in">
                   <div className="relative mb-4 sm:mb-8">
@@ -785,14 +891,14 @@ export default function GateMonitor() {
         </div>
 
         {/* Right: Recent Punches List */}
-        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
+        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
           <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
             <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
             <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {latestPunches.slice(1, 10).map((punch) => (
+            {latestPunches.slice(0, 10).map((punch) => (
               <div
                 key={punch.id}
                 className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
@@ -836,6 +942,11 @@ export default function GateMonitor() {
         </div>
       </main>
 
+      {/* News Scroller - TV Style */}
+      {newsItems.length > 0 && (
+        <NewsScroller items={newsItems} logoUrl={monitorLogo} />
+      )}
+
       {/* Footer Status */}
       <footer className="p-3 sm:p-4 border-t border-white/10 flex items-center justify-between text-xs sm:text-sm text-white/60">
         <div className="flex items-center gap-2">
@@ -852,7 +963,7 @@ export default function GateMonitor() {
           onClick={() => setIsIdle(!isIdle)}
           className="hover:text-white transition-colors font-bengali"
         >
-          {isIdle ? 'লাইভ দেখুন' : 'টপ দেখুন'}
+          {isIdle ? 'লাইভ দেখুন' : hasVideos ? 'ভিডিও দেখুন' : 'টপ দেখুন'}
         </button>
       </footer>
     </div>
