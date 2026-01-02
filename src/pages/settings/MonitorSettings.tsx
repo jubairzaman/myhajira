@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Tv, Image, FileText, Video, Plus, Trash2, Edit2, Save, Loader2, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Tv, Image, FileText, Video, Plus, Trash2, Edit2, Save, Loader2, ArrowUp, ArrowDown, Palette, Type } from 'lucide-react';
 
 interface NewsItem {
   id: string;
@@ -26,6 +28,22 @@ interface VideoItem {
   is_active: boolean;
   display_order: number;
 }
+
+interface ScrollerSettings {
+  fontSize: number;
+  fontFamily: string;
+  speed: number;
+  bgColor: string;
+  textColor: string;
+  bulletColor: string;
+}
+
+const FONT_OPTIONS = [
+  { value: 'Hind Siliguri', label: 'হিন্দ সিলিগুড়ি' },
+  { value: 'Noto Sans Bengali', label: 'নোটো সান্স বাংলা' },
+  { value: 'Tiro Bangla', label: 'তিরো বাংলা' },
+  { value: 'Baloo Da 2', label: 'বালু দা' },
+];
 
 export default function MonitorSettings() {
   const [loading, setLoading] = useState(true);
@@ -49,6 +67,17 @@ export default function MonitorSettings() {
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
   const [showVideoDialog, setShowVideoDialog] = useState(false);
 
+  // Scroller Settings
+  const [scrollerSettings, setScrollerSettings] = useState<ScrollerSettings>({
+    fontSize: 24,
+    fontFamily: 'Hind Siliguri',
+    speed: 50,
+    bgColor: '#991B1B',
+    textColor: '#FFFFFF',
+    bulletColor: '#FDE047',
+  });
+  const [savingScroller, setSavingScroller] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -56,15 +85,23 @@ export default function MonitorSettings() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch logo from system_settings
+      // Fetch logo and scroller settings from system_settings
       const { data: settings } = await supabase
         .from('system_settings')
-        .select('monitor_logo_url')
+        .select('monitor_logo_url, scroller_font_size, scroller_font_family, scroller_speed, scroller_bg_color, scroller_text_color, scroller_bullet_color')
         .limit(1)
         .maybeSingle();
       
       if (settings) {
         setLogoUrl(settings.monitor_logo_url);
+        setScrollerSettings({
+          fontSize: settings.scroller_font_size ?? 24,
+          fontFamily: settings.scroller_font_family ?? 'Hind Siliguri',
+          speed: settings.scroller_speed ?? 50,
+          bgColor: settings.scroller_bg_color ?? '#991B1B',
+          textColor: settings.scroller_text_color ?? '#FFFFFF',
+          bulletColor: settings.scroller_bullet_color ?? '#FDE047',
+        });
       }
 
       // Fetch news items
@@ -138,6 +175,32 @@ export default function MonitorSettings() {
       toast.error('লোগো সংরক্ষণ ব্যর্থ');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Scroller Settings handlers
+  const saveScrollerSettings = async () => {
+    setSavingScroller(true);
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .update({
+          scroller_font_size: scrollerSettings.fontSize,
+          scroller_font_family: scrollerSettings.fontFamily,
+          scroller_speed: scrollerSettings.speed,
+          scroller_bg_color: scrollerSettings.bgColor,
+          scroller_text_color: scrollerSettings.textColor,
+          scroller_bullet_color: scrollerSettings.bulletColor,
+        })
+        .not('id', 'is', null);
+
+      if (error) throw error;
+      toast.success('স্ক্রলার সেটিংস সংরক্ষিত হয়েছে');
+    } catch (error) {
+      console.error('Error saving scroller settings:', error);
+      toast.error('স্ক্রলার সেটিংস সংরক্ষণ ব্যর্থ');
+    } finally {
+      setSavingScroller(false);
     }
   };
 
@@ -420,6 +483,128 @@ export default function MonitorSettings() {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Scroller Settings Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              স্ক্রলার সেটিংস
+            </CardTitle>
+            <CardDescription>নিউজ স্ক্রলারের ফন্ট, স্পিড এবং কালার কাস্টমাইজ করুন</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Preview */}
+            <div className="rounded-lg overflow-hidden border">
+              <div 
+                className="h-16 flex items-center px-6 overflow-hidden"
+                style={{ backgroundColor: scrollerSettings.bgColor }}
+              >
+                <span 
+                  className="font-semibold whitespace-nowrap"
+                  style={{ 
+                    color: scrollerSettings.textColor,
+                    fontSize: `${scrollerSettings.fontSize}px`,
+                    fontFamily: scrollerSettings.fontFamily,
+                  }}
+                >
+                  <span style={{ color: scrollerSettings.bulletColor }}>●</span>
+                  {' '}এটি একটি প্রিভিউ টেক্সট - This is a preview text
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Font Size */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  ফন্ট সাইজ: {scrollerSettings.fontSize}px
+                </Label>
+                <Slider
+                  value={[scrollerSettings.fontSize]}
+                  onValueChange={(value) => setScrollerSettings(prev => ({ ...prev, fontSize: value[0] }))}
+                  min={16}
+                  max={48}
+                  step={2}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Font Family */}
+              <div className="space-y-3">
+                <Label>ফন্ট ফ্যামিলি</Label>
+                <Select
+                  value={scrollerSettings.fontFamily}
+                  onValueChange={(value) => setScrollerSettings(prev => ({ ...prev, fontFamily: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="ফন্ট সিলেক্ট করুন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map(font => (
+                      <SelectItem key={font.value} value={font.value}>
+                        <span style={{ fontFamily: font.value }}>{font.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Speed */}
+              <div className="space-y-3">
+                <Label>স্ক্রল স্পিড: {scrollerSettings.speed < 30 ? 'ধীর' : scrollerSettings.speed < 70 ? 'মাঝারি' : 'দ্রুত'}</Label>
+                <Slider
+                  value={[scrollerSettings.speed]}
+                  onValueChange={(value) => setScrollerSettings(prev => ({ ...prev, speed: value[0] }))}
+                  min={10}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Colors */}
+              <div className="space-y-3">
+                <Label>রঙ সেটিংস</Label>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">ব্যাকগ্রাউন্ড</Label>
+                    <input
+                      type="color"
+                      value={scrollerSettings.bgColor}
+                      onChange={(e) => setScrollerSettings(prev => ({ ...prev, bgColor: e.target.value }))}
+                      className="w-10 h-10 rounded cursor-pointer border"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">টেক্সট</Label>
+                    <input
+                      type="color"
+                      value={scrollerSettings.textColor}
+                      onChange={(e) => setScrollerSettings(prev => ({ ...prev, textColor: e.target.value }))}
+                      className="w-10 h-10 rounded cursor-pointer border"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">বুলেট</Label>
+                    <input
+                      type="color"
+                      value={scrollerSettings.bulletColor}
+                      onChange={(e) => setScrollerSettings(prev => ({ ...prev, bulletColor: e.target.value }))}
+                      className="w-10 h-10 rounded cursor-pointer border"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={saveScrollerSettings} disabled={savingScroller}>
+              {savingScroller ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              স্ক্রলার সেটিংস সংরক্ষণ করুন
+            </Button>
           </CardContent>
         </Card>
 
