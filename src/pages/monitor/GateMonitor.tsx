@@ -58,6 +58,15 @@ interface NewsItem {
   title_bn: string | null;
 }
 
+interface ScrollerSettings {
+  fontSize: number;
+  fontFamily: string;
+  speed: number;
+  bgColor: string;
+  textColor: string;
+  bulletColor: string;
+}
+
 interface VideoItem {
   id: string;
   title: string;
@@ -79,6 +88,14 @@ export default function GateMonitor() {
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [isPunchDisplay, setIsPunchDisplay] = useState(false);
   const punchDisplayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [scrollerSettings, setScrollerSettings] = useState<ScrollerSettings>({
+    fontSize: 24,
+    fontFamily: 'Hind Siliguri',
+    speed: 50,
+    bgColor: '#991B1B',
+    textColor: '#FFFFFF',
+    bulletColor: '#FDE047',
+  });
   
   // Local cache for instant lookup
   const studentCacheRef = useRef<Map<string, CachedStudent>>(new Map());
@@ -119,19 +136,29 @@ export default function GateMonitor() {
     };
   }, []);
 
-  // Load monitor settings (news, videos, logo)
+  // Load monitor settings (news, videos, logo, scroller settings)
   const loadMonitorSettings = async () => {
     try {
-      // Fetch logos
+      // Fetch logos and scroller settings
       const { data: settings } = await supabase
         .from('system_settings')
-        .select('monitor_logo_url, school_logo_url')
+        .select('monitor_logo_url, school_logo_url, scroller_font_size, scroller_font_family, scroller_speed, scroller_bg_color, scroller_text_color, scroller_bullet_color')
         .limit(1)
         .maybeSingle();
       
       if (settings) {
         setMonitorLogo(settings.monitor_logo_url);
         setSchoolLogo(settings.school_logo_url);
+        
+        // Update scroller settings
+        setScrollerSettings({
+          fontSize: settings.scroller_font_size ?? 24,
+          fontFamily: settings.scroller_font_family ?? 'Hind Siliguri',
+          speed: settings.scroller_speed ?? 50,
+          bgColor: settings.scroller_bg_color ?? '#991B1B',
+          textColor: settings.scroller_text_color ?? '#FFFFFF',
+          bulletColor: settings.scroller_bullet_color ?? '#FDE047',
+        });
       }
 
       // Fetch active news
@@ -1021,66 +1048,69 @@ export default function GateMonitor() {
               )}
             </div>
           )}
+
+          {/* News Scroller - ভিডিওর নিচে */}
+          {newsItems.length > 0 && (
+            <NewsScroller 
+              items={newsItems} 
+              logoUrl={monitorLogo} 
+              schoolLogoUrl={schoolLogo}
+              settings={scrollerSettings}
+            />
+          )}
         </div>
 
-        {/* Right: Recent Punches List - Hide during video mode */}
-        {!showVideoMode && (
-          <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
-            <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
-              <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {latestPunches.slice(0, 10).map((punch) => (
-                <div
-                  key={punch.id}
-                  className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
-                >
-                  {punch.photo_url ? (
-                    <img
-                      src={punch.photo_url}
-                      alt={punch.name}
-                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs sm:text-sm font-bold">
-                      {punch.name.charAt(0)}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium font-bengali truncate text-xs sm:text-sm">{punch.name_bn || punch.name}</p>
-                    <p className="text-white/40 text-xs truncate">
-                      {punch.class_name} {punch.section_name}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs sm:text-sm font-mono">{formatPunchTime(punch.punch_time)}</p>
-                    <div className={cn(
-                      "inline-block w-2 h-2 rounded-full mt-1",
-                      punch.status === 'present' ? 'bg-green-500' :
-                      punch.status === 'late' ? 'bg-yellow-500' :
-                      'bg-red-500'
-                    )} />
-                  </div>
-                </div>
-              ))}
-
-              {latestPunches.length === 0 && (
-                <div className="p-6 sm:p-8 text-center text-white/40">
-                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
-                  <p className="font-bengali text-xs sm:text-sm">আজকের কোনো পাঞ্চ নেই</p>
-                </div>
-              )}
-            </div>
+        {/* Right: Recent Punches List - সবসময় দেখাবে */}
+        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
+          <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
+            <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
+            <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
           </div>
-        )}
-      </main>
 
-      {/* News Scroller - TV Style */}
-      {newsItems.length > 0 && (
-        <NewsScroller items={newsItems} logoUrl={monitorLogo} schoolLogoUrl={schoolLogo} />
-      )}
+          <div className="flex-1 overflow-y-auto">
+            {latestPunches.slice(0, 10).map((punch) => (
+              <div
+                key={punch.id}
+                className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
+              >
+                {punch.photo_url ? (
+                  <img
+                    src={punch.photo_url}
+                    alt={punch.name}
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20"
+                  />
+                ) : (
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs sm:text-sm font-bold">
+                    {punch.name.charAt(0)}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium font-bengali truncate text-xs sm:text-sm">{punch.name_bn || punch.name}</p>
+                  <p className="text-white/40 text-xs truncate">
+                    {punch.class_name} {punch.section_name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs sm:text-sm font-mono">{formatPunchTime(punch.punch_time)}</p>
+                  <div className={cn(
+                    "inline-block w-2 h-2 rounded-full mt-1",
+                    punch.status === 'present' ? 'bg-green-500' :
+                    punch.status === 'late' ? 'bg-yellow-500' :
+                    'bg-red-500'
+                  )} />
+                </div>
+              </div>
+            ))}
+
+            {latestPunches.length === 0 && (
+              <div className="p-6 sm:p-8 text-center text-white/40">
+                <Clock className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                <p className="font-bengali text-xs sm:text-sm">আজকের কোনো পাঞ্চ নেই</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
 
       {/* Footer Status */}
       <footer className="p-3 sm:p-4 border-t border-white/10 flex items-center justify-between text-xs sm:text-sm text-white/60">

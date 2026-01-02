@@ -936,6 +936,12 @@ export type Database = {
           school_logo_url: string | null
           school_name: string | null
           school_name_bn: string | null
+          scroller_bg_color: string | null
+          scroller_bullet_color: string | null
+          scroller_font_family: string | null
+          scroller_font_size: number | null
+          scroller_speed: number | null
+          scroller_text_color: string | null
           timezone: string | null
           updated_at: string
         }
@@ -946,6 +952,12 @@ export type Database = {
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null
+          scroller_bg_color?: string | null
+          scroller_bullet_color?: string | null
+          scroller_font_family?: string | null
+          scroller_font_size?: number | null
+          scroller_speed?: number | null
+          scroller_text_color?: string | null
           timezone?: string | null
           updated_at?: string
         }
@@ -956,6 +968,12 @@ export type Database = {
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null
+          scroller_bg_color?: string | null
+          scroller_bullet_color?: string | null
+          scroller_font_family?: string | null
+          scroller_font_size?: number | null
+          scroller_speed?: number | null
+          scroller_text_color?: string | null
           timezone?: string | null
           updated_at?: string
         }
