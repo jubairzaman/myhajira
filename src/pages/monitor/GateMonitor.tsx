@@ -76,6 +76,7 @@ export default function GateMonitor() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
   const [monitorLogo, setMonitorLogo] = useState<string | null>(null);
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [isPunchDisplay, setIsPunchDisplay] = useState(false);
   const punchDisplayTimerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -121,15 +122,16 @@ export default function GateMonitor() {
   // Load monitor settings (news, videos, logo)
   const loadMonitorSettings = async () => {
     try {
-      // Fetch logo
+      // Fetch logos
       const { data: settings } = await supabase
         .from('system_settings')
-        .select('monitor_logo_url')
+        .select('monitor_logo_url, school_logo_url')
         .limit(1)
         .maybeSingle();
       
-      if (settings?.monitor_logo_url) {
+      if (settings) {
         setMonitorLogo(settings.monitor_logo_url);
+        setSchoolLogo(settings.school_logo_url);
       }
 
       // Fetch active news
@@ -319,7 +321,7 @@ export default function GateMonitor() {
   };
 
   // Process card - INSTANT from cache, background API
-  const processCard = useCallback((cardNumber: string) => {
+  const processCard = useCallback(async (cardNumber: string) => {
     if (!cardNumber || cardNumber.length < 4) return;
     
     console.log('[GateMonitor] Processing RFID card:', cardNumber);
@@ -385,11 +387,141 @@ export default function GateMonitor() {
       });
       
     } else {
-      // Card not found in cache
-      setLastApiResponse(`❌ কার্ড পাওয়া যায়নি: ${cardNumber}`);
-      toast.error('কার্ড পাওয়া যায়নি', {
-        description: `কার্ড নম্বর: ${cardNumber}`,
-      });
+      // Card not found in cache - try direct API lookup as fallback
+      console.log('[GateMonitor] Card not in cache, trying API fallback...');
+      
+      try {
+        // Try student cards first
+        const { data: studentCard } = await supabase
+          .from('rfid_cards_students')
+          .select(`
+            card_number,
+            student:students(
+              id, name, name_bn, photo_url,
+              classes(name),
+              sections(name),
+              shifts(name)
+            )
+          `)
+          .eq('card_number', cardNumber)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (studentCard?.student) {
+          const student = studentCard.student as any;
+          const newPunch: PunchRecord = {
+            id: 'api-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            person_id: student.id,
+            person_type: 'student',
+            name: student.name,
+            name_bn: student.name_bn,
+            photo_url: student.photo_url,
+            class_name: student.classes?.name || null,
+            section_name: student.sections?.name || null,
+            punch_time: punchTime,
+            status: 'present',
+          };
+          
+          setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
+          showPunchDisplayTemporarily();
+          playSuccessSound();
+          setLastApiResponse(`✅ ${student.name} - উপস্থিত (API)`);
+          toast.success(`${student.name}`, {
+            description: `${student.classes?.name || ''} ${student.sections?.name || ''}`,
+            duration: 2000,
+          });
+          
+          // Background API call
+          supabase.functions.invoke('process-punch', {
+            body: { card_number: cardNumber, device_ip: 'USB-READER', punch_time: punchTime }
+          }).catch(err => console.error('[GateMonitor] Background API failed:', err));
+          
+          // Add to cache for next time
+          const cached: CachedStudent = {
+            id: student.id,
+            name: student.name,
+            name_bn: student.name_bn,
+            photo_url: student.photo_url,
+            class_name: student.classes?.name || null,
+            section_name: student.sections?.name || null,
+            shift_name: student.shifts?.name || null,
+          };
+          studentCacheRef.current.set(cardNumber, cached);
+          
+          resetIdleTimer();
+          return;
+        }
+        
+        // Try teacher cards
+        const { data: teacherCard } = await supabase
+          .from('rfid_cards_teachers')
+          .select(`
+            card_number,
+            teacher:teachers(
+              id, name, name_bn, photo_url, designation,
+              shifts(name)
+            )
+          `)
+          .eq('card_number', cardNumber)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (teacherCard?.teacher) {
+          const teacher = teacherCard.teacher as any;
+          const newPunch: PunchRecord = {
+            id: 'api-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            person_id: teacher.id,
+            person_type: 'teacher',
+            name: teacher.name,
+            name_bn: teacher.name_bn,
+            photo_url: teacher.photo_url,
+            class_name: teacher.designation || null,
+            section_name: null,
+            punch_time: punchTime,
+            status: 'present',
+          };
+          
+          setLatestPunches(prev => [newPunch, ...prev].slice(0, 20));
+          showPunchDisplayTemporarily();
+          playSuccessSound();
+          setLastApiResponse(`✅ ${teacher.name} - উপস্থিত (API)`);
+          toast.success(`${teacher.name}`, {
+            description: teacher.designation || 'শিক্ষক',
+            duration: 2000,
+          });
+          
+          // Background API call
+          supabase.functions.invoke('process-punch', {
+            body: { card_number: cardNumber, device_ip: 'USB-READER', punch_time: punchTime }
+          }).catch(err => console.error('[GateMonitor] Background API failed:', err));
+          
+          // Add to cache for next time
+          const cachedTeacher: CachedTeacher = {
+            id: teacher.id,
+            name: teacher.name,
+            name_bn: teacher.name_bn,
+            photo_url: teacher.photo_url,
+            designation: teacher.designation,
+            shift_name: teacher.shifts?.name || null,
+          };
+          teacherCacheRef.current.set(cardNumber, cachedTeacher);
+          
+          resetIdleTimer();
+          return;
+        }
+        
+        // Not found in API either
+        setLastApiResponse(`❌ কার্ড পাওয়া যায়নি: ${cardNumber}`);
+        toast.error('কার্ড পাওয়া যায়নি', {
+          description: `কার্ড নম্বর: ${cardNumber}`,
+        });
+      } catch (apiError) {
+        console.error('[GateMonitor] API fallback failed:', apiError);
+        setLastApiResponse(`❌ কার্ড পাওয়া যায়নি: ${cardNumber}`);
+        toast.error('কার্ড পাওয়া যায়নি', {
+          description: `কার্ড নম্বর: ${cardNumber}`,
+        });
+      }
     }
     
     resetIdleTimer();
@@ -947,7 +1079,7 @@ export default function GateMonitor() {
 
       {/* News Scroller - TV Style */}
       {newsItems.length > 0 && (
-        <NewsScroller items={newsItems} logoUrl={monitorLogo} />
+        <NewsScroller items={newsItems} logoUrl={monitorLogo} schoolLogoUrl={schoolLogo} />
       )}
 
       {/* Footer Status */}

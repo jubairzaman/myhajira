@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, AlertCircle } from 'lucide-react';
 
 interface VideoItem {
   id: string;
@@ -16,63 +16,105 @@ interface VideoPlayerProps {
   className?: string;
 }
 
-// Convert Google Drive share URL to embed URL with autoplay
-function convertGoogleDriveUrl(url: string): string {
+// Convert Google Drive share URL to direct download/stream URL
+function convertToDirectUrl(url: string): string {
   // Pattern: https://drive.google.com/file/d/FILE_ID/view
   const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (fileIdMatch) {
-    return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview?autoplay=1&mute=1`;
+    return `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
   }
   
   // Pattern: https://drive.google.com/open?id=FILE_ID
   const openIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (openIdMatch) {
-    return `https://drive.google.com/file/d/${openIdMatch[1]}/preview?autoplay=1&mute=1`;
+    return `https://drive.google.com/uc?export=download&id=${openIdMatch[1]}`;
   }
   
-  // Already an embed URL or other format - add autoplay params if not present
-  if (!url.includes('autoplay')) {
-    return url + (url.includes('?') ? '&' : '?') + 'autoplay=1&mute=1';
-  }
   return url;
 }
 
 export function VideoPlayer({ videos, isPaused = false, onVideoEnd, hideControls = false, className }: VideoPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isIframeMuted, setIsIframeMuted] = useState(true);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-advance to next video every 60 seconds (Google Drive doesn't provide video end events)
-  useEffect(() => {
-    if (videos.length === 0 || isPaused) {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      return;
+  // Handle video end - move to next
+  const handleVideoEnd = useCallback(() => {
+    const nextIndex = (currentIndex + 1) % videos.length;
+    setCurrentIndex(nextIndex);
+    setHasError(false);
+    setIsLoading(true);
+    if (nextIndex === 0 && onVideoEnd) {
+      onVideoEnd();
     }
+  }, [currentIndex, videos.length, onVideoEnd]);
 
+  // Handle video error - skip to next after delay
+  const handleVideoError = useCallback(() => {
+    console.error('[VideoPlayer] Video error, skipping to next');
+    setHasError(true);
+    setIsLoading(false);
+    
+    // Auto-advance after 5 seconds on error
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
     timerRef.current = setTimeout(() => {
-      const nextIndex = (currentIndex + 1) % videos.length;
-      setCurrentIndex(nextIndex);
-      if (nextIndex === 0 && onVideoEnd) {
-        onVideoEnd();
+      handleVideoEnd();
+    }, 5000);
+  }, [handleVideoEnd]);
+
+  // Handle video loaded
+  const handleVideoLoaded = () => {
+    setIsLoading(false);
+    setHasError(false);
+  };
+
+  // Pause/Resume video based on isPaused prop
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isPaused) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play().catch(() => {
+          // Ignore autoplay errors
+        });
       }
-    }, 60000); // 60 seconds per video
+    }
+  }, [isPaused]);
+
+  // Reset when video changes
+  useEffect(() => {
+    setHasError(false);
+    setIsLoading(true);
+    
+    // Auto-advance fallback timer (60 seconds)
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      handleVideoEnd();
+    }, 60000);
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [currentIndex, videos.length, isPaused, onVideoEnd]);
+  }, [currentIndex, handleVideoEnd]);
 
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev - 1 + videos.length) % videos.length);
+    setHasError(false);
+    setIsLoading(true);
   };
 
   const handleNext = () => {
     setCurrentIndex((prev) => (prev + 1) % videos.length);
+    setHasError(false);
+    setIsLoading(true);
   };
 
   if (videos.length === 0) {
@@ -90,18 +132,43 @@ export function VideoPlayer({ videos, isPaused = false, onVideoEnd, hideControls
   }
 
   const currentVideo = videos[currentIndex];
-  const embedUrl = convertGoogleDriveUrl(currentVideo.video_url);
+  const videoUrl = convertToDirectUrl(currentVideo.video_url);
 
   return (
     <div className={cn("relative bg-black", className)}>
-      {/* Video iframe */}
-      <iframe
-        ref={iframeRef}
-        src={embedUrl}
-        className="w-full h-full"
-        allow="autoplay; encrypted-media"
-        allowFullScreen
-        style={{ border: 'none' }}
+      {/* Loading indicator */}
+      {isLoading && !hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+          <div className="text-white text-center">
+            <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+            <p className="font-bengali">ভিডিও লোড হচ্ছে...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+          <div className="text-white text-center">
+            <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
+            <p className="font-bengali text-lg mb-2">ভিডিও লোড করা যায়নি</p>
+            <p className="text-white/60 text-sm">পরবর্তী ভিডিও অটো প্লে হবে...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Video element */}
+      <video
+        ref={videoRef}
+        key={currentVideo.id}
+        src={videoUrl}
+        autoPlay
+        muted
+        playsInline
+        onEnded={handleVideoEnd}
+        onError={handleVideoError}
+        onLoadedData={handleVideoLoaded}
+        className="w-full h-full object-cover"
       />
 
       {/* Pause overlay */}
@@ -151,7 +218,11 @@ export function VideoPlayer({ videos, isPaused = false, onVideoEnd, hideControls
           {videos.map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentIndex(index)}
+              onClick={() => {
+                setCurrentIndex(index);
+                setHasError(false);
+                setIsLoading(true);
+              }}
               className={cn(
                 "w-2 h-2 rounded-full transition-all",
                 index === currentIndex ? "bg-white w-4" : "bg-white/40"
