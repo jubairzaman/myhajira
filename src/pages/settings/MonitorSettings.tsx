@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Tv, Image, FileText, Video, Plus, Trash2, Edit2, Save, Loader2, ArrowUp, ArrowDown, Palette, Type } from 'lucide-react';
+import { Tv, Image, FileText, Video, Plus, Trash2, Edit2, Save, Loader2, ArrowUp, ArrowDown, Palette, Type, Upload } from 'lucide-react';
 
 interface NewsItem {
   id: string;
@@ -63,9 +63,10 @@ export default function MonitorSettings() {
   // Videos
   const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
   const [newVideoTitle, setNewVideoTitle] = useState('');
-  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoFile, setNewVideoFile] = useState<File | null>(null);
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
   const [showVideoDialog, setShowVideoDialog] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   // Scroller Settings
   const [scrollerSettings, setScrollerSettings] = useState<ScrollerSettings>({
@@ -317,17 +318,61 @@ export default function MonitorSettings() {
     }
   };
 
-  // Video handlers
-  const addVideo = async () => {
-    if (!newVideoTitle.trim() || !newVideoUrl.trim()) return;
+  // Video handlers - with file upload
+  const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    // Validate file type
+    const validTypes = ['video/mp4', 'video/webm', 'video/ogg'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('শুধুমাত্র MP4, WebM বা OGG ফাইল সাপোর্টেড');
+      return;
+    }
+
+    // Validate file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('ফাইল সাইজ ১০০MB এর বেশি হতে পারবে না');
+      return;
+    }
+
+    setNewVideoFile(file);
+  };
+
+  const addVideo = async () => {
+    if (!newVideoTitle.trim() || !newVideoFile) {
+      toast.error('ভিডিওর নাম এবং ফাইল দিন');
+      return;
+    }
+
+    setUploadingVideo(true);
     try {
+      // Upload video to storage
+      const fileExt = newVideoFile.name.split('.').pop();
+      const fileName = `monitor-video-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(fileName, newVideoFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(fileName);
+
+      // Add to database
       const maxOrder = Math.max(0, ...videoItems.map(v => v.display_order));
       const { data, error } = await supabase
         .from('monitor_videos')
         .insert({
           title: newVideoTitle,
-          video_url: newVideoUrl,
+          video_url: publicUrlData.publicUrl,
           display_order: maxOrder + 1,
         })
         .select()
@@ -337,16 +382,18 @@ export default function MonitorSettings() {
 
       setVideoItems([...videoItems, data]);
       setNewVideoTitle('');
-      setNewVideoUrl('');
+      setNewVideoFile(null);
       setShowVideoDialog(false);
-      toast.success('ভিডিও যোগ করা হয়েছে');
+      toast.success('ভিডিও আপলোড সম্পন্ন');
     } catch (error) {
       console.error('Error adding video:', error);
-      toast.error('ভিডিও যোগ ব্যর্থ');
+      toast.error('ভিডিও আপলোড ব্যর্থ');
+    } finally {
+      setUploadingVideo(false);
     }
   };
 
-  const updateVideo = async () => {
+  const updateVideoTitle = async () => {
     if (!editingVideo) return;
 
     try {
@@ -354,7 +401,6 @@ export default function MonitorSettings() {
         .from('monitor_videos')
         .update({
           title: editingVideo.title,
-          video_url: editingVideo.video_url,
         })
         .eq('id', editingVideo.id);
 
@@ -388,12 +434,24 @@ export default function MonitorSettings() {
 
   const deleteVideo = async (id: string) => {
     try {
+      // Get video URL to delete from storage
+      const video = videoItems.find(v => v.id === id);
+      
+      // Delete from database
       const { error } = await supabase
         .from('monitor_videos')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
+      // Try to delete from storage (optional, may fail if file doesn't exist)
+      if (video?.video_url) {
+        const fileName = video.video_url.split('/').pop();
+        if (fileName) {
+          await supabase.storage.from('videos').remove([fileName]).catch(() => {});
+        }
+      }
 
       setVideoItems(videoItems.filter(v => v.id !== id));
       toast.success('ভিডিও মুছে ফেলা হয়েছে');
@@ -617,7 +675,7 @@ export default function MonitorSettings() {
                   <FileText className="h-5 w-5" />
                   নিউজ স্ক্রলার
                 </CardTitle>
-                <CardDescription>মনিটরের নিচে স্ক্রল হওয়া নিউজ হেডলাইন</CardDescription>
+                <CardDescription>মনিটরের নিচে স্ক্রল হওয়া নিউজ হেডলাইন (শুধুমাত্র আইডল মোডে দেখাবে)</CardDescription>
               </div>
               <Dialog open={showNewsDialog} onOpenChange={setShowNewsDialog}>
                 <DialogTrigger asChild>
@@ -750,22 +808,29 @@ export default function MonitorSettings() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Video className="h-5 w-5" />
-                  ভিডিও অ্যাড
+                  ভিডিও
                 </CardTitle>
-                <CardDescription>মনিটরে প্লে হওয়া ভিডিও (Google Drive লিংক)</CardDescription>
+                <CardDescription>আইডল মোডে প্লে হওয়া ভিডিও আপলোড করুন (MP4, WebM সাপোর্টেড, সর্বোচ্চ ১০০MB)</CardDescription>
               </div>
-              <Dialog open={showVideoDialog} onOpenChange={setShowVideoDialog}>
+              <Dialog open={showVideoDialog} onOpenChange={(open) => {
+                setShowVideoDialog(open);
+                if (!open) {
+                  setEditingVideo(null);
+                  setNewVideoTitle('');
+                  setNewVideoFile(null);
+                }
+              }}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => { setEditingVideo(null); setNewVideoTitle(''); setNewVideoUrl(''); }}>
+                  <Button onClick={() => { setEditingVideo(null); setNewVideoTitle(''); setNewVideoFile(null); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     নতুন ভিডিও
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{editingVideo ? 'ভিডিও সম্পাদনা' : 'নতুন ভিডিও যোগ করুন'}</DialogTitle>
+                    <DialogTitle>{editingVideo ? 'ভিডিও সম্পাদনা' : 'নতুন ভিডিও আপলোড করুন'}</DialogTitle>
                     <DialogDescription>
-                      Google Drive এ ভিডিও আপলোড করে লিংক পেস্ট করুন
+                      {editingVideo ? 'শুধুমাত্র ভিডিওর শিরোনাম পরিবর্তন করা যাবে' : 'MP4 বা WebM ফরম্যাটের ভিডিও আপলোড করুন'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
@@ -780,25 +845,47 @@ export default function MonitorSettings() {
                         placeholder="ভিডিওর নাম লিখুন"
                       />
                     </div>
-                    <div>
-                      <Label>Google Drive লিংক</Label>
-                      <Input
-                        value={editingVideo ? editingVideo.video_url : newVideoUrl}
-                        onChange={(e) => editingVideo
-                          ? setEditingVideo({ ...editingVideo, video_url: e.target.value })
-                          : setNewVideoUrl(e.target.value)
-                        }
-                        placeholder="https://drive.google.com/file/d/..."
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ভিডিও শেয়ার করার সময় "Anyone with the link" সিলেক্ট করুন
-                      </p>
-                    </div>
+                    {!editingVideo && (
+                      <div>
+                        <Label>ভিডিও ফাইল</Label>
+                        <div className="mt-2">
+                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                              {newVideoFile ? (
+                                <p className="text-sm text-foreground font-medium">{newVideoFile.name}</p>
+                              ) : (
+                                <>
+                                  <p className="text-sm text-muted-foreground">ভিডিও ফাইল সিলেক্ট করুন</p>
+                                  <p className="text-xs text-muted-foreground mt-1">MP4, WebM, OGG (সর্বোচ্চ ১০০MB)</p>
+                                </>
+                              )}
+                            </div>
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="video/mp4,video/webm,video/ogg"
+                              onChange={handleVideoFileSelect}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowVideoDialog(false)}>বাতিল</Button>
-                    <Button onClick={editingVideo ? updateVideo : addVideo}>
-                      {editingVideo ? 'আপডেট করুন' : 'যোগ করুন'}
+                    <Button 
+                      onClick={editingVideo ? updateVideoTitle : addVideo}
+                      disabled={uploadingVideo || (!editingVideo && (!newVideoTitle.trim() || !newVideoFile))}
+                    >
+                      {uploadingVideo ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          আপলোড হচ্ছে...
+                        </>
+                      ) : (
+                        editingVideo ? 'আপডেট করুন' : 'আপলোড করুন'
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -814,7 +901,6 @@ export default function MonitorSettings() {
                   <TableRow>
                     <TableHead className="w-12">ক্রম</TableHead>
                     <TableHead>শিরোনাম</TableHead>
-                    <TableHead>লিংক</TableHead>
                     <TableHead className="w-24">সক্রিয়</TableHead>
                     <TableHead className="w-32">কার্যক্রম</TableHead>
                   </TableRow>
@@ -844,16 +930,11 @@ export default function MonitorSettings() {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{video.title}</TableCell>
                       <TableCell>
-                        <a 
-                          href={video.video_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline text-sm truncate block max-w-[200px]"
-                        >
-                          {video.video_url}
-                        </a>
+                        <p className="font-medium">{video.title}</p>
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {video.video_url.includes('supabase') ? '📁 আপলোডেড ফাইল' : video.video_url}
+                        </p>
                       </TableCell>
                       <TableCell>
                         <Switch

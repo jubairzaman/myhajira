@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Play, Pause, AlertCircle, ExternalLink } from 'lucide-react';
+import { Play, Pause, AlertCircle } from 'lucide-react';
 
 interface VideoItem {
   id: string;
@@ -16,40 +16,10 @@ interface VideoPlayerProps {
   className?: string;
 }
 
-function extractGoogleDriveFileId(url: string): string | null {
-  const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (fileIdMatch) return fileIdMatch[1];
-
-  const openIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if (openIdMatch) return openIdMatch[1];
-
-  return null;
-}
-
-// Check if URL is a Google Drive link
-function isGoogleDriveUrl(url: string): boolean {
-  return url.includes('drive.google.com') || url.includes('docs.google.com');
-}
-
-// Best-effort direct URL for HTML5 video (may fail due to Drive restrictions)
-function convertToDirectUrl(url: string): string {
-  const fileId = extractGoogleDriveFileId(url);
-  if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}`;
-  return url;
-}
-
-// Reliable embed URL for Google Drive (usually loads, but autoplay may be blocked)
-function convertToPreviewUrl(url: string): string {
-  const fileId = extractGoogleDriveFileId(url);
-  if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
-  return url;
-}
-
 export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
   ({ videos, isPaused = false, onVideoEnd, hideControls = false, className }, ref) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
-    const [useIframeFallback, setUseIframeFallback] = useState(false);
     const [hasError, setHasError] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,22 +30,16 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
       setCurrentIndex(nextIndex);
       setIsLoading(true);
       setHasError(false);
-      setUseIframeFallback(false);
 
       if (nextIndex === 0 && onVideoEnd) {
         onVideoEnd();
       }
     }, [currentIndex, videos.length, onVideoEnd]);
 
-    // Reset when video changes - use iframe immediately for Google Drive
+    // Reset when video changes
     useEffect(() => {
-      const currentVideo = videos[currentIndex];
-      const shouldUseIframe = currentVideo && isGoogleDriveUrl(currentVideo.video_url);
-      
       setIsLoading(true);
       setHasError(false);
-      // Skip failed direct URL attempt for Google Drive - use iframe immediately
-      setUseIframeFallback(shouldUseIframe);
 
       // Auto-advance fallback timer (60 seconds)
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -86,12 +50,11 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
       return () => {
         if (timerRef.current) clearTimeout(timerRef.current);
       };
-    }, [currentIndex, handleVideoEnd, videos]);
+    }, [currentIndex, handleVideoEnd]);
 
-    // Pause/Resume only affects HTML5 video. For iframe we just show overlay.
+    // Pause/Resume video
     useEffect(() => {
       if (!videoRef.current) return;
-      if (useIframeFallback) return;
 
       if (isPaused) {
         videoRef.current.pause();
@@ -100,20 +63,18 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
           // Ignore autoplay errors
         });
       }
-    }, [isPaused, useIframeFallback]);
+    }, [isPaused]);
 
     const handlePrevious = () => {
       setCurrentIndex((prev) => (prev - 1 + videos.length) % videos.length);
       setIsLoading(true);
       setHasError(false);
-      setUseIframeFallback(false);
     };
 
     const handleNext = () => {
       setCurrentIndex((prev) => (prev + 1) % videos.length);
       setIsLoading(true);
       setHasError(false);
-      setUseIframeFallback(false);
     };
 
     const handleVideoLoaded = () => {
@@ -121,31 +82,17 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
       setHasError(false);
     };
 
-    const handleIframeLoaded = () => {
-      setIsLoading(false);
-      setHasError(false);
-    };
-
     const handleVideoError = useCallback(() => {
-      // 1st failure: fallback to iframe preview (more reliable for Drive)
-      if (!useIframeFallback) {
-        console.warn('[VideoPlayer] HTML5 video failed, falling back to Google Drive preview iframe');
-        setUseIframeFallback(true);
-        setIsLoading(true);
-        setHasError(false);
-        return;
-      }
-
-      // 2nd failure: show error + auto-advance
-      console.error('[VideoPlayer] Video error even in fallback, skipping to next');
+      console.error('[VideoPlayer] Video error, skipping to next');
       setHasError(true);
       setIsLoading(false);
 
+      // Auto-advance after 5 seconds on error
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         handleVideoEnd();
       }, 5000);
-    }, [handleVideoEnd, useIframeFallback]);
+    }, [handleVideoEnd]);
 
     if (videos.length === 0) {
       return (
@@ -159,8 +106,6 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
     }
 
     const currentVideo = videos[currentIndex];
-    const directUrl = convertToDirectUrl(currentVideo.video_url);
-    const previewUrl = convertToPreviewUrl(currentVideo.video_url);
 
     return (
       <div ref={ref} className={cn('relative bg-black', className)}>
@@ -185,31 +130,20 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
           </div>
         )}
 
-        {/* Player */}
-        {!useIframeFallback ? (
-          <video
-            ref={videoRef}
-            key={currentVideo.id}
-            src={directUrl}
-            autoPlay
-            muted
-            playsInline
-            onEnded={handleVideoEnd}
-            onError={handleVideoError}
-            onLoadedData={handleVideoLoaded}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <iframe
-            key={`${currentVideo.id}-iframe`}
-            src={previewUrl}
-            className="w-full h-full"
-            allow="autoplay; encrypted-media"
-            allowFullScreen
-            style={{ border: 'none' }}
-            onLoad={handleIframeLoaded}
-          />
-        )}
+        {/* Video Player */}
+        <video
+          ref={videoRef}
+          key={currentVideo.id}
+          src={currentVideo.video_url}
+          autoPlay
+          muted
+          loop={videos.length === 1}
+          playsInline
+          onEnded={handleVideoEnd}
+          onError={handleVideoError}
+          onLoadedData={handleVideoLoaded}
+          className="w-full h-full object-cover"
+        />
 
         {/* Pause overlay */}
         {isPaused && (
@@ -218,21 +152,6 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
               <Pause className="h-16 w-16 mx-auto mb-4" />
               <p className="text-2xl font-bengali">পাঞ্চ প্রদর্শন হচ্ছে</p>
             </div>
-          </div>
-        )}
-
-        {/* Note for Drive fallback (only when iframe fallback) */}
-        {useIframeFallback && !hideControls && (
-          <div className="absolute top-3 right-3 z-30">
-            <a
-              href={currentVideo.video_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white/90 backdrop-blur hover:bg-black/60 transition-colors"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Google Drive Preview
-            </a>
           </div>
         )}
 
@@ -273,7 +192,6 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
                   setCurrentIndex(index);
                   setIsLoading(true);
                   setHasError(false);
-                  setUseIframeFallback(false);
                 }}
                 className={cn(
                   'w-2 h-2 rounded-full transition-all',
