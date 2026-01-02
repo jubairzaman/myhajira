@@ -648,14 +648,14 @@ export default function SchoolCalendar() {
                       <div key={cls.id} className="flex items-center justify-between p-2 bg-background rounded">
                         <span className="text-sm font-bengali">{cls.name_bn || cls.name}</span>
                         <Select
-                          value={classEntries[cls.id] || ''}
-                          onValueChange={(value) => setClassEntries(prev => ({ ...prev, [cls.id]: value }))}
+                          value={classEntries[cls.id] || 'none'}
+                          onValueChange={(value) => setClassEntries(prev => ({ ...prev, [cls.id]: value === 'none' ? '' : value }))}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue placeholder="সিলেক্ট করুন" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-</SelectItem>
+                            <SelectItem value="none">-</SelectItem>
                             {ENTRY_TYPES.map((type) => (
                               <SelectItem key={type.value} value={type.value}>
                                 <span className="font-bengali">{type.labelBn}</span>
