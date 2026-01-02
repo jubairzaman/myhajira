@@ -27,57 +27,54 @@ export function NewsScroller({ items, logoUrl, className }: NewsScrollerProps) {
   return (
     <div 
       className={cn(
-        "news-scroller-container relative h-12 sm:h-14 bg-gradient-to-r from-red-700 via-red-600 to-red-700 overflow-hidden",
+        "news-scroller-container flex h-16 sm:h-20 overflow-hidden",
         className
       )}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Left gradient overlay */}
-      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-red-700 to-transparent z-10" />
-      
-      {/* Logo */}
-      {logoUrl && (
-        <div className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
+      {/* Fixed Logo Area - বাম পাশে */}
+      <div className="flex-shrink-0 bg-red-800 px-4 sm:px-6 flex items-center gap-3 border-r border-red-600">
+        {logoUrl ? (
           <img 
             src={logoUrl} 
             alt="Logo" 
-            className="h-8 sm:h-10 w-auto object-contain"
+            className="h-10 sm:h-14 w-auto object-contain"
           />
-        </div>
-      )}
-      
-      {/* Breaking news badge */}
-      <div className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2" style={{ left: logoUrl ? '60px' : '16px' }}>
-        <span className="bg-white text-red-700 px-2 sm:px-3 py-1 text-xs sm:text-sm font-bold rounded animate-pulse">
-          সংবাদ
-        </span>
+        ) : (
+          <span className="bg-white text-red-700 px-3 sm:px-4 py-1.5 text-sm sm:text-base font-bold rounded animate-pulse font-bengali">
+            সংবাদ
+          </span>
+        )}
       </div>
 
-      {/* Right gradient overlay */}
-      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-red-700 to-transparent z-10" />
+      {/* Scrolling Area - লোগোর পরে */}
+      <div className="flex-1 relative bg-gradient-to-r from-red-700 via-red-600 to-red-700 overflow-hidden">
+        {/* Right gradient overlay */}
+        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-red-700 to-transparent z-10" />
 
-      {/* Scrolling content */}
-      <div 
-        ref={scrollRef}
-        className={cn(
-          "news-scroller-content flex items-center h-full whitespace-nowrap",
-          !isPaused && "animate-news-scroll"
-        )}
-        style={{ 
-          paddingLeft: logoUrl ? '140px' : '100px',
-          animationDuration: `${items.length * 8}s`
-        }}
-      >
-        {displayItems.map((item, index) => (
-          <span 
-            key={`${item.id}-${index}`} 
-            className="inline-flex items-center text-white font-bengali text-sm sm:text-lg mx-4 sm:mx-8"
-          >
-            <span className="text-yellow-300 mr-2 sm:mr-3">●</span>
-            {item.title_bn || item.title}
-          </span>
-        ))}
+        {/* Scrolling content */}
+        <div 
+          ref={scrollRef}
+          className={cn(
+            "news-scroller-content flex items-center h-full whitespace-nowrap",
+            !isPaused && "animate-news-scroll"
+          )}
+          style={{ 
+            paddingLeft: '24px',
+            animationDuration: `${items.length * 8}s`
+          }}
+        >
+          {displayItems.map((item, index) => (
+            <span 
+              key={`${item.id}-${index}`} 
+              className="inline-flex items-center text-white font-bengali text-xl sm:text-2xl lg:text-3xl font-semibold mx-6 sm:mx-10"
+            >
+              <span className="text-yellow-300 mr-3 sm:mr-4">●</span>
+              {item.title_bn || item.title}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

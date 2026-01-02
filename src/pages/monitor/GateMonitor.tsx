@@ -771,6 +771,7 @@ export default function GateMonitor() {
               <VideoPlayer 
                 videos={videoItems} 
                 isPaused={isPunchDisplay}
+                hideControls={true}
                 className="absolute inset-0"
               />
             </div>
@@ -890,56 +891,58 @@ export default function GateMonitor() {
           )}
         </div>
 
-        {/* Right: Recent Punches List */}
-        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
-          <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
-            <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
-            <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
-          </div>
+        {/* Right: Recent Punches List - Hide during video mode */}
+        {!showVideoMode && (
+          <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-hidden flex flex-col max-h-64 lg:max-h-none">
+            <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
+              <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
+            </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {latestPunches.slice(0, 10).map((punch) => (
-              <div
-                key={punch.id}
-                className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
-              >
-                {punch.photo_url ? (
-                  <img
-                    src={punch.photo_url}
-                    alt={punch.name}
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20"
-                  />
-                ) : (
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs sm:text-sm font-bold">
-                    {punch.name.charAt(0)}
+            <div className="flex-1 overflow-y-auto">
+              {latestPunches.slice(0, 10).map((punch) => (
+                <div
+                  key={punch.id}
+                  className="p-2 sm:p-3 border-b border-white/5 flex items-center gap-2 sm:gap-3 hover:bg-white/5 transition-colors"
+                >
+                  {punch.photo_url ? (
+                    <img
+                      src={punch.photo_url}
+                      alt={punch.name}
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs sm:text-sm font-bold">
+                      {punch.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium font-bengali truncate text-xs sm:text-sm">{punch.name_bn || punch.name}</p>
+                    <p className="text-white/40 text-xs truncate">
+                      {punch.class_name} {punch.section_name}
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium font-bengali truncate text-xs sm:text-sm">{punch.name_bn || punch.name}</p>
-                  <p className="text-white/40 text-xs truncate">
-                    {punch.class_name} {punch.section_name}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-xs sm:text-sm font-mono">{formatPunchTime(punch.punch_time)}</p>
+                    <div className={cn(
+                      "inline-block w-2 h-2 rounded-full mt-1",
+                      punch.status === 'present' ? 'bg-green-500' :
+                      punch.status === 'late' ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    )} />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs sm:text-sm font-mono">{formatPunchTime(punch.punch_time)}</p>
-                  <div className={cn(
-                    "inline-block w-2 h-2 rounded-full mt-1",
-                    punch.status === 'present' ? 'bg-green-500' :
-                    punch.status === 'late' ? 'bg-yellow-500' :
-                    'bg-red-500'
-                  )} />
-                </div>
-              </div>
-            ))}
+              ))}
 
-            {latestPunches.length === 0 && (
-              <div className="p-6 sm:p-8 text-center text-white/40">
-                <Clock className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
-                <p className="font-bengali text-xs sm:text-sm">আজকের কোনো পাঞ্চ নেই</p>
-              </div>
-            )}
+              {latestPunches.length === 0 && (
+                <div className="p-6 sm:p-8 text-center text-white/40">
+                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                  <p className="font-bengali text-xs sm:text-sm">আজকের কোনো পাঞ্চ নেই</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* News Scroller - TV Style */}
