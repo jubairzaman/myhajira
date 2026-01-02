@@ -118,6 +118,8 @@ export default function TeacherList() {
                   src={teacher.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${teacher.id}`}
                   alt={teacher.name}
                   className="w-16 h-16 rounded-full bg-muted"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

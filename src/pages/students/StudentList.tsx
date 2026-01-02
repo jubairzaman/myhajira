@@ -162,6 +162,7 @@ export default function StudentList() {
                         alt={student.name}
                         className="w-10 h-10 rounded-full bg-muted"
                         loading="lazy"
+                        decoding="async"
                       />
                       <div>
                         <p className="font-medium text-foreground">{student.name}</p>
