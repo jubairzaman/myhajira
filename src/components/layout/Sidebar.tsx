@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users,
@@ -20,6 +21,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NavItem {
   label: string;
@@ -106,7 +109,9 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { signOut } = useAuth();
+  const { activeYear } = useAcademicYear();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const handleLogout = async () => {
@@ -119,11 +124,55 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
     );
   };
-
   const isActive = (href?: string) => {
     if (!href) return false;
     return location.pathname === href;
   };
+
+  // Prefetch data on link hover for faster navigation
+  const handlePrefetch = useCallback((href?: string) => {
+    if (!href || !activeYear?.id) return;
+    
+    if (href === '/students') {
+      queryClient.prefetchQuery({
+        queryKey: ['students', activeYear.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('students')
+            .select(`
+              id, name, name_bn, student_id_number, guardian_mobile, blood_group, photo_url, is_active,
+              shift:shifts(id, name),
+              class:classes(id, name),
+              section:sections(id, name),
+              rfid_card:rfid_cards_students(card_number)
+            `)
+            .eq('academic_year_id', activeYear.id)
+            .eq('is_active', true)
+            .order('name');
+          return data;
+        },
+        staleTime: 5 * 60 * 1000,
+      });
+    } else if (href === '/teachers') {
+      queryClient.prefetchQuery({
+        queryKey: ['teachers', activeYear.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('teachers')
+            .select(`
+              id, name, name_bn, designation, mobile, blood_group, photo_url, is_active,
+              shift:shifts(id, name),
+              rfid_card:rfid_cards_teachers(card_number)
+            `)
+            .eq('academic_year_id', activeYear.id)
+            .eq('is_active', true)
+            .order('name');
+          return data;
+        },
+        staleTime: 5 * 60 * 1000,
+      });
+    }
+  }, [queryClient, activeYear?.id]);
 
   const handleNavClick = () => {
     if (onClose) {
@@ -173,6 +222,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         key={item.label}
         to={item.href || '#'}
         onClick={handleNavClick}
+        onMouseEnter={() => handlePrefetch(item.href)}
         className={cn(
           'nav-item',
           level > 0 && 'pl-10',

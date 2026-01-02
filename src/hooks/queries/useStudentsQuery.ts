@@ -50,6 +50,28 @@ export function useStudentsQuery(academicYearId: string | undefined) {
     },
     enabled: !!academicYearId,
     staleTime: 5 * 60 * 1000, // 5 minutes cache
+    placeholderData: (previousData) => previousData, // Show old data while refetching
+  });
+}
+
+// Lightweight count query for dashboard
+export function useStudentCountQuery(academicYearId: string | undefined) {
+  return useQuery({
+    queryKey: ['students-count', academicYearId],
+    queryFn: async () => {
+      if (!academicYearId) return 0;
+
+      const { count, error } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('academic_year_id', academicYearId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!academicYearId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
