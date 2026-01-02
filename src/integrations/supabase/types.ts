@@ -251,6 +251,66 @@ export type Database = {
         }
         Relationships: []
       }
+      monitor_news: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monitor_videos: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: []
+      }
       panels: {
         Row: {
           absent_cutoff_time: string
@@ -872,6 +932,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          monitor_logo_url: string | null
           school_logo_url: string | null
           school_name: string | null
           school_name_bn: string | null
@@ -881,6 +942,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          monitor_logo_url?: string | null
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null
@@ -890,6 +952,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          monitor_logo_url?: string | null
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null
