@@ -11,29 +11,33 @@ interface VideoItem {
 interface VideoPlayerProps {
   videos: VideoItem[];
   isPaused?: boolean;
+  hideControls?: boolean;
   onVideoEnd?: () => void;
   className?: string;
 }
 
-// Convert Google Drive share URL to embed URL
+// Convert Google Drive share URL to embed URL with autoplay
 function convertGoogleDriveUrl(url: string): string {
   // Pattern: https://drive.google.com/file/d/FILE_ID/view
   const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (fileIdMatch) {
-    return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+    return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview?autoplay=1&mute=1`;
   }
   
   // Pattern: https://drive.google.com/open?id=FILE_ID
   const openIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (openIdMatch) {
-    return `https://drive.google.com/file/d/${openIdMatch[1]}/preview`;
+    return `https://drive.google.com/file/d/${openIdMatch[1]}/preview?autoplay=1&mute=1`;
   }
   
-  // Already an embed URL or other format
+  // Already an embed URL or other format - add autoplay params if not present
+  if (!url.includes('autoplay')) {
+    return url + (url.includes('?') ? '&' : '?') + 'autoplay=1&mute=1';
+  }
   return url;
 }
 
-export function VideoPlayer({ videos, isPaused = false, onVideoEnd, className }: VideoPlayerProps) {
+export function VideoPlayer({ videos, isPaused = false, onVideoEnd, hideControls = false, className }: VideoPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isIframeMuted, setIsIframeMuted] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -110,37 +114,39 @@ export function VideoPlayer({ videos, isPaused = false, onVideoEnd, className }:
         </div>
       )}
 
-      {/* Video info bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <p className="text-white text-sm font-medium truncate max-w-[200px]">
-              {currentVideo.title}
-            </p>
-            <span className="text-white/60 text-sm">
-              {currentIndex + 1} / {videos.length}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevious}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-            >
-              ◀
-            </button>
-            <button
-              onClick={handleNext}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-            >
-              ▶
-            </button>
+      {/* Video info bar - only show when not hideControls */}
+      {!hideControls && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <p className="text-white text-sm font-medium truncate max-w-[200px]">
+                {currentVideo.title}
+              </p>
+              <span className="text-white/60 text-sm">
+                {currentIndex + 1} / {videos.length}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrevious}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+              >
+                ◀
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+              >
+                ▶
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Video indicator dots */}
-      {videos.length > 1 && (
+      {/* Video indicator dots - only show when not hideControls */}
+      {!hideControls && videos.length > 1 && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-2">
           {videos.map((_, index) => (
             <button
