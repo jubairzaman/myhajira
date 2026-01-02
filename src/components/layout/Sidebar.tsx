@@ -105,7 +105,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Structure', 'Attendance', 'Live Monitor', 'Settings']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const handleLogout = async () => {
     await signOut();
@@ -219,7 +219,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 sidebar-scroll">
         {navItems.map((item) => renderNavItem(item))}
       </nav>
 
