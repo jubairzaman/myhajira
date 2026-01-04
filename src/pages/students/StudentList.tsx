@@ -45,21 +45,20 @@ export default function StudentList() {
   const { data: classes = [] } = useClassesQuery();
 
   const handleDelete = useCallback(async (studentId: string) => {
-    if (!confirm('Are you sure you want to deactivate this student?')) return;
+    if (!confirm('আপনি কি এই শিক্ষার্থীকে স্থায়ীভাবে মুছে ফেলতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।')) return;
     
     try {
       const { error } = await supabase
         .from('students')
-        .update({ is_active: false })
+        .delete()
         .eq('id', studentId);
 
       if (error) throw error;
       
-      toast.success('Student deactivated');
-      // Invalidate and refetch students
+      toast.success('শিক্ষার্থী মুছে ফেলা হয়েছে');
       queryClient.invalidateQueries({ queryKey: ['students', activeYear?.id] });
     } catch (error: any) {
-      toast.error('Failed to deactivate student');
+      toast.error('শিক্ষার্থী মুছে ফেলা সম্ভব হয়নি');
     }
   }, [activeYear?.id, queryClient]);
 
@@ -215,7 +214,7 @@ export default function StudentList() {
                           onClick={() => handleDelete(student.id)}
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Deactivate
+                          Delete / মুছুন
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
