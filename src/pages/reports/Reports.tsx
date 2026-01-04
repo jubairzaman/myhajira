@@ -1,502 +1,547 @@
-import { useState, useEffect } from 'react';
+/**
+ * Reports Page - Attendance Reports System
+ * Developed by Jubair Zaman
+ * 
+ * Three Real-Time Reports:
+ * 1. Monthly Student Attendance Report (A4 Portrait)
+ * 2. Monthly Class Attendance Register (A3 Landscape)
+ * 3. Monthly Teacher Attendance Report (A4 Portrait)
+ */
+
+import { useState, useEffect, useRef } from 'react';
+import { format } from 'date-fns';
+import { FileText, Printer, Users, GraduationCap, UserCheck, Calendar } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { FileText, Download, Users, GraduationCap, Clock, BarChart3, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { Input } from '@/components/ui/input';
+import { StudentMonthlyReport } from './components/StudentMonthlyReport';
+import { ClassMonthlyReport } from './components/ClassMonthlyReport';
+import { TeacherMonthlyReport } from './components/TeacherMonthlyReport';
 
-interface AttendanceStats {
-  total: number;
-  present: number;
-  late: number;
-  absent: number;
-}
-
-interface AttendanceRecord {
+interface AcademicYear {
   id: string;
   name: string;
-  class_name: string | null;
-  section_name: string | null;
-  punch_time: string;
-  status: string;
+}
+
+interface ClassData {
+  id: string;
+  name: string;
+  name_bn: string | null;
+}
+
+interface SectionData {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  class_id: string;
+}
+
+interface StudentData {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  student_id_number: string | null;
+  class_id: string;
+  section_id: string;
+}
+
+interface TeacherData {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  designation: string;
 }
 
 export default function Reports() {
   const { activeYear } = useAcademicYear();
-  const [reportType, setReportType] = useState('student-daily');
-  const [dateRange, setDateRange] = useState({
-    start: new Date().toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
-  const [selectedClass, setSelectedClass] = useState('all');
-  const [classes, setClasses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<AttendanceStats>({ total: 0, present: 0, late: 0, absent: 0 });
-  const [reportData, setReportData] = useState<AttendanceRecord[]>([]);
+  const reportRef = useRef<HTMLDivElement>(null);
 
+  // Common State
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+
+  // Student Report State
+  const [classes, setClasses] = useState<ClassData[]>([]);
+  const [sections, setSections] = useState<SectionData[]>([]);
+  const [students, setStudents] = useState<StudentData[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedSection, setSelectedSection] = useState<string>('');
+  const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [showStudentReport, setShowStudentReport] = useState(false);
+
+  // Class Report State
+  const [classReportClass, setClassReportClass] = useState<string>('');
+  const [classReportSection, setClassReportSection] = useState<string>('');
+  const [classReportSections, setClassReportSections] = useState<SectionData[]>([]);
+  const [showClassReport, setShowClassReport] = useState(false);
+
+  // Teacher Report State
+  const [teachers, setTeachers] = useState<TeacherData[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState<string>('');
+  const [showTeacherReport, setShowTeacherReport] = useState(false);
+
+  // Fetch academic years on mount
   useEffect(() => {
+    const fetchAcademicYears = async () => {
+      const { data } = await supabase
+        .from('academic_years')
+        .select('id, name')
+        .eq('is_archived', false)
+        .order('start_date', { ascending: false });
+
+      if (data) {
+        setAcademicYears(data);
+        if (activeYear) {
+          setSelectedYear(activeYear.id);
+        } else if (data.length > 0) {
+          setSelectedYear(data[0].id);
+        }
+      }
+    };
+    fetchAcademicYears();
+  }, [activeYear]);
+
+  // Fetch classes when academic year changes
+  useEffect(() => {
+    if (!selectedYear) return;
+
+    const fetchClasses = async () => {
+      const { data } = await supabase
+        .from('classes')
+        .select('id, name, name_bn')
+        .eq('is_active', true)
+        .order('grade_order');
+
+      if (data) {
+        setClasses(data);
+      }
+    };
     fetchClasses();
-  }, []);
 
+    const fetchTeachers = async () => {
+      const { data } = await supabase
+        .from('teachers')
+        .select('id, name, name_bn, designation')
+        .eq('academic_year_id', selectedYear)
+        .eq('is_active', true)
+        .order('name');
+
+      if (data) {
+        setTeachers(data);
+      }
+    };
+    fetchTeachers();
+  }, [selectedYear]);
+
+  // Fetch sections when class changes (for student report)
   useEffect(() => {
-    if (activeYear) {
-      fetchStats();
+    if (!selectedClass) {
+      setSections([]);
+      setStudents([]);
+      return;
     }
-  }, [activeYear, dateRange]);
 
-  const fetchClasses = async () => {
-    const { data } = await supabase.from('classes').select('id, name').eq('is_active', true).order('grade_order');
-    setClasses(data || []);
-  };
+    const fetchSections = async () => {
+      const { data } = await supabase
+        .from('sections')
+        .select('id, name, name_bn, class_id')
+        .eq('class_id', selectedClass)
+        .eq('is_active', true)
+        .order('name');
 
-  const fetchStats = async () => {
-    if (!activeYear) return;
+      if (data) {
+        setSections(data);
+      }
+    };
+    fetchSections();
+  }, [selectedClass]);
 
-    try {
-      // Fetch total students
-      const { count: totalStudents } = await supabase
+  // Fetch sections for class report
+  useEffect(() => {
+    if (!classReportClass) {
+      setClassReportSections([]);
+      return;
+    }
+
+    const fetchSections = async () => {
+      const { data } = await supabase
+        .from('sections')
+        .select('id, name, name_bn, class_id')
+        .eq('class_id', classReportClass)
+        .eq('is_active', true)
+        .order('name');
+
+      if (data) {
+        setClassReportSections(data);
+      }
+    };
+    fetchSections();
+  }, [classReportClass]);
+
+  // Fetch students when section changes
+  useEffect(() => {
+    if (!selectedSection || !selectedYear) {
+      setStudents([]);
+      return;
+    }
+
+    const fetchStudents = async () => {
+      const { data } = await supabase
         .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('academic_year_id', activeYear.id)
-        .eq('is_active', true);
+        .select('id, name, name_bn, student_id_number, class_id, section_id')
+        .eq('section_id', selectedSection)
+        .eq('academic_year_id', selectedYear)
+        .eq('is_active', true)
+        .order('student_id_number');
 
-      // Fetch today's attendance
-      const { data: attendance } = await supabase
-        .from('student_attendance')
-        .select('status')
-        .eq('academic_year_id', activeYear.id)
-        .eq('attendance_date', dateRange.start);
-
-      const present = attendance?.filter(a => a.status === 'present').length || 0;
-      const late = attendance?.filter(a => a.status === 'late').length || 0;
-      const attendedCount = present + late;
-      const absent = (totalStudents || 0) - attendedCount;
-
-      setStats({
-        total: totalStudents || 0,
-        present,
-        late,
-        absent: absent > 0 ? absent : 0,
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  const generateReport = async () => {
-    if (!activeYear) {
-      toast.error('No active academic year');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('student_attendance')
-        .select(`
-          id, punch_time, status, attendance_date,
-          student:students(
-            id, name, name_bn,
-            class:classes(id, name),
-            section:sections(name)
-          )
-        `)
-        .eq('academic_year_id', activeYear.id)
-        .gte('attendance_date', dateRange.start)
-        .lte('attendance_date', dateRange.end)
-        .order('punch_time', { ascending: false });
-
-      // Apply status filter based on report type
-      if (reportType === 'student-absent') {
-        query = query.eq('status', 'absent');
-      } else if (reportType === 'student-late') {
-        query = query.eq('status', 'late');
+      if (data) {
+        setStudents(data);
       }
+    };
+    fetchStudents();
+  }, [selectedSection, selectedYear]);
 
-      const { data, error } = await query.limit(500);
-
-      if (error) throw error;
-
-      // Filter by class if selected
-      let filteredData = data || [];
-      if (selectedClass !== 'all') {
-        filteredData = filteredData.filter((record: any) => 
-          record.student?.class?.id === selectedClass
-        );
-      }
-
-      const records: AttendanceRecord[] = filteredData.map((record: any) => ({
-        id: record.id,
-        name: record.student?.name || 'Unknown',
-        class_name: record.student?.class?.name,
-        section_name: record.student?.section?.name,
-        punch_time: record.punch_time,
-        status: record.status,
-      }));
-
-      setReportData(records);
-      toast.success(`Found ${records.length} records`);
-    } catch (error: any) {
-      console.error('Error generating report:', error);
-      toast.error('Failed to generate report');
-    } finally {
-      setLoading(false);
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
-  const downloadCSV = () => {
-    if (reportData.length === 0) {
-      toast.error('No data to download. Generate a report first.');
-      return;
-    }
-
-    const headers = ['Name', 'Class', 'Section', 'Time', 'Status', 'Date'];
-    const rows = reportData.map(record => [
-      record.name,
-      record.class_name || '',
-      record.section_name || '',
-      new Date(record.punch_time).toLocaleTimeString(),
-      record.status,
-      new Date(record.punch_time).toLocaleDateString(),
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance-report-${dateRange.start}-to-${dateRange.end}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Report downloaded');
+  const getMonthDate = () => {
+    const [year, month] = selectedMonth.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, 1);
   };
 
-  const attendanceRate = stats.total > 0 
-    ? (((stats.present + stats.late) / stats.total) * 100).toFixed(1) 
-    : '0';
+  const getSelectedYearName = () => {
+    return academicYears.find(y => y.id === selectedYear)?.name || '';
+  };
+
+  const getClassName = (classId: string) => {
+    const cls = classes.find(c => c.id === classId);
+    return cls?.name_bn || cls?.name || '';
+  };
+
+  const getSectionName = (sectionId: string, sectionsList: SectionData[]) => {
+    const sec = sectionsList.find(s => s.id === sectionId);
+    return sec?.name_bn || sec?.name || '';
+  };
+
+  const resetStudentReport = () => {
+    setShowStudentReport(false);
+    setSelectedStudent('');
+  };
+
+  const resetClassReport = () => {
+    setShowClassReport(false);
+  };
+
+  const resetTeacherReport = () => {
+    setShowTeacherReport(false);
+    setSelectedTeacher('');
+  };
 
   return (
-    <MainLayout title="Reports" titleBn="রিপোর্ট">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-          <FileText className="w-6 h-6 text-primary" />
+    <MainLayout title="রিপোর্ট" titleBn="Reports">
+      <div className="space-y-6">
+        {/* Header - Hide on print */}
+        <div className="no-print flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <FileText className="w-8 h-8" />
+              রিপোর্ট ও বিশ্লেষণ
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              শিক্ষার্থী ও শিক্ষকদের উপস্থিতি রিপোর্ট তৈরি করুন
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-semibold">Reports & Analytics</h2>
-          <p className="text-sm text-muted-foreground font-bengali">রিপোর্ট ও বিশ্লেষণ</p>
-        </div>
-      </div>
 
-      <Tabs defaultValue="students" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4 gap-2">
-          <TabsTrigger value="students" className="gap-2">
-            <GraduationCap className="w-4 h-4" />
-            Students
-          </TabsTrigger>
-          <TabsTrigger value="teachers" className="gap-2">
-            <Users className="w-4 h-4" />
-            Teachers
-          </TabsTrigger>
-          <TabsTrigger value="class" className="gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Class Reports
-          </TabsTrigger>
-          <TabsTrigger value="system" className="gap-2">
-            <Clock className="w-4 h-4" />
-            System
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="students">
-          <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-4">Student Attendance Reports</h3>
-            <p className="text-sm text-muted-foreground mb-6 font-bengali">শিক্ষার্থী উপস্থিতি রিপোর্ট</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="space-y-2">
-                <Label>Report Type</Label>
-                <Select value={reportType} onValueChange={setReportType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="student-daily">Daily Attendance</SelectItem>
-                    <SelectItem value="student-monthly">Monthly Summary</SelectItem>
-                    <SelectItem value="student-absent">Absent Report</SelectItem>
-                    <SelectItem value="student-late">Late Arrivals</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Class Filter</Label>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Classes</SelectItem>
-                    {classes.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button variant="hero" className="gap-2" onClick={generateReport} disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                Generate Report
-              </Button>
-              <Button variant="outline" className="gap-2" onClick={downloadCSV}>
-                <Download className="w-4 h-4" />
-                Download CSV
-              </Button>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-            <div className="card-elevated p-4 text-center">
-              <p className="text-3xl font-bold text-success">{attendanceRate}%</p>
-              <p className="text-sm text-muted-foreground font-bengali">মোট উপস্থিতি হার</p>
-            </div>
-            <div className="card-elevated p-4 text-center">
-              <p className="text-3xl font-bold text-warning">{stats.late}</p>
-              <p className="text-sm text-muted-foreground font-bengali">বিলম্বে আসা</p>
-            </div>
-            <div className="card-elevated p-4 text-center">
-              <p className="text-3xl font-bold text-destructive">{stats.absent}</p>
-              <p className="text-sm text-muted-foreground font-bengali">অনুপস্থিত</p>
-            </div>
-            <div className="card-elevated p-4 text-center">
-              <p className="text-3xl font-bold text-primary">{stats.present + stats.late}</p>
-              <p className="text-sm text-muted-foreground font-bengali">উপস্থিত</p>
-            </div>
-          </div>
-
-          {/* Report Data Table */}
-          {reportData.length > 0 && (
-            <div className="card-elevated mt-6 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportData.slice(0, 50).map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.name}</TableCell>
-                      <TableCell>{record.class_name || '-'}</TableCell>
-                      <TableCell>{record.section_name || '-'}</TableCell>
-                      <TableCell>{new Date(record.punch_time).toLocaleTimeString()}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          record.status === 'present' ? 'bg-success/20 text-success' :
-                          record.status === 'late' ? 'bg-warning/20 text-warning' :
-                          'bg-destructive/20 text-destructive'
-                        }`}>
-                          {record.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {reportData.length > 50 && (
-                <p className="p-4 text-sm text-muted-foreground text-center">
-                  Showing 50 of {reportData.length} records. Download CSV for full data.
-                </p>
-              )}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="teachers">
-          <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-4">Teacher Attendance Reports</h3>
-            <p className="text-sm text-muted-foreground mb-6 font-bengali">শিক্ষক উপস্থিতি রিপোর্ট</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="space-y-2">
-                <Label>Report Type</Label>
-                <Select defaultValue="teacher-daily">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="teacher-daily">Daily Report</SelectItem>
-                    <SelectItem value="teacher-monthly">Monthly Summary</SelectItem>
-                    <SelectItem value="teacher-late">Late Minutes Report</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Input type="date" defaultValue={dateRange.start} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>End Date</Label>
-                <Input type="date" defaultValue={dateRange.end} />
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button variant="hero" className="gap-2" onClick={() => toast.info('Teacher reports coming soon')}>
-                <FileText className="w-4 h-4" />
-                Generate Report
-              </Button>
-              <Button variant="outline" className="gap-2">
-                <Download className="w-4 h-4" />
-                Download CSV
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="class">
-          <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-4">Class-wise Reports</h3>
-            <p className="text-sm text-muted-foreground mb-6 font-bengali">শ্রেণী ভিত্তিক রিপোর্ট</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="space-y-2">
-                <Label>Report Type</Label>
-                <Select defaultValue="class-comparison">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="class-comparison">Class Comparison</SelectItem>
-                    <SelectItem value="shift-performance">Shift Performance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Month</Label>
-                <Input type="month" />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Class</Label>
-                <Select defaultValue="all">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Classes</SelectItem>
-                    {classes.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button variant="hero" className="gap-2" onClick={() => toast.info('Class reports coming soon')}>
-                <FileText className="w-4 h-4" />
-                Generate Report
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="system">
-          <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-4">System Reports</h3>
-            <p className="text-sm text-muted-foreground mb-6 font-bengali">সিস্টেম রিপোর্ট</p>
-
+        {/* Filters Card - Hide on print */}
+        <Card className="no-print">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              রিপোর্ট ফিল্টার
+            </CardTitle>
+            <CardDescription>
+              রিপোর্ট তৈরির জন্য প্রয়োজনীয় তথ্য নির্বাচন করুন
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Common Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-2">
-                <Label>Report Type</Label>
-                <Select defaultValue="device-performance">
+                <Label>শিক্ষাবর্ষ</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="শিক্ষাবর্ষ নির্বাচন করুন" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="device-performance">Device Performance</SelectItem>
-                    <SelectItem value="sms-delivery">SMS Delivery Report</SelectItem>
-                    <SelectItem value="audit-log">Audit Logs</SelectItem>
+                    {academicYears.map(year => (
+                      <SelectItem key={year.id} value={year.id}>
+                        {year.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label>Date Range</Label>
-                <Input type="date" defaultValue={dateRange.start} />
+                <Label>মাস</Label>
+                <Input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <Button variant="hero" className="gap-2" onClick={() => toast.info('System reports coming soon')}>
-                <FileText className="w-4 h-4" />
-                Generate Report
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+            {/* Report Type Tabs */}
+            <Tabs defaultValue="student" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="student" className="flex items-center gap-2" onClick={resetStudentReport}>
+                  <GraduationCap className="w-4 h-4" />
+                  শিক্ষার্থী মাসিক
+                </TabsTrigger>
+                <TabsTrigger value="class" className="flex items-center gap-2" onClick={resetClassReport}>
+                  <Users className="w-4 h-4" />
+                  শ্রেণী রেজিস্টার
+                </TabsTrigger>
+                <TabsTrigger value="teacher" className="flex items-center gap-2" onClick={resetTeacherReport}>
+                  <UserCheck className="w-4 h-4" />
+                  শিক্ষক মাসিক
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Student Monthly Report Tab */}
+              <TabsContent value="student" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>শ্রেণী</Label>
+                    <Select value={selectedClass} onValueChange={(v) => {
+                      setSelectedClass(v);
+                      setSelectedSection('');
+                      setSelectedStudent('');
+                      setShowStudentReport(false);
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শ্রেণী নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes.map(cls => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name_bn || cls.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>শাখা</Label>
+                    <Select value={selectedSection} onValueChange={(v) => {
+                      setSelectedSection(v);
+                      setSelectedStudent('');
+                      setShowStudentReport(false);
+                    }} disabled={!selectedClass}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শাখা নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sections.map(sec => (
+                          <SelectItem key={sec.id} value={sec.id}>
+                            {sec.name_bn || sec.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>শিক্ষার্থী</Label>
+                    <Select value={selectedStudent} onValueChange={(v) => {
+                      setSelectedStudent(v);
+                      setShowStudentReport(false);
+                    }} disabled={!selectedSection}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শিক্ষার্থী নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map(student => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.student_id_number ? `${student.student_id_number} - ` : ''}
+                            {student.name_bn || student.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowStudentReport(true)}
+                    disabled={!selectedStudent || !selectedYear}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    রিপোর্ট তৈরি করুন
+                  </Button>
+                  {showStudentReport && (
+                    <Button variant="outline" onClick={handlePrint}>
+                      <Printer className="w-4 h-4 mr-2" />
+                      প্রিন্ট / PDF
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Class Monthly Register Tab */}
+              <TabsContent value="class" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>শ্রেণী</Label>
+                    <Select value={classReportClass} onValueChange={(v) => {
+                      setClassReportClass(v);
+                      setClassReportSection('');
+                      setShowClassReport(false);
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শ্রেণী নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes.map(cls => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name_bn || cls.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>শাখা</Label>
+                    <Select value={classReportSection} onValueChange={(v) => {
+                      setClassReportSection(v);
+                      setShowClassReport(false);
+                    }} disabled={!classReportClass}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শাখা নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classReportSections.map(sec => (
+                          <SelectItem key={sec.id} value={sec.id}>
+                            {sec.name_bn || sec.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowClassReport(true)}
+                    disabled={!classReportClass || !classReportSection || !selectedYear}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    রিপোর্ট তৈরি করুন
+                  </Button>
+                  {showClassReport && (
+                    <Button variant="outline" onClick={handlePrint}>
+                      <Printer className="w-4 h-4 mr-2" />
+                      প্রিন্ট / PDF (A3)
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Teacher Monthly Report Tab */}
+              <TabsContent value="teacher" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>শিক্ষক</Label>
+                    <Select value={selectedTeacher} onValueChange={(v) => {
+                      setSelectedTeacher(v);
+                      setShowTeacherReport(false);
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="শিক্ষক নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teachers.map(teacher => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.name_bn || teacher.name} - {teacher.designation}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowTeacherReport(true)}
+                    disabled={!selectedTeacher || !selectedYear}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    রিপোর্ট তৈরি করুন
+                  </Button>
+                  {showTeacherReport && (
+                    <Button variant="outline" onClick={handlePrint}>
+                      <Printer className="w-4 h-4 mr-2" />
+                      প্রিন্ট / PDF
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Report Display Area */}
+        <div ref={reportRef} className="print-area">
+          {showStudentReport && selectedStudent && (
+            <Card className="print:shadow-none print:border-none">
+              <CardContent className="p-0">
+                <StudentMonthlyReport
+                  studentId={selectedStudent}
+                  month={getMonthDate()}
+                  academicYearId={selectedYear}
+                  academicYearName={getSelectedYearName()}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {showClassReport && classReportClass && classReportSection && (
+            <Card className="print:shadow-none print:border-none class-register-card">
+              <CardContent className="p-0">
+                <ClassMonthlyReport
+                  classId={classReportClass}
+                  sectionId={classReportSection}
+                  month={getMonthDate()}
+                  academicYearId={selectedYear}
+                  academicYearName={getSelectedYearName()}
+                  className={getClassName(classReportClass)}
+                  sectionName={getSectionName(classReportSection, classReportSections)}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {showTeacherReport && selectedTeacher && (
+            <Card className="print:shadow-none print:border-none">
+              <CardContent className="p-0">
+                <TeacherMonthlyReport
+                  teacherId={selectedTeacher}
+                  month={getMonthDate()}
+                  academicYearId={selectedYear}
+                  academicYearName={getSelectedYearName()}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </MainLayout>
   );
 }

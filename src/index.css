@@ -435,3 +435,172 @@
   transform: scale(1);
   transition: opacity 300ms, transform 300ms;
 }
+
+/* ========================================
+   PRINT STYLES - Attendance Reports
+   Developed by Jubair Zaman
+   ======================================== */
+
+/* Hide elements when printing */
+@media print {
+  /* Hide navigation, filters, and non-report elements */
+  .no-print,
+  .no-print *,
+  header,
+  nav,
+  aside,
+  .sidebar,
+  button:not(.print-visible),
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+
+  /* Reset page margins and background */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Main print area takes full width */
+  .print-area {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Report container styles */
+  .report-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20mm !important;
+    background: white !important;
+    color: black !important;
+    page-break-inside: avoid;
+  }
+
+  /* Report header */
+  .report-header {
+    text-align: center;
+    margin-bottom: 15mm;
+    padding-bottom: 5mm;
+    border-bottom: 2px solid #000;
+  }
+
+  .report-header img {
+    max-width: 80px !important;
+    max-height: 80px !important;
+  }
+
+  .report-header h1 {
+    font-size: 24pt !important;
+    margin: 0 !important;
+    color: black !important;
+  }
+
+  .report-header h2 {
+    font-size: 18pt !important;
+    margin-top: 5mm !important;
+    color: black !important;
+  }
+
+  /* Tables */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10pt !important;
+  }
+
+  th, td {
+    border: 1px solid #333 !important;
+    padding: 4px 8px !important;
+    text-align: left !important;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  /* Badge styles for print */
+  .badge,
+  [class*="bg-green"],
+  [class*="bg-yellow"],
+  [class*="bg-red"] {
+    border: 1px solid #333 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+  }
+
+  /* Cards */
+  .card,
+  [class*="Card"] {
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Summary sections */
+  .summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 10px !important;
+    margin-top: 10mm !important;
+  }
+
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .avoid-page-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* Student & Teacher Reports - A4 Portrait */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+}
+
+/* Class Register - A3 Landscape (when class-register class is present) */
+@media print {
+  .class-register {
+    font-size: 8pt !important;
+  }
+
+  .class-register table {
+    font-size: 7pt !important;
+  }
+
+  .class-register th,
+  .class-register td {
+    padding: 2px 4px !important;
+  }
+
+  /* Sticky columns for class register */
+  .class-register .sticky {
+    position: relative !important;
+    left: auto !important;
+  }
+}
+
+/* For A3 landscape printing, add this class to the parent */
+.class-register-card {
+  @media print {
+    @page {
+      size: A3 landscape;
+      margin: 10mm;
+    }
+  }
+}
