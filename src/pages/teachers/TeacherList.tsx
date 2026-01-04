@@ -42,21 +42,20 @@ export default function TeacherList() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleDelete = async (teacherId: string) => {
-    if (!confirm('Are you sure you want to deactivate this teacher?')) return;
+    if (!confirm('আপনি কি এই শিক্ষককে স্থায়ীভাবে মুছে ফেলতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।')) return;
     
     try {
       const { error } = await supabase
         .from('teachers')
-        .update({ is_active: false })
+        .delete()
         .eq('id', teacherId);
 
       if (error) throw error;
       
-      toast.success('Teacher deactivated');
-      // Invalidate and refetch
+      toast.success('শিক্ষক মুছে ফেলা হয়েছে');
       queryClient.invalidateQueries({ queryKey: ['teachers', activeYear?.id] });
     } catch (error: any) {
-      toast.error('Failed to deactivate teacher');
+      toast.error('শিক্ষক মুছে ফেলা সম্ভব হয়নি');
     }
   };
 
@@ -145,7 +144,7 @@ export default function TeacherList() {
                       onClick={() => handleDelete(teacher.id)}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Deactivate
+                      Delete / মুছুন
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
