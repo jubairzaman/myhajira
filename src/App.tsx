@@ -35,6 +35,9 @@ import StudentAttendance from "./pages/attendance/StudentAttendance";
 import TeacherAttendance from "./pages/attendance/TeacherAttendance";
 import ManualEntry from "./pages/attendance/ManualEntry";
 
+// Fee Pages
+import FeeSettings from "./pages/fees/FeeSettings";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -127,6 +130,13 @@ const App = () => (
               <Route path="/devices" element={
                 <ProtectedRoute requireAdmin>
                   <DeviceManagement />
+                </ProtectedRoute>
+              } />
+              
+              {/* Fees */}
+              <Route path="/fees/settings" element={
+                <ProtectedRoute requireAdmin>
+                  <FeeSettings />
                 </ProtectedRoute>
               } />
               

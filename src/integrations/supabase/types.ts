@@ -122,6 +122,48 @@ export type Database = {
           },
         ]
       }
+      class_monthly_fees: {
+        Row: {
+          academic_year_id: string
+          amount: number
+          class_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          amount?: number
+          class_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          amount?: number
+          class_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_monthly_fees_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_monthly_fees_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           created_at: string
@@ -214,6 +256,91 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      exams: {
+        Row: {
+          academic_year_id: string
+          created_at: string
+          exam_fee_amount: number
+          id: string
+          is_active: boolean
+          name: string
+          name_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string
+          exam_fee_amount?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          name_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string
+          exam_fee_amount?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          name_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exams_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fee_settings: {
+        Row: {
+          academic_year_id: string
+          admission_fee: number
+          created_at: string
+          id: string
+          late_fine_amount: number
+          late_fine_enabled: boolean
+          monthly_due_date: number
+          session_charge: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          admission_fee?: number
+          created_at?: string
+          id?: string
+          late_fine_amount?: number
+          late_fine_enabled?: boolean
+          monthly_due_date?: number
+          session_charge?: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          admission_fee?: number
+          created_at?: string
+          id?: string
+          late_fine_amount?: number
+          late_fine_enabled?: boolean
+          monthly_due_date?: number
+          session_charge?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_settings_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: true
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       manual_attendance_logs: {
         Row: {
@@ -831,6 +958,117 @@ export type Database = {
           },
           {
             foreignKeyName: "student_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_custom_fees: {
+        Row: {
+          created_at: string
+          custom_monthly_fee: number | null
+          effective_from: string
+          id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_monthly_fee?: number | null
+          effective_from?: string
+          id?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_monthly_fee?: number | null
+          effective_from?: string
+          id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_custom_fees_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_fee_records: {
+        Row: {
+          academic_year_id: string
+          amount_due: number
+          amount_paid: number
+          collected_by: string | null
+          created_at: string
+          exam_id: string | null
+          fee_month: string | null
+          fee_type: string
+          id: string
+          late_fine: number
+          payment_date: string | null
+          receipt_number: string | null
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          amount_due?: number
+          amount_paid?: number
+          collected_by?: string | null
+          created_at?: string
+          exam_id?: string | null
+          fee_month?: string | null
+          fee_type: string
+          id?: string
+          late_fine?: number
+          payment_date?: string | null
+          receipt_number?: string | null
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          amount_due?: number
+          amount_paid?: number
+          collected_by?: string | null
+          created_at?: string
+          exam_id?: string | null
+          fee_month?: string | null
+          fee_type?: string
+          id?: string
+          late_fine?: number
+          payment_date?: string | null
+          receipt_number?: string | null
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_fee_records_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_fee_records_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_fee_records_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
