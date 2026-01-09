@@ -18,6 +18,7 @@ import {
   Building2,
   X,
   Tv,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -78,6 +79,16 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Gate Monitor', labelBn: 'গেট মনিটর', icon: ChevronRight, href: '/monitor/gate' },
       { label: 'Office Monitor', labelBn: 'অফিস মনিটর', icon: ChevronRight, href: '/monitor/office' },
+    ],
+  },
+  {
+    label: 'Fees',
+    labelBn: 'ফি ম্যানেজমেন্ট',
+    icon: Wallet,
+    children: [
+      { label: 'Fee Settings', labelBn: 'ফি সেটিংস', icon: ChevronRight, href: '/fees/settings' },
+      { label: 'Fee Collection', labelBn: 'ফি আদায়', icon: ChevronRight, href: '/fees/collection' },
+      { label: 'Fee Reports', labelBn: 'ফি রিপোর্ট', icon: ChevronRight, href: '/fees/reports' },
     ],
   },
   {
