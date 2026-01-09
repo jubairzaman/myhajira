@@ -125,26 +125,32 @@ export type Database = {
       class_monthly_fees: {
         Row: {
           academic_year_id: string
+          admission_fee: number
           amount: number
           class_id: string
           created_at: string
           id: string
+          session_charge: number
           updated_at: string
         }
         Insert: {
           academic_year_id: string
+          admission_fee?: number
           amount?: number
           class_id: string
           created_at?: string
           id?: string
+          session_charge?: number
           updated_at?: string
         }
         Update: {
           academic_year_id?: string
+          admission_fee?: number
           amount?: number
           class_id?: string
           created_at?: string
           id?: string
+          session_charge?: number
           updated_at?: string
         }
         Relationships: [
@@ -301,35 +307,29 @@ export type Database = {
       fee_settings: {
         Row: {
           academic_year_id: string
-          admission_fee: number
           created_at: string
           id: string
           late_fine_amount: number
           late_fine_enabled: boolean
           monthly_due_date: number
-          session_charge: number
           updated_at: string
         }
         Insert: {
           academic_year_id: string
-          admission_fee?: number
           created_at?: string
           id?: string
           late_fine_amount?: number
           late_fine_enabled?: boolean
           monthly_due_date?: number
-          session_charge?: number
           updated_at?: string
         }
         Update: {
           academic_year_id?: string
-          admission_fee?: number
           created_at?: string
           id?: string
           late_fine_amount?: number
           late_fine_enabled?: boolean
           monthly_due_date?: number
-          session_charge?: number
           updated_at?: string
         }
         Relationships: [
