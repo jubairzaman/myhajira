@@ -43,14 +43,12 @@ export default function FeeSettings() {
   const [monthlyDueDate, setMonthlyDueDate] = useState(10);
   const [lateFineAmount, setLateFineAmount] = useState(50);
   const [lateFineEnabled, setLateFineEnabled] = useState(false);
-  const [admissionFee, setAdmissionFee] = useState(0);
-  const [sessionCharge, setSessionCharge] = useState(0);
 
   // Class Monthly Fees State
   const { data: classes, isLoading: isLoadingClasses } = useClassesQuery();
   const { data: classMonthlyFees, isLoading: isLoadingClassFees } = useClassMonthlyFees();
   const upsertClassFee = useUpsertClassMonthlyFee();
-  const [classFees, setClassFees] = useState<Record<string, number>>({});
+  const [classFees, setClassFees] = useState<Record<string, { amount: number; admissionFee: number; sessionCharge: number }>>({});
 
   // Exams State
   const { data: exams, isLoading: isLoadingExams } = useExams();
@@ -70,17 +68,19 @@ export default function FeeSettings() {
       setMonthlyDueDate(feeSettings.monthly_due_date);
       setLateFineAmount(Number(feeSettings.late_fine_amount));
       setLateFineEnabled(feeSettings.late_fine_enabled);
-      setAdmissionFee(Number(feeSettings.admission_fee));
-      setSessionCharge(Number(feeSettings.session_charge));
     }
   }, [feeSettings]);
 
   // Load Class Monthly Fees
   useEffect(() => {
     if (classMonthlyFees) {
-      const fees: Record<string, number> = {};
+      const fees: Record<string, { amount: number; admissionFee: number; sessionCharge: number }> = {};
       classMonthlyFees.forEach((cf) => {
-        fees[cf.class_id] = Number(cf.amount);
+        fees[cf.class_id] = {
+          amount: Number(cf.amount),
+          admissionFee: Number(cf.admission_fee),
+          sessionCharge: Number(cf.session_charge),
+        };
       });
       setClassFees(fees);
     }
@@ -91,13 +91,17 @@ export default function FeeSettings() {
       monthly_due_date: monthlyDueDate,
       late_fine_amount: lateFineAmount,
       late_fine_enabled: lateFineEnabled,
-      admission_fee: admissionFee,
-      session_charge: sessionCharge,
     });
   };
 
-  const handleSaveClassFee = (classId: string, amount: number) => {
-    upsertClassFee.mutate({ classId, amount });
+  const handleSaveClassFee = (classId: string) => {
+    const fee = classFees[classId] || { amount: 0, admissionFee: 0, sessionCharge: 0 };
+    upsertClassFee.mutate({ 
+      classId, 
+      amount: fee.amount,
+      admissionFee: fee.admissionFee,
+      sessionCharge: fee.sessionCharge
+    });
   };
 
   const handleOpenExamDialog = (exam?: Exam) => {
@@ -174,7 +178,7 @@ export default function FeeSettings() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6">
             {/* Late Fine Settings */}
             <Card>
               <CardHeader>
@@ -183,87 +187,56 @@ export default function FeeSettings() {
                   বিলম্ব জরিমানা সেটিংস
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="late-fine-enabled">জরিমানা সক্রিয়</Label>
-                  <Switch
-                    id="late-fine-enabled"
-                    checked={lateFineEnabled}
-                    onCheckedChange={setLateFineEnabled}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="due-date">মাসিক বকেয়া তারিখ</Label>
-                  <Input
-                    id="due-date"
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={monthlyDueDate}
-                    onChange={(e) => setMonthlyDueDate(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fine-amount">জরিমানা পরিমাণ (টাকা)</Label>
-                  <Input
-                    id="fine-amount"
-                    type="number"
-                    min={0}
-                    value={lateFineAmount}
-                    onChange={(e) => setLateFineAmount(Number(e.target.value))}
-                  />
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="flex items-center justify-between md:col-span-1">
+                    <Label htmlFor="late-fine-enabled">জরিমানা সক্রিয়</Label>
+                    <Switch
+                      id="late-fine-enabled"
+                      checked={lateFineEnabled}
+                      onCheckedChange={setLateFineEnabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="due-date">মাসিক বকেয়া তারিখ</Label>
+                    <Input
+                      id="due-date"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={monthlyDueDate}
+                      onChange={(e) => setMonthlyDueDate(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fine-amount">জরিমানা পরিমাণ (টাকা)</Label>
+                    <Input
+                      id="fine-amount"
+                      type="number"
+                      min={0}
+                      value={lateFineAmount}
+                      onChange={(e) => setLateFineAmount(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      onClick={handleSaveSettings}
+                      disabled={upsertSettings.isPending}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      সংরক্ষণ করুন
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Admission & Session Fee */}
+            {/* Class-wise Fees */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5" />
-                  ভর্তি ও সেশন ফি
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="admission-fee">ভর্তি ফি (টাকা)</Label>
-                  <Input
-                    id="admission-fee"
-                    type="number"
-                    min={0}
-                    value={admissionFee}
-                    onChange={(e) => setAdmissionFee(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground">নতুন শিক্ষার্থীদের জন্য</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session-charge">সেশন চার্জ (টাকা)</Label>
-                  <Input
-                    id="session-charge"
-                    type="number"
-                    min={0}
-                    value={sessionCharge}
-                    onChange={(e) => setSessionCharge(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground">পুরাতন শিক্ষার্থীদের জন্য</p>
-                </div>
-                <Button
-                  onClick={handleSaveSettings}
-                  disabled={upsertSettings.isPending}
-                  className="w-full"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  সেটিংস সংরক্ষণ করুন
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Class Monthly Fees */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
                   <ClipboardList className="w-5 h-5" />
-                  শ্রেণী ভিত্তিক মাসিক ফি
+                  শ্রেণী ভিত্তিক ফি
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -271,6 +244,8 @@ export default function FeeSettings() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>শ্রেণী</TableHead>
+                      <TableHead>ভর্তি ফি (টাকা)</TableHead>
+                      <TableHead>সেশন চার্জ (টাকা)</TableHead>
                       <TableHead>মাসিক ফি (টাকা)</TableHead>
                       <TableHead className="w-24">অ্যাকশন</TableHead>
                     </TableRow>
@@ -288,12 +263,55 @@ export default function FeeSettings() {
                           <Input
                             type="number"
                             min={0}
-                            className="w-32"
-                            value={classFees[cls.id] || 0}
+                            className="w-28"
+                            value={classFees[cls.id]?.admissionFee || 0}
                             onChange={(e) =>
                               setClassFees((prev) => ({
                                 ...prev,
-                                [cls.id]: Number(e.target.value),
+                                [cls.id]: {
+                                  ...prev[cls.id],
+                                  admissionFee: Number(e.target.value),
+                                  amount: prev[cls.id]?.amount || 0,
+                                  sessionCharge: prev[cls.id]?.sessionCharge || 0,
+                                },
+                              }))
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="w-28"
+                            value={classFees[cls.id]?.sessionCharge || 0}
+                            onChange={(e) =>
+                              setClassFees((prev) => ({
+                                ...prev,
+                                [cls.id]: {
+                                  ...prev[cls.id],
+                                  sessionCharge: Number(e.target.value),
+                                  amount: prev[cls.id]?.amount || 0,
+                                  admissionFee: prev[cls.id]?.admissionFee || 0,
+                                },
+                              }))
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="w-28"
+                            value={classFees[cls.id]?.amount || 0}
+                            onChange={(e) =>
+                              setClassFees((prev) => ({
+                                ...prev,
+                                [cls.id]: {
+                                  ...prev[cls.id],
+                                  amount: Number(e.target.value),
+                                  admissionFee: prev[cls.id]?.admissionFee || 0,
+                                  sessionCharge: prev[cls.id]?.sessionCharge || 0,
+                                },
                               }))
                             }
                           />
@@ -302,7 +320,7 @@ export default function FeeSettings() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleSaveClassFee(cls.id, classFees[cls.id] || 0)}
+                            onClick={() => handleSaveClassFee(cls.id)}
                             disabled={upsertClassFee.isPending}
                           >
                             <Save className="w-4 h-4" />

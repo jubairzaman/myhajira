@@ -10,8 +10,6 @@ export interface FeeSettings {
   monthly_due_date: number;
   late_fine_amount: number;
   late_fine_enabled: boolean;
-  admission_fee: number;
-  session_charge: number;
 }
 
 export interface ClassMonthlyFee {
@@ -19,6 +17,8 @@ export interface ClassMonthlyFee {
   class_id: string;
   academic_year_id: string;
   amount: number;
+  admission_fee: number;
+  session_charge: number;
   class?: {
     id: string;
     name: string;
@@ -127,7 +127,17 @@ export function useUpsertClassMonthlyFee() {
   const { activeYear } = useAcademicYear();
 
   return useMutation({
-    mutationFn: async ({ classId, amount }: { classId: string; amount: number }) => {
+    mutationFn: async ({ 
+      classId, 
+      amount, 
+      admissionFee, 
+      sessionCharge 
+    }: { 
+      classId: string; 
+      amount: number; 
+      admissionFee: number; 
+      sessionCharge: number;
+    }) => {
       if (!activeYear?.id) throw new Error('No active academic year');
 
       const { data: existing } = await supabase
@@ -140,13 +150,19 @@ export function useUpsertClassMonthlyFee() {
       if (existing) {
         const { error } = await supabase
           .from('class_monthly_fees')
-          .update({ amount })
+          .update({ amount, admission_fee: admissionFee, session_charge: sessionCharge })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('class_monthly_fees')
-          .insert({ class_id: classId, academic_year_id: activeYear.id, amount });
+          .insert({ 
+            class_id: classId, 
+            academic_year_id: activeYear.id, 
+            amount,
+            admission_fee: admissionFee,
+            session_charge: sessionCharge
+          });
         if (error) throw error;
       }
     },
