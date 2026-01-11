@@ -38,6 +38,7 @@ import ManualEntry from "./pages/attendance/ManualEntry";
 // Fee Pages
 import FeeSettings from "./pages/fees/FeeSettings";
 import FeeCollection from "./pages/fees/FeeCollection";
+import FeeReports from "./pages/fees/FeeReports";
 
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
@@ -143,6 +144,11 @@ const App = () => (
               <Route path="/fees/collection" element={
                 <ProtectedRoute requireAdmin>
                   <FeeCollection />
+                </ProtectedRoute>
+              } />
+              <Route path="/fees/reports" element={
+                <ProtectedRoute>
+                  <FeeReports />
                 </ProtectedRoute>
               } />
               
