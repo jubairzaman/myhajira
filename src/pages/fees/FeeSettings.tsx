@@ -20,8 +20,15 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Settings, Plus, Pencil, Trash2, Save, GraduationCap, ClipboardList } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, Save, GraduationCap, ClipboardList, Calendar, Loader2 } from 'lucide-react';
 import { useClassesQuery } from '@/hooks/queries/useClassesQuery';
 import {
   useFeeSettings,
@@ -34,6 +41,23 @@ import {
   useDeleteExam,
   type Exam,
 } from '@/hooks/queries/useFeesQuery';
+import { useBulkGenerateMonthlyFees, useBulkGenerateExamFees } from '@/hooks/queries/useBulkFeeGeneration';
+
+// Bengali month names
+const bengaliMonths = [
+  { value: '01', label: 'জানুয়ারি' },
+  { value: '02', label: 'ফেব্রুয়ারি' },
+  { value: '03', label: 'মার্চ' },
+  { value: '04', label: 'এপ্রিল' },
+  { value: '05', label: 'মে' },
+  { value: '06', label: 'জুন' },
+  { value: '07', label: 'জুলাই' },
+  { value: '08', label: 'আগস্ট' },
+  { value: '09', label: 'সেপ্টেম্বর' },
+  { value: '10', label: 'অক্টোবর' },
+  { value: '11', label: 'নভেম্বর' },
+  { value: '12', label: 'ডিসেম্বর' },
+];
 
 export default function FeeSettings() {
   // Fee Settings State
@@ -61,6 +85,15 @@ export default function FeeSettings() {
   const [examName, setExamName] = useState('');
   const [examNameBn, setExamNameBn] = useState('');
   const [examFee, setExamFee] = useState(0);
+  
+  // Bulk fee generation state
+  const [bulkMonth, setBulkMonth] = useState('');
+  const [bulkYear, setBulkYear] = useState(new Date().getFullYear().toString());
+  const [bulkClassId, setBulkClassId] = useState<string>('all');
+  const [bulkExamId, setBulkExamId] = useState<string>('');
+  
+  const bulkGenerateMonthly = useBulkGenerateMonthlyFees();
+  const bulkGenerateExam = useBulkGenerateExamFees();
 
   // Load Fee Settings
   useEffect(() => {
@@ -143,6 +176,23 @@ export default function FeeSettings() {
     if (confirm('আপনি কি নিশ্চিত এই পরীক্ষা মুছে ফেলতে চান?')) {
       deleteExam.mutate(id);
     }
+  };
+  
+  const handleBulkGenerateMonthly = () => {
+    if (!bulkMonth || !bulkYear) return;
+    const month = `${bulkYear}-${bulkMonth}`;
+    bulkGenerateMonthly.mutate({
+      month,
+      classId: bulkClassId === 'all' ? undefined : bulkClassId,
+    });
+  };
+  
+  const handleBulkGenerateExam = () => {
+    if (!bulkExamId) return;
+    bulkGenerateExam.mutate({
+      examId: bulkExamId,
+      classId: bulkClassId === 'all' ? undefined : bulkClassId,
+    });
   };
 
   const sortedClasses = classes?.slice().sort((a, b) => a.grade_order - b.grade_order) || [];
@@ -400,6 +450,144 @@ export default function FeeSettings() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     কোন পরীক্ষা যুক্ত করা হয়নি। উপরে "নতুন পরীক্ষা" বাটনে ক্লিক করুন।
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Bulk Fee Generation */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  বাল্ক ফি তৈরি
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Monthly Fee Generation */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h4 className="font-medium">মাসিক ফি তৈরি করুন</h4>
+                  <p className="text-sm text-muted-foreground">
+                    নির্দিষ্ট মাসের জন্য সব শিক্ষার্থীর মাসিক ফি রেকর্ড একসাথে তৈরি করুন
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label>মাস</Label>
+                      <Select value={bulkMonth} onValueChange={setBulkMonth}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="মাস নির্বাচন" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {bengaliMonths.map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>বছর</Label>
+                      <Select value={bulkYear} onValueChange={setBulkYear}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[2024, 2025, 2026].map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>শ্রেণী (ঐচ্ছিক)</Label>
+                      <Select value={bulkClassId} onValueChange={setBulkClassId}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">সকল শ্রেণী</SelectItem>
+                          {sortedClasses.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id}>
+                              {cls.name} {cls.name_bn && `(${cls.name_bn})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button 
+                        onClick={handleBulkGenerateMonthly}
+                        disabled={!bulkMonth || bulkGenerateMonthly.isPending}
+                        className="w-full"
+                      >
+                        {bulkGenerateMonthly.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-2" />
+                        )}
+                        তৈরি করুন
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Exam Fee Generation */}
+                {exams && exams.length > 0 && (
+                  <div className="p-4 border rounded-lg space-y-4">
+                    <h4 className="font-medium">পরীক্ষা ফি তৈরি করুন</h4>
+                    <p className="text-sm text-muted-foreground">
+                      নির্দিষ্ট পরীক্ষার জন্য সব শিক্ষার্থীর পরীক্ষা ফি রেকর্ড একসাথে তৈরি করুন
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label>পরীক্ষা</Label>
+                        <Select value={bulkExamId} onValueChange={setBulkExamId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="পরীক্ষা নির্বাচন" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {exams.filter(e => e.is_active).map((exam) => (
+                              <SelectItem key={exam.id} value={exam.id}>
+                                {exam.name_bn || exam.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>শ্রেণী (ঐচ্ছিক)</Label>
+                        <Select value={bulkClassId} onValueChange={setBulkClassId}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">সকল শ্রেণী</SelectItem>
+                            {sortedClasses.map((cls) => (
+                              <SelectItem key={cls.id} value={cls.id}>
+                                {cls.name} {cls.name_bn && `(${cls.name_bn})`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button 
+                          onClick={handleBulkGenerateExam}
+                          disabled={!bulkExamId || bulkGenerateExam.isPending}
+                          className="w-full"
+                        >
+                          {bulkGenerateExam.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Plus className="w-4 h-4 mr-2" />
+                          )}
+                          তৈরি করুন
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>

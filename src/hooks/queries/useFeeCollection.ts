@@ -156,21 +156,24 @@ export function useCollectFee() {
       const totalPaid = Number(record.amount_paid) + amountPaid;
       const totalDue = Number(record.amount_due) + lateFine;
       const newStatus = totalPaid >= totalDue ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+      const receiptNumber = generateReceiptNumber();
 
-      const { error } = await supabase
+      const { data: updatedRecord, error } = await supabase
         .from('student_fee_records')
         .update({
           amount_paid: totalPaid,
           late_fine: lateFine,
           status: newStatus,
           payment_date: new Date().toISOString(),
-          receipt_number: generateReceiptNumber(),
+          receipt_number: receiptNumber,
         })
-        .eq('id', recordId);
+        .eq('id', recordId)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      return { receiptNumber: generateReceiptNumber() };
+      return updatedRecord as StudentFeeRecord;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-fee-records'] });

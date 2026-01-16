@@ -17,6 +17,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { useAutoGenerateAdmissionFees } from '@/hooks/queries/useBulkFeeGeneration';
 
 interface Shift {
   id: string;
@@ -49,6 +50,9 @@ export default function StudentRegistration() {
   const [sections, setSections] = useState<Section[]>([]);
   const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
   const [filteredSections, setFilteredSections] = useState<Section[]>([]);
+  
+  // Auto fee generation hook
+  const autoGenerateFees = useAutoGenerateAdmissionFees();
 
   const [formData, setFormData] = useState({
     nameEnglish: '',
@@ -229,6 +233,14 @@ export default function StudentRegistration() {
           console.error('RFID enrollment error:', rfidError);
           toast.warning('Student saved, but RFID card enrollment failed');
         }
+      }
+      
+      // Auto-generate admission and session fees
+      if (student) {
+        autoGenerateFees.mutate({
+          studentId: student.id,
+          classId: student.class_id,
+        });
       }
 
       toast.success('Student registered successfully!');

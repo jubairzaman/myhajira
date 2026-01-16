@@ -9,14 +9,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-interface ReceiptData {
+export interface ReceiptData {
   receiptNumber: string;
   studentName: string;
   studentNameBn?: string;
-  studentId: string;
+  studentId?: string;
   className: string;
+  classNameBn?: string;
   sectionName?: string;
-  guardianMobile: string;
+  guardianMobile?: string;
   feeType: string;
   feeMonth?: string;
   examName?: string;
@@ -117,21 +118,25 @@ export function ReceiptPrint({
                 <span className="text-muted-foreground">শিক্ষার্থীর নাম:</span>
                 <p className="font-medium font-bengali">{data.studentNameBn || data.studentName}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">আইডি নম্বর:</span>
-                <p className="font-mono font-medium">{data.studentId}</p>
-              </div>
+              {data.studentId && (
+                <div>
+                  <span className="text-muted-foreground">আইডি নম্বর:</span>
+                  <p className="font-mono font-medium">{data.studentId}</p>
+                </div>
+              )}
               <div>
                 <span className="text-muted-foreground">শ্রেণী:</span>
                 <p className="font-medium">
-                  {data.className}
+                  {data.classNameBn || data.className}
                   {data.sectionName && ` - ${data.sectionName}`}
                 </p>
               </div>
-              <div>
-                <span className="text-muted-foreground">অভিভাবকের মোবাইল:</span>
-                <p className="font-mono font-medium">{data.guardianMobile}</p>
-              </div>
+              {data.guardianMobile && (
+                <div>
+                  <span className="text-muted-foreground">অভিভাবকের মোবাইল:</span>
+                  <p className="font-mono font-medium">{data.guardianMobile}</p>
+                </div>
+              )}
             </div>
           </div>
 
