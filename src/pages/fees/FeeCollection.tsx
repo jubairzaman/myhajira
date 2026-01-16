@@ -20,6 +20,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,6 +38,7 @@ import {
   Receipt,
   Printer,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
@@ -38,9 +46,27 @@ import {
   useSearchStudent,
   useStudentFeeRecords,
   useCollectFee,
+  useCreateFeeRecord,
   type StudentWithFees,
   type StudentFeeRecord,
 } from '@/hooks/queries/useFeeCollection';
+import { ReceiptPrint, type ReceiptData } from '@/components/fees/ReceiptPrint';
+
+// Bengali month names
+const bengaliMonths = [
+  { value: '01', label: 'জানুয়ারি' },
+  { value: '02', label: 'ফেব্রুয়ারি' },
+  { value: '03', label: 'মার্চ' },
+  { value: '04', label: 'এপ্রিল' },
+  { value: '05', label: 'মে' },
+  { value: '06', label: 'জুন' },
+  { value: '07', label: 'জুলাই' },
+  { value: '08', label: 'আগস্ট' },
+  { value: '09', label: 'সেপ্টেম্বর' },
+  { value: '10', label: 'অক্টোবর' },
+  { value: '11', label: 'নভেম্বর' },
+  { value: '12', label: 'ডিসেম্বর' },
+];
 
 export default function FeeCollection() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,12 +75,24 @@ export default function FeeCollection() {
   const [selectedRecord, setSelectedRecord] = useState<StudentFeeRecord | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [lateFine, setLateFine] = useState(0);
+  
+  // Receipt print state
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  
+  // Add new fee dialog state
+  const [addFeeDialogOpen, setAddFeeDialogOpen] = useState(false);
+  const [newFeeType, setNewFeeType] = useState<'monthly' | 'admission' | 'session' | 'exam'>('monthly');
+  const [newFeeMonth, setNewFeeMonth] = useState('');
+  const [newFeeYear, setNewFeeYear] = useState(new Date().getFullYear().toString());
+  const [newFeeAmount, setNewFeeAmount] = useState(0);
 
   const searchMutation = useSearchStudent();
   const { data: feeRecords, isLoading: isLoadingRecords } = useStudentFeeRecords(
     selectedStudent?.id
   );
   const collectFee = useCollectFee();
+  const createFeeRecord = useCreateFeeRecord();
 
   const handleSearch = () => {
     if (!searchTerm.trim()) return;
@@ -92,9 +130,77 @@ export default function FeeCollection() {
         lateFine,
       },
       {
-        onSuccess: () => {
+        onSuccess: (updatedRecord) => {
           setPaymentDialogOpen(false);
           setSelectedRecord(null);
+          
+          // Prepare receipt data for printing
+          if (selectedStudent && updatedRecord) {
+            setReceiptData({
+              receiptNumber: updatedRecord.receipt_number || `RCP-${Date.now()}`,
+              paymentDate: new Date().toISOString(),
+              studentName: selectedStudent.name,
+              studentNameBn: selectedStudent.name_bn || undefined,
+              className: selectedStudent.class?.name || '',
+              classNameBn: selectedStudent.class?.name_bn || undefined,
+              sectionName: selectedStudent.section?.name || undefined,
+              studentId: selectedStudent.student_id_number || undefined,
+              feeType: updatedRecord.fee_type,
+              feeMonth: updatedRecord.fee_month || undefined,
+              amountDue: Number(updatedRecord.amount_due),
+              amountPaid: Number(updatedRecord.amount_paid),
+              lateFine: Number(updatedRecord.late_fine),
+            });
+            setReceiptOpen(true);
+          }
+        },
+      }
+    );
+  };
+  
+  const handlePrintReceipt = (record: StudentFeeRecord) => {
+    if (!selectedStudent) return;
+    
+    setReceiptData({
+      receiptNumber: record.receipt_number || `RCP-${Date.now()}`,
+      paymentDate: record.payment_date || new Date().toISOString(),
+      studentName: selectedStudent.name,
+      studentNameBn: selectedStudent.name_bn || undefined,
+      className: selectedStudent.class?.name || '',
+      classNameBn: selectedStudent.class?.name_bn || undefined,
+      sectionName: selectedStudent.section?.name || undefined,
+      studentId: selectedStudent.student_id_number || undefined,
+      feeType: record.fee_type,
+      feeMonth: record.fee_month || undefined,
+      examName: record.exam?.name_bn || record.exam?.name || undefined,
+      amountDue: Number(record.amount_due),
+      amountPaid: Number(record.amount_paid),
+      lateFine: Number(record.late_fine),
+    });
+    setReceiptOpen(true);
+  };
+  
+  const handleAddNewFee = () => {
+    if (!selectedStudent || newFeeAmount <= 0) return;
+    
+    let feeMonth: string | undefined;
+    if (newFeeType === 'monthly' && newFeeMonth && newFeeYear) {
+      feeMonth = `${newFeeYear}-${newFeeMonth}-01`;
+    }
+    
+    createFeeRecord.mutate(
+      {
+        studentId: selectedStudent.id,
+        feeType: newFeeType,
+        amountDue: newFeeAmount,
+        feeMonth,
+      },
+      {
+        onSuccess: () => {
+          setAddFeeDialogOpen(false);
+          setNewFeeType('monthly');
+          setNewFeeMonth('');
+          setNewFeeAmount(0);
         },
       }
     );
@@ -366,8 +472,12 @@ export default function FeeCollection() {
                                   আদায়
                                 </Button>
                               )}
-                              {record.receipt_number && (
-                                <Button size="sm" variant="outline">
+                              {record.amount_paid > 0 && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handlePrintReceipt(record)}
+                                >
                                   <Printer className="w-4 h-4" />
                                 </Button>
                               )}
@@ -379,11 +489,30 @@ export default function FeeCollection() {
                   </Table>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    এই শিক্ষার্থীর কোন ফি রেকর্ড নেই
+                    <p>এই শিক্ষার্থীর কোন ফি রেকর্ড নেই</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4"
+                      onClick={() => setAddFeeDialogOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      নতুন ফি যুক্ত করুন
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
+            
+            {/* Add New Fee Button */}
+            {feeRecords && feeRecords.length > 0 && (
+              <div className="flex justify-end">
+                <Button onClick={() => setAddFeeDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  নতুন ফি যুক্ত করুন
+                </Button>
+              </div>
+            )}
           </>
         )}
 
@@ -464,6 +593,99 @@ export default function FeeCollection() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
+        {/* Add New Fee Dialog */}
+        <Dialog open={addFeeDialogOpen} onOpenChange={setAddFeeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>নতুন ফি যুক্ত করুন</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>ফি এর ধরন</Label>
+                <Select 
+                  value={newFeeType} 
+                  onValueChange={(v) => setNewFeeType(v as typeof newFeeType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">মাসিক ফি</SelectItem>
+                    <SelectItem value="admission">ভর্তি ফি</SelectItem>
+                    <SelectItem value="session">সেশন চার্জ</SelectItem>
+                    <SelectItem value="exam">পরীক্ষা ফি</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {newFeeType === 'monthly' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>মাস</Label>
+                    <Select value={newFeeMonth} onValueChange={setNewFeeMonth}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="মাস নির্বাচন করুন" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bengaliMonths.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>বছর</Label>
+                    <Select value={newFeeYear} onValueChange={setNewFeeYear}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2024, 2025, 2026].map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label>বকেয়া পরিমাণ (টাকা)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newFeeAmount}
+                  onChange={(e) => setNewFeeAmount(Number(e.target.value))}
+                  placeholder="টাকার পরিমাণ লিখুন"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddFeeDialogOpen(false)}>
+                বাতিল
+              </Button>
+              <Button 
+                onClick={handleAddNewFee} 
+                disabled={createFeeRecord.isPending || newFeeAmount <= 0}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                যুক্ত করুন
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Receipt Print Dialog */}
+        <ReceiptPrint 
+          open={receiptOpen} 
+          onOpenChange={setReceiptOpen} 
+          data={receiptData}
+        />
       </div>
     </MainLayout>
   );
