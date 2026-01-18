@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,9 +39,13 @@ import {
   Printer,
   AlertCircle,
   Plus,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 import {
   useSearchStudent,
   useStudentFeeRecords,
@@ -69,6 +73,7 @@ const bengaliMonths = [
 ];
 
 export default function FeeCollection() {
+  const { activeYear } = useAcademicYear();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithFees | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -86,6 +91,11 @@ export default function FeeCollection() {
   const [newFeeMonth, setNewFeeMonth] = useState('');
   const [newFeeYear, setNewFeeYear] = useState(new Date().getFullYear().toString());
   const [newFeeAmount, setNewFeeAmount] = useState(0);
+  const [newFeeExamId, setNewFeeExamId] = useState('');
+  
+  // Class fees and exams
+  const [classFee, setClassFee] = useState<{ amount: number; admission_fee: number; session_charge: number } | null>(null);
+  const [exams, setExams] = useState<{ id: string; name: string; name_bn: string | null; exam_fee_amount: number }[]>([]);
 
   const searchMutation = useSearchStudent();
   const { data: feeRecords, isLoading: isLoadingRecords } = useStudentFeeRecords(
@@ -93,6 +103,60 @@ export default function FeeCollection() {
   );
   const collectFee = useCollectFee();
   const createFeeRecord = useCreateFeeRecord();
+
+  // Fetch class fees when student is selected
+  useEffect(() => {
+    const fetchClassFee = async () => {
+      if (!selectedStudent?.class?.id || !activeYear?.id) {
+        setClassFee(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('class_monthly_fees')
+        .select('amount, admission_fee, session_charge')
+        .eq('class_id', selectedStudent.class.id)
+        .eq('academic_year_id', activeYear.id)
+        .maybeSingle();
+
+      setClassFee(data);
+    };
+
+    fetchClassFee();
+  }, [selectedStudent?.class?.id, activeYear?.id]);
+
+  // Fetch exams
+  useEffect(() => {
+    const fetchExams = async () => {
+      if (!activeYear?.id) return;
+
+      const { data } = await supabase
+        .from('exams')
+        .select('id, name, name_bn, exam_fee_amount')
+        .eq('academic_year_id', activeYear.id)
+        .eq('is_active', true);
+
+      setExams(data || []);
+    };
+
+    fetchExams();
+  }, [activeYear?.id]);
+
+  // Auto-fill amount when fee type or exam changes
+  useEffect(() => {
+    if (newFeeType === 'monthly' && classFee) {
+      setNewFeeAmount(classFee.amount);
+    } else if (newFeeType === 'admission' && classFee) {
+      setNewFeeAmount(classFee.admission_fee);
+    } else if (newFeeType === 'session' && classFee) {
+      setNewFeeAmount(classFee.session_charge);
+    } else if (newFeeType === 'exam' && newFeeExamId) {
+      const exam = exams.find(e => e.id === newFeeExamId);
+      if (exam) {
+        setNewFeeAmount(exam.exam_fee_amount);
+      }
+    }
+  }, [newFeeType, classFee, newFeeExamId, exams]);
 
   const handleSearch = () => {
     if (!searchTerm.trim()) return;
@@ -184,8 +248,14 @@ export default function FeeCollection() {
     if (!selectedStudent || newFeeAmount <= 0) return;
     
     let feeMonth: string | undefined;
+    let examId: string | undefined;
+    
     if (newFeeType === 'monthly' && newFeeMonth && newFeeYear) {
       feeMonth = `${newFeeYear}-${newFeeMonth}-01`;
+    }
+    
+    if (newFeeType === 'exam') {
+      examId = newFeeExamId;
     }
     
     createFeeRecord.mutate(
@@ -194,6 +264,7 @@ export default function FeeCollection() {
         feeType: newFeeType,
         amountDue: newFeeAmount,
         feeMonth,
+        examId,
       },
       {
         onSuccess: () => {
@@ -201,6 +272,7 @@ export default function FeeCollection() {
           setNewFeeType('monthly');
           setNewFeeMonth('');
           setNewFeeAmount(0);
+          setNewFeeExamId('');
         },
       }
     );
@@ -243,10 +315,29 @@ export default function FeeCollection() {
     }
   };
 
+  // Get monthly fee status for visual cards
+  const getMonthlyFeeStatus = () => {
+    if (!feeRecords) return [];
+    const monthlyRecords = feeRecords.filter(r => r.fee_type === 'monthly');
+    return bengaliMonths.map(month => {
+      const record = monthlyRecords.find(r => {
+        if (!r.fee_month) return false;
+        return r.fee_month.substring(5, 7) === month.value;
+      });
+      return {
+        month: month.value,
+        label: month.label,
+        status: record?.status || null,
+        record
+      };
+    });
+  };
+
   // Calculate totals
   const totalDue = feeRecords?.reduce((sum, r) => sum + Number(r.amount_due), 0) || 0;
   const totalPaid = feeRecords?.reduce((sum, r) => sum + Number(r.amount_paid), 0) || 0;
   const totalRemaining = totalDue - totalPaid;
+  const monthlyFeeStatus = getMonthlyFeeStatus();
 
   return (
     <MainLayout title="ফি আদায়">
@@ -323,14 +414,14 @@ export default function FeeCollection() {
             {/* Student Info Card */}
             <Card>
               <CardContent className="py-6">
-                <div className="flex items-start gap-6">
-                  <Avatar className="w-20 h-20">
+                <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                  <Avatar className="w-16 h-16 sm:w-20 sm:h-20">
                     <AvatarImage src={selectedStudent.photo_url || undefined} />
                     <AvatarFallback className="text-2xl bg-primary/10 text-primary">
                       {selectedStudent.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="flex-1 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
                     <div>
                       <div className="flex items-center gap-2 text-muted-foreground text-sm">
                         <User className="w-4 h-4" />
@@ -376,40 +467,87 @@ export default function FeeCollection() {
             </Card>
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="py-4">
+            <div className="grid gap-4 grid-cols-3">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
+                <CardContent className="py-4 text-center">
                   <div className="text-sm text-muted-foreground">মোট বকেয়া</div>
-                  <div className="text-2xl font-bold text-primary">
+                  <div className="text-xl sm:text-2xl font-bold text-primary">
                     ৳ {totalDue.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="py-4">
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
+                <CardContent className="py-4 text-center">
                   <div className="text-sm text-muted-foreground">মোট পরিশোধিত</div>
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-xl sm:text-2xl font-bold text-green-600">
                     ৳ {totalPaid.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="py-4">
+              <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border-red-200 dark:border-red-800">
+                <CardContent className="py-4 text-center">
                   <div className="text-sm text-muted-foreground">অবশিষ্ট বকেয়া</div>
-                  <div className="text-2xl font-bold text-destructive">
+                  <div className="text-xl sm:text-2xl font-bold text-destructive">
                     ৳ {totalRemaining.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Fee Records Table */}
+            {/* Monthly Fee Visual Cards */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Receipt className="w-5 h-5" />
-                  ফি রেকর্ড
+                  মাসিক ফি স্ট্যাটাস
                 </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-2">
+                  {monthlyFeeStatus.map(({ month, label, status, record }) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => record && record.status !== 'paid' && handleOpenPayment(record)}
+                      disabled={!record || status === 'paid'}
+                      className={`
+                        p-2 sm:p-3 rounded-lg border-2 text-center transition-all
+                        ${status === 'paid' 
+                          ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
+                          : status === 'partial'
+                            ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:border-yellow-500'
+                            : status === 'unpaid'
+                              ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:border-red-500'
+                              : 'bg-muted/50 border-muted-foreground/20'
+                        }
+                      `}
+                    >
+                      <div className="font-bengali text-xs sm:text-sm font-medium truncate">{label}</div>
+                      <div className="mt-1">
+                        {status === 'paid' && <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-green-600" />}
+                        {status === 'partial' && <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-yellow-600" />}
+                        {status === 'unpaid' && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-red-600" />}
+                        {!status && <span className="text-xs text-muted-foreground">—</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Fee Records Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Receipt className="w-5 h-5" />
+                    সকল ফি রেকর্ড
+                  </CardTitle>
+                  <Button size="sm" onClick={() => setAddFeeDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    নতুন ফি
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoadingRecords ? (
@@ -419,74 +557,72 @@ export default function FeeCollection() {
                     ))}
                   </div>
                 ) : feeRecords && feeRecords.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ফি এর ধরন</TableHead>
-                        <TableHead>মাস/পরীক্ষা</TableHead>
-                        <TableHead className="text-right">বকেয়া</TableHead>
-                        <TableHead className="text-right">জরিমানা</TableHead>
-                        <TableHead className="text-right">পরিশোধিত</TableHead>
-                        <TableHead>স্ট্যাটাস</TableHead>
-                        <TableHead>রিসিপ্ট</TableHead>
-                        <TableHead className="w-24">অ্যাকশন</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {feeRecords.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium">
-                            {getFeeTypeLabel(record.fee_type)}
-                          </TableCell>
-                          <TableCell>
-                            {record.fee_type === 'exam' && record.exam
-                              ? record.exam.name_bn || record.exam.name
-                              : formatMonth(record.fee_month)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ৳ {Number(record.amount_due).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {Number(record.late_fine) > 0
-                              ? `৳ ${Number(record.late_fine).toLocaleString()}`
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ৳ {Number(record.amount_paid).toLocaleString()}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(record.status)}</TableCell>
-                          <TableCell>
-                            {record.receipt_number ? (
-                              <span className="font-mono text-sm">{record.receipt_number}</span>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              {record.status !== 'paid' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleOpenPayment(record)}
-                                >
-                                  আদায়
-                                </Button>
-                              )}
-                              {record.amount_paid > 0 && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handlePrintReceipt(record)}
-                                >
-                                  <Printer className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ফি এর ধরন</TableHead>
+                          <TableHead className="hidden sm:table-cell">মাস/পরীক্ষা</TableHead>
+                          <TableHead className="text-right">বকেয়া</TableHead>
+                          <TableHead className="text-right hidden md:table-cell">পরিশোধিত</TableHead>
+                          <TableHead className="hidden lg:table-cell">স্ট্যাটাস</TableHead>
+                          <TableHead className="w-24">অ্যাকশন</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {feeRecords.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium">
+                              <div>{getFeeTypeLabel(record.fee_type)}</div>
+                              <div className="text-xs text-muted-foreground sm:hidden">
+                                {record.fee_type === 'exam' && record.exam
+                                  ? record.exam.name_bn || record.exam.name
+                                  : formatMonth(record.fee_month)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              {record.fee_type === 'exam' && record.exam
+                                ? record.exam.name_bn || record.exam.name
+                                : formatMonth(record.fee_month)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div>৳ {Number(record.amount_due).toLocaleString()}</div>
+                              {Number(record.late_fine) > 0 && (
+                                <div className="text-xs text-destructive">
+                                  +৳{Number(record.late_fine)} জরিমানা
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right hidden md:table-cell">
+                              ৳ {Number(record.amount_paid).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">{getStatusBadge(record.status)}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {record.status !== 'paid' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenPayment(record)}
+                                  >
+                                    আদায়
+                                  </Button>
+                                )}
+                                {record.amount_paid > 0 && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handlePrintReceipt(record)}
+                                  >
+                                    <Printer className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>এই শিক্ষার্থীর কোন ফি রেকর্ড নেই</p>
@@ -503,16 +639,6 @@ export default function FeeCollection() {
                 )}
               </CardContent>
             </Card>
-            
-            {/* Add New Fee Button */}
-            {feeRecords && feeRecords.length > 0 && (
-              <div className="flex justify-end">
-                <Button onClick={() => setAddFeeDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  নতুন ফি যুক্ত করুন
-                </Button>
-              </div>
-            )}
           </>
         )}
 
@@ -654,6 +780,24 @@ export default function FeeCollection() {
                 </div>
               )}
               
+              {newFeeType === 'exam' && (
+                <div className="space-y-2">
+                  <Label>পরীক্ষা</Label>
+                  <Select value={newFeeExamId} onValueChange={setNewFeeExamId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="পরীক্ষা নির্বাচন করুন" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exams.map((exam) => (
+                        <SelectItem key={exam.id} value={exam.id}>
+                          {exam.name_bn || exam.name} (৳{exam.exam_fee_amount})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label>বকেয়া পরিমাণ (টাকা)</Label>
                 <Input
@@ -663,6 +807,13 @@ export default function FeeCollection() {
                   onChange={(e) => setNewFeeAmount(Number(e.target.value))}
                   placeholder="টাকার পরিমাণ লিখুন"
                 />
+                {classFee && (
+                  <p className="text-xs text-muted-foreground">
+                    {newFeeType === 'monthly' && `ডিফল্ট মাসিক ফি: ৳${classFee.amount}`}
+                    {newFeeType === 'admission' && `ডিফল্ট ভর্তি ফি: ৳${classFee.admission_fee}`}
+                    {newFeeType === 'session' && `ডিফল্ট সেশন চার্জ: ৳${classFee.session_charge}`}
+                  </p>
+                )}
               </div>
             </div>
             <DialogFooter>
