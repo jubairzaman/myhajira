@@ -50,10 +50,12 @@ import {
   useSearchStudent,
   useStudentFeeRecords,
   useCollectFee,
+  useCollectMultipleFees,
   useCreateFeeRecord,
   type StudentWithFees,
   type StudentFeeRecord,
 } from '@/hooks/queries/useFeeCollection';
+import { useFeeSettings } from '@/hooks/queries/useFeesQuery';
 import { ReceiptPrint, type ReceiptData } from '@/components/fees/ReceiptPrint';
 
 // Bengali month names
@@ -80,6 +82,11 @@ export default function FeeCollection() {
   const [selectedRecord, setSelectedRecord] = useState<StudentFeeRecord | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [lateFine, setLateFine] = useState(0);
+  const [autoLateFineApplied, setAutoLateFineApplied] = useState(false);
+  
+  // Multi-select for batch payment
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+  const [multiPaymentDialogOpen, setMultiPaymentDialogOpen] = useState(false);
   
   // Receipt print state
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -97,11 +104,15 @@ export default function FeeCollection() {
   const [classFee, setClassFee] = useState<{ amount: number; admission_fee: number; session_charge: number } | null>(null);
   const [exams, setExams] = useState<{ id: string; name: string; name_bn: string | null; exam_fee_amount: number }[]>([]);
 
+  // Fee settings for late fine
+  const { data: feeSettings } = useFeeSettings();
+
   const searchMutation = useSearchStudent();
   const { data: feeRecords, isLoading: isLoadingRecords } = useStudentFeeRecords(
     selectedStudent?.id
   );
   const collectFee = useCollectFee();
+  const collectMultipleFees = useCollectMultipleFees();
   const createFeeRecord = useCreateFeeRecord();
 
   // Fetch class fees when student is selected
@@ -180,8 +191,85 @@ export default function FeeCollection() {
     setSelectedRecord(record);
     const remaining = Number(record.amount_due) - Number(record.amount_paid);
     setPaymentAmount(remaining > 0 ? remaining : 0);
-    setLateFine(Number(record.late_fine) || 0);
+    
+    // Auto-calculate late fine
+    let autoFine = Number(record.late_fine) || 0;
+    setAutoLateFineApplied(false);
+    
+    if (feeSettings?.late_fine_enabled && record.fee_type === 'monthly' && record.fee_month) {
+      const today = new Date();
+      const feeMonthDate = new Date(record.fee_month);
+      const dueDate = new Date(feeMonthDate.getFullYear(), feeMonthDate.getMonth(), feeSettings.monthly_due_date);
+      
+      // If today is past the due date and no late fine already applied
+      if (today > dueDate && Number(record.late_fine) === 0) {
+        autoFine = Number(feeSettings.late_fine_amount);
+        setAutoLateFineApplied(true);
+      }
+    }
+    
+    setLateFine(autoFine);
     setPaymentDialogOpen(true);
+  };
+
+  // Toggle record selection for multi-payment
+  const toggleRecordSelection = (recordId: string) => {
+    const newSelected = new Set(selectedRecordIds);
+    if (newSelected.has(recordId)) {
+      newSelected.delete(recordId);
+    } else {
+      newSelected.add(recordId);
+    }
+    setSelectedRecordIds(newSelected);
+  };
+
+  // Get selected unpaid records
+  const selectedUnpaidRecords = feeRecords?.filter(
+    r => selectedRecordIds.has(r.id) && r.status !== 'paid'
+  ) || [];
+
+  // Calculate total for selected records
+  const selectedTotal = selectedUnpaidRecords.reduce((sum, r) => {
+    return sum + (Number(r.amount_due) - Number(r.amount_paid));
+  }, 0);
+
+  // Handle multi-payment
+  const handleMultiPayment = () => {
+    if (selectedUnpaidRecords.length === 0) return;
+
+    const recordsToCollect = selectedUnpaidRecords.map(r => ({
+      id: r.id,
+      amountToPay: Number(r.amount_due) - Number(r.amount_paid),
+    }));
+
+    collectMultipleFees.mutate(
+      { records: recordsToCollect },
+      {
+        onSuccess: (result) => {
+          setMultiPaymentDialogOpen(false);
+          setSelectedRecordIds(new Set());
+          
+          // Prepare receipt data for multi-item
+          if (selectedStudent) {
+            setReceiptData({
+              receiptNumber: result.receiptNumber,
+              paymentDate: new Date().toISOString(),
+              studentName: selectedStudent.name,
+              studentNameBn: selectedStudent.name_bn || undefined,
+              className: selectedStudent.class?.name || '',
+              classNameBn: selectedStudent.class?.name_bn || undefined,
+              sectionName: selectedStudent.section?.name || undefined,
+              studentId: selectedStudent.student_id_number || undefined,
+              feeType: 'multiple',
+              amountDue: selectedTotal,
+              amountPaid: selectedTotal,
+              lateFine: 0,
+            });
+            setReceiptOpen(true);
+          }
+        },
+      }
+    );
   };
 
   const handleCollectPayment = () => {
@@ -543,10 +631,22 @@ export default function FeeCollection() {
                     <Receipt className="w-5 h-5" />
                     সকল ফি রেকর্ড
                   </CardTitle>
-                  <Button size="sm" onClick={() => setAddFeeDialogOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    নতুন ফি
-                  </Button>
+                  <div className="flex gap-2">
+                    {selectedUnpaidRecords.length > 0 && (
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => setMultiPaymentDialogOpen(true)}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        নির্বাচিত ({selectedUnpaidRecords.length}) আদায় করুন
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setAddFeeDialogOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      নতুন ফি
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -561,6 +661,20 @@ export default function FeeCollection() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-10">
+                            <input
+                              type="checkbox"
+                              className="rounded border-muted-foreground"
+                              checked={feeRecords?.filter(r => r.status !== 'paid').every(r => selectedRecordIds.has(r.id)) || false}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedRecordIds(new Set(feeRecords?.filter(r => r.status !== 'paid').map(r => r.id) || []));
+                                } else {
+                                  setSelectedRecordIds(new Set());
+                                }
+                              }}
+                            />
+                          </TableHead>
                           <TableHead>ফি এর ধরন</TableHead>
                           <TableHead className="hidden sm:table-cell">মাস/পরীক্ষা</TableHead>
                           <TableHead className="text-right">বকেয়া</TableHead>
@@ -571,7 +685,17 @@ export default function FeeCollection() {
                       </TableHeader>
                       <TableBody>
                         {feeRecords.map((record) => (
-                          <TableRow key={record.id}>
+                          <TableRow key={record.id} className={selectedRecordIds.has(record.id) ? 'bg-primary/5' : ''}>
+                            <TableCell>
+                              {record.status !== 'paid' && (
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-muted-foreground"
+                                  checked={selectedRecordIds.has(record.id)}
+                                  onChange={() => toggleRecordSelection(record.id)}
+                                />
+                              )}
+                            </TableCell>
                             <TableCell className="font-medium">
                               <div>{getFeeTypeLabel(record.fee_type)}</div>
                               <div className="text-xs text-muted-foreground sm:hidden">
@@ -690,7 +814,12 @@ export default function FeeCollection() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="late-fine">বিলম্ব জরিমানা (টাকা)</Label>
+                  <Label htmlFor="late-fine" className="flex items-center gap-2">
+                    বিলম্ব জরিমানা (টাকা)
+                    {autoLateFineApplied && (
+                      <Badge variant="secondary" className="text-xs">স্বয়ংক্রিয়</Badge>
+                    )}
+                  </Label>
                   <Input
                     id="late-fine"
                     type="number"
@@ -715,6 +844,44 @@ export default function FeeCollection() {
               <Button onClick={handleCollectPayment} disabled={collectFee.isPending}>
                 <CreditCard className="w-4 h-4 mr-2" />
                 আদায় করুন
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Multi-Payment Dialog */}
+        <Dialog open={multiPaymentDialogOpen} onOpenChange={setMultiPaymentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>একাধিক ফি আদায়</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">নির্বাচিত আইটেম</div>
+                <div className="font-semibold">{selectedUnpaidRecords.length}টি ফি রেকর্ড</div>
+              </div>
+              <div className="space-y-2">
+                {selectedUnpaidRecords.map(record => (
+                  <div key={record.id} className="flex justify-between p-2 border rounded">
+                    <span>{getFeeTypeLabel(record.fee_type)}</span>
+                    <span>৳ {(Number(record.amount_due) - Number(record.amount_paid)).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-primary/10 rounded-lg">
+                <div className="text-sm text-muted-foreground">মোট আদায়</div>
+                <div className="text-2xl font-bold text-primary">
+                  ৳ {selectedTotal.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMultiPaymentDialogOpen(false)}>
+                বাতিল
+              </Button>
+              <Button onClick={handleMultiPayment} disabled={collectMultipleFees.isPending}>
+                <CreditCard className="w-4 h-4 mr-2" />
+                সব আদায় করুন
               </Button>
             </DialogFooter>
           </DialogContent>

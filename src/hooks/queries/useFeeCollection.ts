@@ -177,7 +177,69 @@ export function useCollectFee() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-fee-records'] });
+      queryClient.invalidateQueries({ queryKey: ['fee-collection-stats'] });
       toast.success('ফি আদায় সম্পন্ন হয়েছে');
+    },
+    onError: (error) => {
+      toast.error('ফি আদায়ে সমস্যা হয়েছে');
+      console.error(error);
+    },
+  });
+}
+
+// Collect multiple fees at once
+export function useCollectMultipleFees() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      records,
+      lateFines = {},
+    }: {
+      records: { id: string; amountToPay: number }[];
+      lateFines?: Record<string, number>;
+    }) => {
+      const receiptNumber = generateReceiptNumber();
+      const updatedRecords: StudentFeeRecord[] = [];
+
+      for (const { id, amountToPay } of records) {
+        // Get current record
+        const { data: record, error: fetchError } = await supabase
+          .from('student_fee_records')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        const lateFine = lateFines[id] || Number(record.late_fine) || 0;
+        const totalPaid = Number(record.amount_paid) + amountToPay;
+        const totalDue = Number(record.amount_due) + lateFine;
+        const newStatus = totalPaid >= totalDue ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+
+        const { data: updatedRecord, error } = await supabase
+          .from('student_fee_records')
+          .update({
+            amount_paid: totalPaid,
+            late_fine: lateFine,
+            status: newStatus,
+            payment_date: new Date().toISOString(),
+            receipt_number: receiptNumber,
+          })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        updatedRecords.push(updatedRecord as StudentFeeRecord);
+      }
+
+      return { records: updatedRecords, receiptNumber };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['student-fee-records'] });
+      queryClient.invalidateQueries({ queryKey: ['fee-collection-stats'] });
+      toast.success(`${data.records.length}টি ফি আদায় সম্পন্ন হয়েছে`);
     },
     onError: (error) => {
       toast.error('ফি আদায়ে সমস্যা হয়েছে');

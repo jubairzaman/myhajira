@@ -9,7 +9,9 @@ import {
   TrendingUp,
   DollarSign,
   Wallet,
-  Clock
+  Clock,
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +28,8 @@ import {
   useDefaulterList,
   useFeeCollectionStats 
 } from '@/hooks/queries/useFeeReports';
+import { useSendBulkFeeDueSms } from '@/hooks/queries/useFeeDueSms';
+import { supabase } from '@/integrations/supabase/client';
 
 const FeeReports = () => {
   const [selectedClass, setSelectedClass] = useState<string>('');
@@ -45,6 +49,43 @@ const FeeReports = () => {
     selectedClass || undefined,
     selectedFeeType || undefined
   );
+  const sendBulkSms = useSendBulkFeeDueSms();
+
+  const handleSendBulkSms = async () => {
+    if (!defaulters || defaulters.length === 0) return;
+    
+    // For now, we'll show a toast explaining the feature
+    // Full implementation would require fetching guardian_mobile for each student
+    const studentIds = [...new Set(defaulters.map(d => d.studentId))];
+    
+    // Fetch guardian mobiles for these students
+    const { data: students } = await supabase
+      .from('students')
+      .select('id, name, name_bn, guardian_mobile, class:classes(name)')
+      .in('id', studentIds);
+    
+    if (!students || students.length === 0) return;
+    
+    const smsData = students
+      .filter((s: any) => s.guardian_mobile)
+      .map((s: any) => {
+        const studentDefaulters = defaulters.filter(d => d.studentId === s.id);
+        const totalDue = studentDefaulters.reduce((sum, d) => sum + d.remaining, 0);
+        return {
+          studentId: s.id,
+          studentName: s.name_bn || s.name,
+          className: s.class?.name || '',
+          dueAmount: totalDue,
+          guardianMobile: s.guardian_mobile,
+        };
+      });
+    
+    if (smsData.length === 0) {
+      return;
+    }
+    
+    sendBulkSms.mutate({ students: smsData });
+  };
 
   // Generate last 12 months
   const months = Array.from({ length: 12 }, (_, i) => {
@@ -411,6 +452,19 @@ const FeeReports = () => {
                       <SelectItem value="exam">পরীক্ষা ফি</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendBulkSms}
+                    disabled={!defaulters?.length || sendBulkSms.isPending}
+                  >
+                    {sendBulkSms.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                    )}
+                    বকেয়া SMS
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
