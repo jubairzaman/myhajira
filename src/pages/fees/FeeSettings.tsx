@@ -41,7 +41,7 @@ import {
   useDeleteExam,
   type Exam,
 } from '@/hooks/queries/useFeesQuery';
-import { useBulkGenerateMonthlyFees, useBulkGenerateExamFees } from '@/hooks/queries/useBulkFeeGeneration';
+import { useBulkGenerateMonthlyFees, useBulkGenerateExamFees, useBulkGenerateAllMonthlyFees } from '@/hooks/queries/useBulkFeeGeneration';
 
 // Bengali month names
 const bengaliMonths = [
@@ -94,6 +94,7 @@ export default function FeeSettings() {
   
   const bulkGenerateMonthly = useBulkGenerateMonthlyFees();
   const bulkGenerateExam = useBulkGenerateExamFees();
+  const bulkGenerateAllMonths = useBulkGenerateAllMonthlyFees();
 
   // Load Fee Settings
   useEffect(() => {
@@ -464,11 +465,58 @@ export default function FeeSettings() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Monthly Fee Generation */}
-                <div className="p-4 border rounded-lg space-y-4">
-                  <h4 className="font-medium">মাসিক ফি তৈরি করুন</h4>
+                {/* Generate All Months at Once */}
+                <div className="p-4 border rounded-lg space-y-4 bg-primary/5">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    সব মাসের ফি একসাথে তৈরি করুন
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    নির্দিষ্ট মাসের জন্য সব শিক্ষার্থীর মাসিক ফি রেকর্ড একসাথে তৈরি করুন
+                    শিক্ষাবর্ষের সব মাসের জন্য সব শিক্ষার্থীর মাসিক ফি রেকর্ড একসাথে তৈরি করুন।
+                    শিক্ষার্থীর ভর্তির মাস থেকে ফি গণনা শুরু হবে এবং কাস্টম ফি থাকলে সেটি ব্যবহার হবে।
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>শ্রেণী (ঐচ্ছিক)</Label>
+                      <Select value={bulkClassId} onValueChange={setBulkClassId}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">সকল শ্রেণী</SelectItem>
+                          {sortedClasses.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id}>
+                              {cls.name} {cls.name_bn && `(${cls.name_bn})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button 
+                        onClick={() => bulkGenerateAllMonths.mutate({ 
+                          classId: bulkClassId === 'all' ? undefined : bulkClassId 
+                        })}
+                        disabled={bulkGenerateAllMonths.isPending}
+                        className="w-full"
+                        variant="default"
+                      >
+                        {bulkGenerateAllMonths.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-2" />
+                        )}
+                        সব মাসের ফি তৈরি করুন
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly Fee Generation - Single Month */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h4 className="font-medium">নির্দিষ্ট মাসের ফি তৈরি করুন</h4>
+                  <p className="text-sm text-muted-foreground">
+                    নির্দিষ্ট একটি মাসের জন্য সব শিক্ষার্থীর মাসিক ফি রেকর্ড তৈরি করুন
                   </p>
                   <div className="grid gap-4 md:grid-cols-4">
                     <div className="space-y-2">
@@ -522,6 +570,7 @@ export default function FeeSettings() {
                         onClick={handleBulkGenerateMonthly}
                         disabled={!bulkMonth || bulkGenerateMonthly.isPending}
                         className="w-full"
+                        variant="outline"
                       >
                         {bulkGenerateMonthly.isPending ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
