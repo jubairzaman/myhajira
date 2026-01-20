@@ -565,6 +565,39 @@ export type Database = {
           },
         ]
       }
+      required_documents: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          is_mandatory: boolean
+          name: string
+          name_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          name: string
+          name_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          name?: string
+          name_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rfid_cards_students: {
         Row: {
           card_number: string
@@ -968,6 +1001,7 @@ export type Database = {
       student_custom_fees: {
         Row: {
           created_at: string
+          custom_admission_fee: number | null
           custom_monthly_fee: number | null
           effective_from: string
           id: string
@@ -976,6 +1010,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_admission_fee?: number | null
           custom_monthly_fee?: number | null
           effective_from?: string
           id?: string
@@ -984,6 +1019,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_admission_fee?: number | null
           custom_monthly_fee?: number | null
           effective_from?: string
           id?: string
@@ -995,6 +1031,54 @@ export type Database = {
             foreignKeyName: "student_custom_fees_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_documents: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          is_submitted: boolean
+          notes: string | null
+          student_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          is_submitted?: boolean
+          notes?: string | null
+          student_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          is_submitted?: boolean
+          notes?: string | null
+          student_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "required_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
