@@ -65,6 +65,7 @@ export default function StudentRegistration() {
     bloodGroup: '',
     photoUrl: '',
     rfidCardId: '',
+    admissionDate: new Date().toISOString().split('T')[0],
   });
 
   // Fetch shifts, classes, sections
@@ -214,6 +215,7 @@ export default function StudentRegistration() {
           blood_group: formData.bloodGroup || null,
           photo_url: photoUrl,
           academic_year_id: activeYear.id,
+          admission_date: formData.admissionDate || null,
         })
         .select()
         .single();
@@ -336,6 +338,15 @@ export default function StudentRegistration() {
                       placeholder="Optional ID number"
                       value={formData.studentIdNumber}
                       onChange={(e) => updateField('studentIdNumber', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-bengali">ভর্তির তারিখ</Label>
+                    <Input
+                      type="date"
+                      value={formData.admissionDate}
+                      onChange={(e) => updateField('admissionDate', e.target.value)}
                     />
                   </div>
                 </div>
