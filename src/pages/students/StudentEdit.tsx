@@ -42,13 +42,15 @@ import {
   AlertCircle,
   User,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Settings2
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useStudentFeeRecords, useCreateFeeRecord, useCollectFee, StudentFeeRecord } from '@/hooks/queries/useFeeCollection';
+import { useStudentCustomFee, useUpsertStudentCustomFee } from '@/hooks/queries/useStudentCustomFee';
 
 interface Shift {
   id: string;
@@ -125,11 +127,15 @@ export default function StudentEdit() {
   const [newFeeAmount, setNewFeeAmount] = useState('');
   const [newFeeExamId, setNewFeeExamId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [customFeeAmount, setCustomFeeAmount] = useState('');
+  const [customFeeEffectiveFrom, setCustomFeeEffectiveFrom] = useState('');
 
   // Fee hooks
   const { data: feeRecords = [], isLoading: feeLoading } = useStudentFeeRecords(id);
   const createFeeRecord = useCreateFeeRecord();
   const collectFee = useCollectFee();
+  const { data: studentCustomFee, isLoading: customFeeLoading } = useStudentCustomFee(id);
+  const upsertCustomFee = useUpsertStudentCustomFee();
 
   const [formData, setFormData] = useState({
     nameEnglish: '',
@@ -268,8 +274,13 @@ export default function StudentEdit() {
 
   // Auto-fill amount when fee type changes
   useEffect(() => {
-    if (newFeeType === 'monthly' && classFee) {
-      setNewFeeAmount(classFee.amount.toString());
+    if (newFeeType === 'monthly') {
+      // Priority: custom fee > class fee
+      if (studentCustomFee?.custom_monthly_fee) {
+        setNewFeeAmount(studentCustomFee.custom_monthly_fee.toString());
+      } else if (classFee) {
+        setNewFeeAmount(classFee.amount.toString());
+      }
     } else if (newFeeType === 'admission' && classFee) {
       setNewFeeAmount(classFee.admission_fee.toString());
     } else if (newFeeType === 'session' && classFee) {
@@ -280,7 +291,18 @@ export default function StudentEdit() {
         setNewFeeAmount(exam.exam_fee_amount.toString());
       }
     }
-  }, [newFeeType, classFee, newFeeExamId, exams]);
+  }, [newFeeType, classFee, newFeeExamId, exams, studentCustomFee]);
+
+  // Populate custom fee form when data loads
+  useEffect(() => {
+    if (studentCustomFee) {
+      setCustomFeeAmount(studentCustomFee.custom_monthly_fee?.toString() || '');
+      setCustomFeeEffectiveFrom(studentCustomFee.effective_from || '');
+    } else {
+      setCustomFeeAmount('');
+      setCustomFeeEffectiveFrom(new Date().toISOString().split('T')[0]);
+    }
+  }, [studentCustomFee]);
 
   const uploadPhoto = async (base64Photo: string): Promise<string | null> => {
     if (!base64Photo || !base64Photo.startsWith('data:image')) {
@@ -461,6 +483,18 @@ export default function StudentEdit() {
     const remaining = Number(record.amount_due) + Number(record.late_fine) - Number(record.amount_paid);
     setPaymentAmount(remaining.toString());
     setShowPaymentDialog(true);
+  };
+
+  const handleSaveCustomFee = async () => {
+    if (!id) return;
+    
+    const amount = customFeeAmount ? parseFloat(customFeeAmount) : null;
+    
+    await upsertCustomFee.mutateAsync({
+      studentId: id,
+      customMonthlyFee: amount,
+      effectiveFrom: customFeeEffectiveFrom || undefined,
+    });
   };
 
   const getMonthLabel = (feeMonth: string | null) => {
@@ -722,6 +756,73 @@ export default function StudentEdit() {
                       </p>
                     </CardContent>
                   </Card>
+                </div>
+
+                {/* Custom Monthly Fee Section */}
+                <div className="form-section">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Settings2 className="w-5 h-5 text-primary" />
+                    <h3 className="text-lg font-semibold font-bengali">কাস্টম মাসিক ফি</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4 font-bengali">
+                    এই শিক্ষার্থীর জন্য ভিন্ন মাসিক ফি নির্ধারণ করুন। খালি রাখলে শ্রেণীর ডিফল্ট ফি প্রযোজ্য হবে।
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="font-bengali">কাস্টম মাসিক ফি (টাকা)</Label>
+                      <Input
+                        type="number"
+                        placeholder="পরিমাণ লিখুন"
+                        value={customFeeAmount}
+                        onChange={(e) => setCustomFeeAmount(e.target.value)}
+                      />
+                      {classFee && (
+                        <p className="text-xs text-muted-foreground font-bengali">
+                          শ্রেণীর ডিফল্ট ফি: ৳{classFee.amount}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="font-bengali">কার্যকর তারিখ</Label>
+                      <Input
+                        type="date"
+                        value={customFeeEffectiveFrom}
+                        onChange={(e) => setCustomFeeEffectiveFrom(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground font-bengali">
+                        এই তারিখ থেকে নতুন ফি প্রযোজ্য হবে
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        onClick={handleSaveCustomFee}
+                        disabled={upsertCustomFee.isPending || customFeeLoading}
+                        className="w-full"
+                      >
+                        {upsertCustomFee.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        <span className="font-bengali">সংরক্ষণ করুন</span>
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {studentCustomFee?.custom_monthly_fee && (
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <p className="text-sm font-bengali">
+                        <span className="font-medium">বর্তমান কাস্টম ফি:</span> ৳{studentCustomFee.custom_monthly_fee}
+                        <span className="text-muted-foreground ml-2">
+                          (কার্যকর: {new Date(studentCustomFee.effective_from).toLocaleDateString('bn-BD')})
+                        </span>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Monthly Fee Visual Cards */}

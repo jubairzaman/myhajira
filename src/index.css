@@ -604,3 +604,133 @@
     }
   }
 }
+
+/* ========================================
+   FEE REPORTS - A4 Print Optimization
+   ======================================== */
+@media print {
+  /* Fee report specific styles */
+  .fee-report {
+    width: 100% !important;
+    background: white !important;
+  }
+
+  .fee-report .report-title {
+    font-size: 16pt !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    margin-bottom: 10mm !important;
+  }
+
+  .fee-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+  }
+
+  .fee-report th {
+    background-color: #e5e7eb !important;
+    font-weight: bold !important;
+    text-align: left !important;
+    padding: 6px 8px !important;
+    border: 1px solid #374151 !important;
+  }
+
+  .fee-report td {
+    padding: 4px 8px !important;
+    border: 1px solid #9ca3af !important;
+    vertical-align: top !important;
+  }
+
+  /* Status badges in print */
+  .fee-report .badge-paid {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+  }
+
+  .fee-report .badge-unpaid {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+  }
+
+  .fee-report .badge-partial {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+  }
+
+  /* Summary footer */
+  .fee-report .report-summary {
+    margin-top: 10mm !important;
+    padding-top: 5mm !important;
+    border-top: 2px solid #374151 !important;
+  }
+
+  .fee-report .report-summary p {
+    font-size: 10pt !important;
+    margin: 2mm 0 !important;
+  }
+
+  /* Signature area */
+  .fee-report .signature-area {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-top: 20mm !important;
+  }
+
+  .fee-report .signature-box {
+    width: 40% !important;
+    text-align: center !important;
+    padding-top: 15mm !important;
+    border-top: 1px solid #374151 !important;
+    font-size: 9pt !important;
+  }
+
+  /* Receipt print styles */
+  .receipt-print {
+    width: 80mm !important;
+    padding: 5mm !important;
+    font-size: 10pt !important;
+  }
+
+  .receipt-print .receipt-header {
+    text-align: center !important;
+    margin-bottom: 5mm !important;
+    padding-bottom: 3mm !important;
+    border-bottom: 1px dashed #333 !important;
+  }
+
+  .receipt-print .receipt-body {
+    margin: 5mm 0 !important;
+  }
+
+  .receipt-print .receipt-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin: 2mm 0 !important;
+  }
+
+  .receipt-print .receipt-total {
+    font-weight: bold !important;
+    font-size: 12pt !important;
+    border-top: 1px dashed #333 !important;
+    padding-top: 3mm !important;
+    margin-top: 5mm !important;
+  }
+
+  .receipt-print .receipt-footer {
+    text-align: center !important;
+    margin-top: 5mm !important;
+    padding-top: 3mm !important;
+    border-top: 1px dashed #333 !important;
+    font-size: 8pt !important;
+  }
+}
