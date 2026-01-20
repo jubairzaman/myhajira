@@ -6,6 +6,7 @@ export interface StudentCustomFee {
   id: string;
   student_id: string;
   custom_monthly_fee: number | null;
+  custom_admission_fee: number | null;
   effective_from: string;
   created_at: string;
   updated_at: string;
@@ -39,14 +40,16 @@ export function useUpsertStudentCustomFee() {
     mutationFn: async ({
       studentId,
       customMonthlyFee,
+      customAdmissionFee,
       effectiveFrom,
     }: {
       studentId: string;
       customMonthlyFee: number | null;
+      customAdmissionFee?: number | null;
       effectiveFrom?: string;
     }) => {
-      // If custom fee is null or 0, delete the record
-      if (!customMonthlyFee || customMonthlyFee <= 0) {
+      // If both fees are null or 0, delete the record
+      if ((!customMonthlyFee || customMonthlyFee <= 0) && (!customAdmissionFee || customAdmissionFee <= 0)) {
         const { error } = await supabase
           .from('student_custom_fees')
           .delete()
@@ -67,7 +70,8 @@ export function useUpsertStudentCustomFee() {
         const { data, error } = await supabase
           .from('student_custom_fees')
           .update({
-            custom_monthly_fee: customMonthlyFee,
+            custom_monthly_fee: customMonthlyFee || null,
+            custom_admission_fee: customAdmissionFee || null,
             effective_from: effectiveFrom || new Date().toISOString().split('T')[0],
           })
           .eq('id', existing.id)
@@ -81,7 +85,8 @@ export function useUpsertStudentCustomFee() {
           .from('student_custom_fees')
           .insert({
             student_id: studentId,
-            custom_monthly_fee: customMonthlyFee,
+            custom_monthly_fee: customMonthlyFee || null,
+            custom_admission_fee: customAdmissionFee || null,
             effective_from: effectiveFrom || new Date().toISOString().split('T')[0],
           })
           .select()

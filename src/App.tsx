@@ -13,6 +13,7 @@ import Login from "./pages/auth/Login";
 import StudentList from "./pages/students/StudentList";
 import StudentRegistration from "./pages/students/StudentRegistration";
 import StudentEdit from "./pages/students/StudentEdit";
+import StudentDetails from "./pages/students/StudentDetails";
 import TeacherList from "./pages/teachers/TeacherList";
 import TeacherRegistration from "./pages/teachers/TeacherRegistration";
 import TeacherEdit from "./pages/teachers/TeacherEdit";
@@ -87,6 +88,11 @@ const App = () => (
               <Route path="/students/:id/edit" element={
                 <ProtectedRoute requireAdmin>
                   <StudentEdit />
+                </ProtectedRoute>
+              } />
+              <Route path="/students/:id" element={
+                <ProtectedRoute>
+                  <StudentDetails />
                 </ProtectedRoute>
               } />
               

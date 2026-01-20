@@ -5,6 +5,8 @@ import { RfidEnroll } from '@/components/forms/RfidEnroll';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Select,
   SelectContent,
@@ -12,12 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { GraduationCap, Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { GraduationCap, Save, ArrowLeft, Loader2, FileText, Wallet, CheckCircle2, XCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useAutoGenerateAdmissionFees } from '@/hooks/queries/useBulkFeeGeneration';
+import { useRequiredDocuments, useBulkUpsertStudentDocuments } from '@/hooks/queries/useDocuments';
+import { useUpsertStudentCustomFee } from '@/hooks/queries/useStudentCustomFee';
 
 interface Shift {
   id: string;
@@ -39,6 +43,12 @@ interface Section {
   class_id: string;
 }
 
+interface ClassFee {
+  amount: number;
+  admission_fee: number;
+  session_charge: number;
+}
+
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function StudentRegistration() {
@@ -50,6 +60,15 @@ export default function StudentRegistration() {
   const [sections, setSections] = useState<Section[]>([]);
   const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
   const [filteredSections, setFilteredSections] = useState<Section[]>([]);
+  const [classFee, setClassFee] = useState<ClassFee | null>(null);
+  
+  // Document checklist state
+  const { data: requiredDocuments = [] } = useRequiredDocuments();
+  const [documentChecklist, setDocumentChecklist] = useState<Record<string, boolean>>({});
+  const bulkUpsertDocuments = useBulkUpsertStudentDocuments();
+  
+  // Custom fee hooks
+  const upsertCustomFee = useUpsertStudentCustomFee();
   
   // Auto fee generation hook
   const autoGenerateFees = useAutoGenerateAdmissionFees();
@@ -66,7 +85,21 @@ export default function StudentRegistration() {
     photoUrl: '',
     rfidCardId: '',
     admissionDate: new Date().toISOString().split('T')[0],
+    // Custom fee fields
+    customMonthlyFee: '',
+    customAdmissionFee: '',
   });
+
+  // Initialize document checklist when documents load
+  useEffect(() => {
+    if (requiredDocuments.length > 0) {
+      const initial: Record<string, boolean> = {};
+      requiredDocuments.forEach(doc => {
+        initial[doc.id] = false;
+      });
+      setDocumentChecklist(initial);
+    }
+  }, [requiredDocuments]);
 
   // Fetch shifts, classes, sections
   useEffect(() => {
@@ -105,6 +138,27 @@ export default function StudentRegistration() {
 
     fetchData();
   }, [activeYear]);
+
+  // Fetch class fee when class changes
+  useEffect(() => {
+    const fetchClassFee = async () => {
+      if (!formData.classId || !activeYear?.id) {
+        setClassFee(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('class_monthly_fees')
+        .select('amount, admission_fee, session_charge')
+        .eq('class_id', formData.classId)
+        .eq('academic_year_id', activeYear.id)
+        .maybeSingle();
+
+      setClassFee(data);
+    };
+
+    fetchClassFee();
+  }, [formData.classId, activeYear?.id]);
 
   // Filter classes when shift changes
   useEffect(() => {
@@ -236,6 +290,33 @@ export default function StudentRegistration() {
           toast.warning('Student saved, but RFID card enrollment failed');
         }
       }
+
+      // Save custom fees if provided
+      if (student && (formData.customMonthlyFee || formData.customAdmissionFee)) {
+        const customMonthly = formData.customMonthlyFee ? parseFloat(formData.customMonthlyFee) : null;
+        const customAdmission = formData.customAdmissionFee ? parseFloat(formData.customAdmissionFee) : null;
+        
+        if (customMonthly || customAdmission) {
+          await upsertCustomFee.mutateAsync({
+            studentId: student.id,
+            customMonthlyFee: customMonthly,
+            customAdmissionFee: customAdmission,
+            effectiveFrom: formData.admissionDate,
+          });
+        }
+      }
+
+      // Save document checklist
+      if (student && requiredDocuments.length > 0) {
+        const documents = Object.entries(documentChecklist).map(([docId, isSubmitted]) => ({
+          documentId: docId,
+          isSubmitted,
+        }));
+        await bulkUpsertDocuments.mutateAsync({
+          studentId: student.id,
+          documents,
+        });
+      }
       
       // Auto-generate admission and session fees
       if (student) {
@@ -259,9 +340,23 @@ export default function StudentRegistration() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const toggleDocument = (docId: string) => {
+    setDocumentChecklist(prev => ({
+      ...prev,
+      [docId]: !prev[docId],
+    }));
+  };
+
+  // Count document stats
+  const docStats = {
+    total: requiredDocuments.length,
+    mandatory: requiredDocuments.filter(d => d.is_mandatory).length,
+    submitted: Object.values(documentChecklist).filter(Boolean).length,
+  };
+
   return (
     <MainLayout title="Student Registration" titleBn="শিক্ষার্থী নিবন্ধন">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link to="/students">
@@ -303,6 +398,54 @@ export default function StudentRegistration() {
                   onChange={(value) => updateField('rfidCardId', value)}
                 />
               </div>
+
+              {/* Document Checklist */}
+              {requiredDocuments.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <FileText className="w-5 h-5" />
+                      <span className="font-bengali">ডকুমেন্ট চেকলিস্ট</span>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {docStats.submitted}/{docStats.total} জমা দেওয়া হয়েছে
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {requiredDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                          documentChecklist[doc.id] 
+                            ? 'bg-success/5 border-success/20' 
+                            : doc.is_mandatory 
+                              ? 'bg-destructive/5 border-destructive/20'
+                              : ''
+                        }`}
+                        onClick={() => toggleDocument(doc.id)}
+                      >
+                        <Checkbox
+                          checked={documentChecklist[doc.id] || false}
+                          onCheckedChange={() => toggleDocument(doc.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">
+                            {doc.name_bn || doc.name}
+                          </p>
+                          {doc.is_mandatory && (
+                            <span className="text-xs text-destructive">বাধ্যতামূলক</span>
+                          )}
+                        </div>
+                        {documentChecklist[doc.id] ? (
+                          <CheckCircle2 className="w-4 h-4 text-success" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column - Form Fields */}
@@ -449,6 +592,60 @@ export default function StudentRegistration() {
                   </div>
                 </div>
               </div>
+
+              {/* Custom Fee Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Wallet className="w-5 h-5" />
+                    <span className="font-bengali">কাস্টম ফি (ঐচ্ছিক)</span>
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground font-bengali">
+                    শ্রেণী অনুযায়ী ফি থেকে ভিন্ন হলে এখানে দিন
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {classFee && (
+                    <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground font-bengali mb-2">শ্রেণী অনুযায়ী ফি:</p>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">মাসিক:</span>{' '}
+                          <span className="font-medium">৳{classFee.amount}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">ভর্তি:</span>{' '}
+                          <span className="font-medium">৳{classFee.admission_fee}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">সেশন:</span>{' '}
+                          <span className="font-medium">৳{classFee.session_charge}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="font-bengali">কাস্টম মাসিক ফি</Label>
+                      <Input
+                        type="number"
+                        placeholder={classFee ? `ডিফল্ট: ৳${classFee.amount}` : 'পরিমাণ লিখুন'}
+                        value={formData.customMonthlyFee}
+                        onChange={(e) => updateField('customMonthlyFee', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-bengali">কাস্টম ভর্তি ফি</Label>
+                      <Input
+                        type="number"
+                        placeholder={classFee ? `ডিফল্ট: ৳${classFee.admission_fee}` : 'পরিমাণ লিখুন'}
+                        value={formData.customAdmissionFee}
+                        onChange={(e) => updateField('customAdmissionFee', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Submit Button */}
               <div className="flex justify-end gap-4">
