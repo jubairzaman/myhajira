@@ -11,7 +11,12 @@ import {
   Wallet,
   Clock,
   MessageSquare,
-  Loader2
+  Loader2,
+  Search,
+  User,
+  CheckCircle,
+  XCircle,
+  MinusCircle
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { useClassesQuery } from '@/hooks/queries/useClassesQuery';
 import { 
   useClassCollectionReport, 
@@ -28,6 +34,7 @@ import {
   useDefaulterList,
   useFeeCollectionStats 
 } from '@/hooks/queries/useFeeReports';
+import { useStudentFeeHistory, useSearchStudentsForFee } from '@/hooks/queries/useStudentFeeHistory';
 import { useSendBulkFeeDueSms } from '@/hooks/queries/useFeeDueSms';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -35,6 +42,11 @@ const FeeReports = () => {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedFeeType, setSelectedFeeType] = useState<string>('');
+  
+  // Student report states
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const { data: classes, isLoading: classesLoading } = useClassesQuery();
   const { data: stats, isLoading: statsLoading } = useFeeCollectionStats();
@@ -49,6 +61,8 @@ const FeeReports = () => {
     selectedClass || undefined,
     selectedFeeType || undefined
   );
+  const { data: searchResults, isLoading: searchLoading } = useSearchStudentsForFee(studentSearchTerm);
+  const { data: studentFeeHistory, isLoading: studentHistoryLoading } = useStudentFeeHistory(selectedStudentId);
   const sendBulkSms = useSendBulkFeeDueSms();
 
   const handleSendBulkSms = async () => {
@@ -101,6 +115,12 @@ const FeeReports = () => {
     window.print();
   };
 
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setShowSearchResults(false);
+    setStudentSearchTerm('');
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
@@ -112,6 +132,17 @@ const FeeReports = () => {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'partial':
+        return <MinusCircle className="h-4 w-4 text-amber-600" />;
+      default:
+        return <XCircle className="h-4 w-4 text-red-600" />;
+    }
+  };
+
   const getFeeTypeLabel = (type: string): string => {
     const labels: Record<string, string> = {
       admission: 'ভর্তি ফি',
@@ -120,6 +151,16 @@ const FeeReports = () => {
       exam: 'পরীক্ষা ফি',
     };
     return labels[type] || type;
+  };
+
+  const formatMonth = (monthStr: string | null): string => {
+    if (!monthStr) return '-';
+    try {
+      const date = new Date(monthStr + '-01');
+      return format(date, 'MMMM yyyy', { locale: bn });
+    } catch {
+      return monthStr;
+    }
   };
 
   return (
@@ -182,9 +223,13 @@ const FeeReports = () => {
         </div>
 
         {/* Reports Tabs */}
-        <Tabs defaultValue="class-report" className="print-area">
+        <Tabs defaultValue="student-report" className="print-area">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 no-print">
-            <TabsList>
+            <TabsList className="grid grid-cols-4">
+              <TabsTrigger value="student-report" className="gap-2">
+                <User className="h-4 w-4" />
+                শিক্ষার্থী রিপোর্ট
+              </TabsTrigger>
               <TabsTrigger value="class-report" className="gap-2">
                 <FileText className="h-4 w-4" />
                 শ্রেণী রিপোর্ট
@@ -204,6 +249,222 @@ const FeeReports = () => {
               প্রিন্ট করুন
             </Button>
           </div>
+
+          {/* Student Report Tab */}
+          <TabsContent value="student-report">
+            <Card className="student-fee-report">
+              <CardHeader className="no-print">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  শিক্ষার্থী ফি রিপোর্ট
+                </CardTitle>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="শিক্ষার্থীর আইডি বা নাম দিয়ে খুঁজুন..."
+                    value={studentSearchTerm}
+                    onChange={(e) => {
+                      setStudentSearchTerm(e.target.value);
+                      setShowSearchResults(true);
+                    }}
+                    className="pl-10 max-w-md"
+                    onFocus={() => setShowSearchResults(true)}
+                  />
+                  
+                  {/* Search Results Dropdown */}
+                  {showSearchResults && studentSearchTerm.length >= 2 && (
+                    <div className="absolute z-10 top-full left-0 w-full max-w-md mt-1 bg-card border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      {searchLoading ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          খোঁজা হচ্ছে...
+                        </div>
+                      ) : searchResults && searchResults.length > 0 ? (
+                        searchResults.map((student) => (
+                          <button
+                            key={student.id}
+                            className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 border-b last:border-b-0"
+                            onClick={() => handleSelectStudent(student.id)}
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium">{student.nameBn || student.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {student.studentIdNumber} • {student.className}
+                                {student.sectionName && ` - ${student.sectionName}`}
+                              </p>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-muted-foreground">
+                          কোনো শিক্ষার্থী পাওয়া যায়নি
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!selectedStudentId ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    শিক্ষার্থী খুঁজে নির্বাচন করুন
+                  </p>
+                ) : studentHistoryLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-64" />
+                  </div>
+                ) : studentFeeHistory ? (
+                  <div className="space-y-6">
+                    {/* Student Info Header - For Print */}
+                    <div className="print-header hidden print:block text-center mb-6">
+                      <h1 className="text-xl font-bold">শিক্ষার্থী ফি রিপোর্ট</h1>
+                      <p className="text-sm text-muted-foreground">শিক্ষাবর্ষ: ২০২৫-২০২৬</p>
+                    </div>
+
+                    {/* Student Profile Card */}
+                    <div className="flex flex-col md:flex-row gap-6 p-4 bg-muted/30 rounded-lg">
+                      {studentFeeHistory.photoUrl && (
+                        <img 
+                          src={studentFeeHistory.photoUrl} 
+                          alt="Student Photo"
+                          className="w-24 h-28 object-cover rounded-lg border print:w-20 print:h-24"
+                        />
+                      )}
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">নাম</p>
+                          <p className="font-medium">{studentFeeHistory.studentNameBn || studentFeeHistory.studentName}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">আইডি</p>
+                          <p className="font-mono font-medium">{studentFeeHistory.studentIdNumber || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">শ্রেণী</p>
+                          <p className="font-medium">
+                            {studentFeeHistory.classNameBn || studentFeeHistory.className}
+                            {studentFeeHistory.sectionName && ` - ${studentFeeHistory.sectionName}`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">অভিভাবকের মোবাইল</p>
+                          <p className="font-mono font-medium">{studentFeeHistory.guardianMobile}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 bg-blue-50 rounded-lg text-center">
+                        <p className="text-sm text-muted-foreground">মোট ফি</p>
+                        <p className="text-xl font-bold text-blue-700">
+                          ৳ {studentFeeHistory.totalDue.toLocaleString('bn-BD')}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-amber-50 rounded-lg text-center">
+                        <p className="text-sm text-muted-foreground">জরিমানা</p>
+                        <p className="text-xl font-bold text-amber-700">
+                          ৳ {studentFeeHistory.totalLateFine.toLocaleString('bn-BD')}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-green-50 rounded-lg text-center">
+                        <p className="text-sm text-muted-foreground">পরিশোধিত</p>
+                        <p className="text-xl font-bold text-green-700">
+                          ৳ {studentFeeHistory.totalPaid.toLocaleString('bn-BD')}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-red-50 rounded-lg text-center">
+                        <p className="text-sm text-muted-foreground">বাকি</p>
+                        <p className="text-xl font-bold text-red-700">
+                          ৳ {studentFeeHistory.totalRemaining.toLocaleString('bn-BD')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Fee Records Table */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ফি টাইপ</TableHead>
+                          <TableHead>মাস/পরীক্ষা</TableHead>
+                          <TableHead className="text-right">ফি</TableHead>
+                          <TableHead className="text-right">জরিমানা</TableHead>
+                          <TableHead className="text-right">পরিশোধিত</TableHead>
+                          <TableHead className="text-right">বাকি</TableHead>
+                          <TableHead className="text-center">স্ট্যাটাস</TableHead>
+                          <TableHead className="text-center no-print">রিসিপ্ট</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {studentFeeHistory.records.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium">
+                              {getFeeTypeLabel(record.feeType)}
+                            </TableCell>
+                            <TableCell>
+                              {record.feeType === 'monthly' 
+                                ? formatMonth(record.feeMonth)
+                                : record.feeType === 'exam'
+                                  ? record.examName || '-'
+                                  : '-'
+                              }
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ৳ {record.amountDue.toLocaleString('bn-BD')}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-amber-600">
+                              ৳ {record.lateFine.toLocaleString('bn-BD')}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-green-600">
+                              ৳ {record.amountPaid.toLocaleString('bn-BD')}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-red-600">
+                              ৳ {record.remaining.toLocaleString('bn-BD')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {getStatusIcon(record.status)}
+                                <span className="hidden md:inline text-xs">
+                                  {record.status === 'paid' ? 'পরিশোধিত' : record.status === 'partial' ? 'আংশিক' : 'অপরিশোধিত'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center font-mono text-xs no-print">
+                              {record.receiptNumber || '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Print Footer */}
+                    <div className="hidden print:block mt-8 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-8 mt-12">
+                        <div className="text-center">
+                          <div className="border-t border-black pt-2">
+                            <p className="text-sm">অভিভাবকের স্বাক্ষর</p>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="border-t border-black pt-2">
+                            <p className="text-sm">অফিস সিল ও স্বাক্ষর</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-center text-xs text-muted-foreground mt-8">
+                        প্রিন্ট তারিখ: {format(new Date(), 'dd MMMM yyyy', { locale: bn })}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">
+                    শিক্ষার্থীর তথ্য পাওয়া যায়নি
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Class Report */}
           <TabsContent value="class-report">

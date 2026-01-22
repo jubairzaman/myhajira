@@ -9,6 +9,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+// Single fee item for itemized receipts
+export interface ReceiptFeeItem {
+  feeType: string;
+  feeMonth?: string;
+  examName?: string;
+  amountDue: number;
+  lateFine: number;
+  amountPaid: number;
+}
+
 export interface ReceiptData {
   receiptNumber: string;
   studentName: string;
@@ -18,6 +28,7 @@ export interface ReceiptData {
   classNameBn?: string;
   sectionName?: string;
   guardianMobile?: string;
+  // Single item (backward compatible)
   feeType: string;
   feeMonth?: string;
   examName?: string;
@@ -27,6 +38,8 @@ export interface ReceiptData {
   paymentDate: string;
   previousBalance?: number;
   remainingBalance?: number;
+  // Multi-item support
+  items?: ReceiptFeeItem[];
 }
 
 interface ReceiptPrintProps {
@@ -70,8 +83,24 @@ export function ReceiptPrint({
     window.print();
   };
 
-  const totalPaid = data.amountPaid;
-  const grandTotal = data.amountDue + data.lateFine;
+  // Determine if this is a multi-item receipt
+  const isMultiItem = data.items && data.items.length > 1;
+  const feeItems = data.items && data.items.length > 0 
+    ? data.items 
+    : [{
+        feeType: data.feeType,
+        feeMonth: data.feeMonth,
+        examName: data.examName,
+        amountDue: data.amountDue,
+        lateFine: data.lateFine,
+        amountPaid: data.amountPaid,
+      }];
+
+  // Calculate totals
+  const totalDue = feeItems.reduce((sum, item) => sum + item.amountDue, 0);
+  const totalLateFine = feeItems.reduce((sum, item) => sum + item.lateFine, 0);
+  const totalPaid = feeItems.reduce((sum, item) => sum + item.amountPaid, 0);
+  const grandTotal = totalDue + totalLateFine;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,56 +169,95 @@ export function ReceiptPrint({
             </div>
           </div>
 
-          {/* Fee Details */}
+          {/* Fee Details - Itemized Table */}
           <table className="w-full border-collapse mb-4">
             <thead>
               <tr className="bg-muted">
                 <th className="border border-border p-2 text-left">বিবরণ</th>
-                <th className="border border-border p-2 text-right w-32">টাকা</th>
+                <th className="border border-border p-2 text-right w-24">ফি</th>
+                {totalLateFine > 0 && (
+                  <th className="border border-border p-2 text-right w-24">জরিমানা</th>
+                )}
+                <th className="border border-border p-2 text-right w-24">পরিশোধ</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className="border border-border p-2">
-                  <span className="font-medium">{getFeeTypeLabel(data.feeType)}</span>
-                  {data.feeMonth && (
-                    <span className="text-muted-foreground ml-2">
-                      ({formatMonth(data.feeMonth)})
-                    </span>
+              {feeItems.map((item, index) => (
+                <tr key={index}>
+                  <td className="border border-border p-2">
+                    <span className="font-medium">{getFeeTypeLabel(item.feeType)}</span>
+                    {item.feeMonth && (
+                      <span className="text-muted-foreground ml-2">
+                        ({formatMonth(item.feeMonth)})
+                      </span>
+                    )}
+                    {item.examName && (
+                      <span className="text-muted-foreground ml-2">
+                        ({item.examName})
+                      </span>
+                    )}
+                  </td>
+                  <td className="border border-border p-2 text-right font-mono">
+                    ৳ {item.amountDue.toLocaleString('bn-BD')}
+                  </td>
+                  {totalLateFine > 0 && (
+                    <td className="border border-border p-2 text-right font-mono text-destructive">
+                      {item.lateFine > 0 ? `৳ ${item.lateFine.toLocaleString('bn-BD')}` : '-'}
+                    </td>
                   )}
-                  {data.examName && (
-                    <span className="text-muted-foreground ml-2">
-                      ({data.examName})
-                    </span>
-                  )}
-                </td>
-                <td className="border border-border p-2 text-right font-mono">
-                  ৳ {data.amountDue.toLocaleString('bn-BD')}
-                </td>
-              </tr>
-              {data.lateFine > 0 && (
-                <tr>
-                  <td className="border border-border p-2">বিলম্ব জরিমানা</td>
-                  <td className="border border-border p-2 text-right font-mono text-destructive">
-                    ৳ {data.lateFine.toLocaleString('bn-BD')}
+                  <td className="border border-border p-2 text-right font-mono text-green-600">
+                    ৳ {item.amountPaid.toLocaleString('bn-BD')}
                   </td>
                 </tr>
+              ))}
+
+              {/* Subtotals for multi-item */}
+              {isMultiItem && (
+                <>
+                  <tr className="bg-muted/30">
+                    <td className="border border-border p-2 font-medium">মোট ফি</td>
+                    <td className="border border-border p-2 text-right font-mono font-medium">
+                      ৳ {totalDue.toLocaleString('bn-BD')}
+                    </td>
+                    {totalLateFine > 0 && (
+                      <td className="border border-border p-2 text-right font-mono text-destructive">
+                        ৳ {totalLateFine.toLocaleString('bn-BD')}
+                      </td>
+                    )}
+                    <td className="border border-border p-2"></td>
+                  </tr>
+                </>
               )}
+
+              {/* Grand Total */}
               <tr className="bg-muted/50 font-medium">
-                <td className="border border-border p-2">মোট</td>
+                <td className="border border-border p-2" colSpan={totalLateFine > 0 ? 2 : 1}>
+                  সর্বমোট {totalLateFine > 0 ? '(ফি + জরিমানা)' : ''}
+                </td>
+                {totalLateFine > 0 && <td className="border border-border p-2"></td>}
                 <td className="border border-border p-2 text-right font-mono">
                   ৳ {grandTotal.toLocaleString('bn-BD')}
                 </td>
               </tr>
+
+              {/* Total Paid */}
               <tr className="bg-green-50 font-bold text-green-700">
-                <td className="border border-border p-2">পরিশোধিত</td>
+                <td className="border border-border p-2" colSpan={totalLateFine > 0 ? 2 : 1}>
+                  মোট পরিশোধিত
+                </td>
+                {totalLateFine > 0 && <td className="border border-border p-2"></td>}
                 <td className="border border-border p-2 text-right font-mono">
                   ৳ {totalPaid.toLocaleString('bn-BD')}
                 </td>
               </tr>
+
+              {/* Remaining */}
               {(grandTotal - totalPaid) > 0 && (
                 <tr className="bg-amber-50 text-amber-700">
-                  <td className="border border-border p-2">বাকি</td>
+                  <td className="border border-border p-2" colSpan={totalLateFine > 0 ? 2 : 1}>
+                    বাকি
+                  </td>
+                  {totalLateFine > 0 && <td className="border border-border p-2"></td>}
                   <td className="border border-border p-2 text-right font-mono font-medium">
                     ৳ {(grandTotal - totalPaid).toLocaleString('bn-BD')}
                   </td>
@@ -197,6 +265,20 @@ export function ReceiptPrint({
               )}
             </tbody>
           </table>
+
+          {/* Items Summary for Multi-item */}
+          {isMultiItem && (
+            <div className="text-xs text-muted-foreground mb-4 p-2 bg-muted/20 rounded">
+              <span className="font-medium">পরিশোধিত আইটেম ({feeItems.length}টি): </span>
+              {feeItems.map((item, i) => (
+                <span key={i}>
+                  {getFeeTypeLabel(item.feeType)}
+                  {item.feeMonth && ` (${formatMonth(item.feeMonth)})`}
+                  {i < feeItems.length - 1 ? ', ' : ''}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Amount in Words */}
           <div className="bg-muted/30 p-3 rounded text-sm mb-6">
