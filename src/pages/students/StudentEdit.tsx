@@ -5,6 +5,7 @@ import { RfidEnroll } from '@/components/forms/RfidEnroll';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Select,
   SelectContent,
@@ -43,7 +44,8 @@ import {
   User,
   CheckCircle2,
   XCircle,
-  Settings2
+  Settings2,
+  FileText
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -51,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useStudentFeeRecords, useCreateFeeRecord, useCollectFee, StudentFeeRecord } from '@/hooks/queries/useFeeCollection';
 import { useStudentCustomFee, useUpsertStudentCustomFee } from '@/hooks/queries/useStudentCustomFee';
+import { useRequiredDocuments, useStudentDocuments, useUpsertStudentDocument } from '@/hooks/queries/useDocuments';
 
 interface Shift {
   id: string;
@@ -128,6 +131,7 @@ export default function StudentEdit() {
   const [newFeeExamId, setNewFeeExamId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [customFeeAmount, setCustomFeeAmount] = useState('');
+  const [customAdmissionFeeAmount, setCustomAdmissionFeeAmount] = useState('');
   const [customFeeEffectiveFrom, setCustomFeeEffectiveFrom] = useState('');
 
   // Fee hooks
@@ -136,6 +140,11 @@ export default function StudentEdit() {
   const collectFee = useCollectFee();
   const { data: studentCustomFee, isLoading: customFeeLoading } = useStudentCustomFee(id);
   const upsertCustomFee = useUpsertStudentCustomFee();
+
+  // Document hooks
+  const { data: requiredDocuments = [], isLoading: docsLoading } = useRequiredDocuments();
+  const { data: studentDocuments = [], isLoading: studentDocsLoading } = useStudentDocuments(id);
+  const upsertStudentDocument = useUpsertStudentDocument();
 
   const [formData, setFormData] = useState({
     nameEnglish: '',
@@ -297,9 +306,11 @@ export default function StudentEdit() {
   useEffect(() => {
     if (studentCustomFee) {
       setCustomFeeAmount(studentCustomFee.custom_monthly_fee?.toString() || '');
+      setCustomAdmissionFeeAmount(studentCustomFee.custom_admission_fee?.toString() || '');
       setCustomFeeEffectiveFrom(studentCustomFee.effective_from || '');
     } else {
       setCustomFeeAmount('');
+      setCustomAdmissionFeeAmount('');
       setCustomFeeEffectiveFrom(new Date().toISOString().split('T')[0]);
     }
   }, [studentCustomFee]);
@@ -488,13 +499,40 @@ export default function StudentEdit() {
   const handleSaveCustomFee = async () => {
     if (!id) return;
     
-    const amount = customFeeAmount ? parseFloat(customFeeAmount) : null;
+    const monthlyAmount = customFeeAmount ? parseFloat(customFeeAmount) : null;
+    const admissionAmount = customAdmissionFeeAmount ? parseFloat(customAdmissionFeeAmount) : null;
     
     await upsertCustomFee.mutateAsync({
       studentId: id,
-      customMonthlyFee: amount,
+      customMonthlyFee: monthlyAmount,
+      customAdmissionFee: admissionAmount,
       effectiveFrom: customFeeEffectiveFrom || undefined,
     });
+  };
+
+  // Handle document toggle
+  const handleDocumentToggle = async (documentId: string, isSubmitted: boolean) => {
+    if (!id) return;
+    
+    await upsertStudentDocument.mutateAsync({
+      studentId: id,
+      documentId,
+      isSubmitted,
+    });
+  };
+
+  // Get document status for a specific document
+  const getDocumentStatus = (documentId: string) => {
+    const studentDoc = studentDocuments.find(d => d.document_id === documentId);
+    return studentDoc?.is_submitted ?? false;
+  };
+
+  // Document summary
+  const documentSummary = {
+    total: requiredDocuments.length,
+    submitted: studentDocuments.filter(d => d.is_submitted).length,
+    mandatory: requiredDocuments.filter(d => d.is_mandatory).length,
+    mandatorySubmitted: requiredDocuments.filter(d => d.is_mandatory && getDocumentStatus(d.id)).length,
   };
 
   const getMonthLabel = (feeMonth: string | null) => {
@@ -563,7 +601,7 @@ export default function StudentEdit() {
           {/* Right Column - Tabbed Content */}
           <div className="lg:col-span-2">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="info" className="flex items-center gap-2">
                   <User className="w-4 h-4" />
                   <span className="font-bengali">শিক্ষার্থীর তথ্য</span>
@@ -574,6 +612,15 @@ export default function StudentEdit() {
                   {totalRemaining > 0 && (
                     <Badge variant="destructive" className="ml-1 text-xs">
                       ৳{totalRemaining}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="documents" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-bengali">ডকুমেন্ট</span>
+                  {documentSummary.total > 0 && documentSummary.submitted < documentSummary.total && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {documentSummary.submitted}/{documentSummary.total}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -758,17 +805,17 @@ export default function StudentEdit() {
                   </Card>
                 </div>
 
-                {/* Custom Monthly Fee Section */}
+                {/* Custom Fee Section */}
                 <div className="form-section">
                   <div className="flex items-center gap-2 mb-4">
                     <Settings2 className="w-5 h-5 text-primary" />
-                    <h3 className="text-lg font-semibold font-bengali">কাস্টম মাসিক ফি</h3>
+                    <h3 className="text-lg font-semibold font-bengali">কাস্টম ফি সেটিংস</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4 font-bengali">
-                    এই শিক্ষার্থীর জন্য ভিন্ন মাসিক ফি নির্ধারণ করুন। খালি রাখলে শ্রেণীর ডিফল্ট ফি প্রযোজ্য হবে।
+                    এই শিক্ষার্থীর জন্য ভিন্ন ফি নির্ধারণ করুন। খালি রাখলে শ্রেণীর ডিফল্ট ফি প্রযোজ্য হবে।
                   </p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label className="font-bengali">কাস্টম মাসিক ফি (টাকা)</Label>
                       <Input
@@ -779,7 +826,22 @@ export default function StudentEdit() {
                       />
                       {classFee && (
                         <p className="text-xs text-muted-foreground font-bengali">
-                          শ্রেণীর ডিফল্ট ফি: ৳{classFee.amount}
+                          শ্রেণীর ডিফল্ট: ৳{classFee.amount}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="font-bengali">কাস্টম ভর্তি ফি (টাকা)</Label>
+                      <Input
+                        type="number"
+                        placeholder="পরিমাণ লিখুন"
+                        value={customAdmissionFeeAmount}
+                        onChange={(e) => setCustomAdmissionFeeAmount(e.target.value)}
+                      />
+                      {classFee && (
+                        <p className="text-xs text-muted-foreground font-bengali">
+                          শ্রেণীর ডিফল্ট: ৳{classFee.admission_fee}
                         </p>
                       )}
                     </div>
@@ -792,7 +854,7 @@ export default function StudentEdit() {
                         onChange={(e) => setCustomFeeEffectiveFrom(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground font-bengali">
-                        এই তারিখ থেকে নতুন ফি প্রযোজ্য হবে
+                        এই তারিখ থেকে প্রযোজ্য
                       </p>
                     </div>
                     
@@ -813,10 +875,16 @@ export default function StudentEdit() {
                     </div>
                   </div>
                   
-                  {studentCustomFee?.custom_monthly_fee && (
+                  {(studentCustomFee?.custom_monthly_fee || studentCustomFee?.custom_admission_fee) && (
                     <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                       <p className="text-sm font-bengali">
-                        <span className="font-medium">বর্তমান কাস্টম ফি:</span> ৳{studentCustomFee.custom_monthly_fee}
+                        <span className="font-medium">বর্তমান কাস্টম ফি:</span>
+                        {studentCustomFee.custom_monthly_fee && (
+                          <span className="ml-2">মাসিক: ৳{studentCustomFee.custom_monthly_fee}</span>
+                        )}
+                        {studentCustomFee.custom_admission_fee && (
+                          <span className="ml-2">ভর্তি: ৳{studentCustomFee.custom_admission_fee}</span>
+                        )}
                         <span className="text-muted-foreground ml-2">
                           (কার্যকর: {new Date(studentCustomFee.effective_from).toLocaleDateString('bn-BD')})
                         </span>
@@ -952,6 +1020,115 @@ export default function StudentEdit() {
                           })}
                         </TableBody>
                       </Table>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Documents Tab */}
+              <TabsContent value="documents" className="space-y-6">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground font-bengali">মোট ডকুমেন্ট</p>
+                      <p className="text-2xl font-bold text-blue-600">{documentSummary.total}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground font-bengali">জমা হয়েছে</p>
+                      <p className="text-2xl font-bold text-green-600">{documentSummary.submitted}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground font-bengali">বাকি আছে</p>
+                      <p className="text-2xl font-bold text-orange-600">{documentSummary.total - documentSummary.submitted}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground font-bengali">বাধ্যতামূলক</p>
+                      <p className="text-2xl font-bold text-purple-600">{documentSummary.mandatorySubmitted}/{documentSummary.mandatory}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Document Checklist */}
+                <div className="form-section">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <h3 className="text-lg font-semibold font-bengali">ডকুমেন্ট চেকলিস্ট</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4 font-bengali">
+                    শিক্ষার্থীর জমাদানকৃত ডকুমেন্ট চিহ্নিত করুন।
+                  </p>
+
+                  {docsLoading || studentDocsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : requiredDocuments.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="font-bengali">কোনো ডকুমেন্ট সেট করা হয়নি</p>
+                      <p className="text-xs font-bengali mt-1">
+                        Settings → Admission Documents থেকে ডকুমেন্ট যোগ করুন
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {requiredDocuments.map((doc) => {
+                        const isSubmitted = getDocumentStatus(doc.id);
+                        const isPending = upsertStudentDocument.isPending;
+                        
+                        return (
+                          <div
+                            key={doc.id}
+                            className={`
+                              flex items-center justify-between p-4 rounded-lg border-2 transition-all
+                              ${isSubmitted 
+                                ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                                : 'bg-muted/50 border-muted-foreground/20 hover:border-primary/30'
+                              }
+                            `}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                id={`doc-${doc.id}`}
+                                checked={isSubmitted}
+                                disabled={isPending}
+                                onCheckedChange={(checked) => handleDocumentToggle(doc.id, !!checked)}
+                                className="h-5 w-5"
+                              />
+                              <div>
+                                <label
+                                  htmlFor={`doc-${doc.id}`}
+                                  className="font-medium cursor-pointer font-bengali"
+                                >
+                                  {doc.name_bn || doc.name}
+                                </label>
+                                {doc.name_bn && (
+                                  <p className="text-xs text-muted-foreground">{doc.name}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {doc.is_mandatory && (
+                                <Badge variant="destructive" className="text-xs font-bengali">
+                                  বাধ্যতামূলক
+                                </Badge>
+                              )}
+                              {isSubmitted ? (
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-muted-foreground/50" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

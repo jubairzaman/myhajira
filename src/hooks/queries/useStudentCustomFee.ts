@@ -98,7 +98,7 @@ export function useUpsertStudentCustomFee() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['student-custom-fee', variables.studentId] });
-      toast.success('কাস্টম মাসিক ফি সংরক্ষিত হয়েছে');
+      toast.success('কাস্টম ফি সংরক্ষিত হয়েছে');
     },
     onError: (error) => {
       toast.error('সংরক্ষণে সমস্যা হয়েছে');
