@@ -56,6 +56,7 @@ const getFeeTypeLabel = (type: string): string => {
     session: 'সেশন চার্জ',
     monthly: 'মাসিক বেতন',
     exam: 'পরীক্ষা ফি',
+    product: 'পণ্য বিক্রয়',
   };
   return labels[type] || type;
 };

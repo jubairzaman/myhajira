@@ -1,18 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -28,31 +21,31 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Search,
   CreditCard,
-  User,
   Phone,
   GraduationCap,
   Receipt,
   Printer,
-  AlertCircle,
   Plus,
+  Minus,
   CheckCircle2,
   XCircle,
   Package,
   ShoppingCart,
   X,
+  AlertCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { toast } from 'sonner';
 import {
   useSearchStudent,
   useStudentFeeRecords,
-  useCollectFee,
   useCollectMultipleFees,
   useCreateFeeRecord,
   type StudentWithFees,
@@ -63,9 +56,9 @@ import { ReceiptPrint, type ReceiptData } from '@/components/fees/ReceiptPrint';
 import { 
   useActiveProducts, 
   useSellProduct,
-  getCategoryLabel,
   type InventoryProduct 
 } from '@/hooks/queries/useInventory';
+import { cn } from '@/lib/utils';
 
 // Bengali month names
 const bengaliMonths = [
@@ -83,19 +76,36 @@ const bengaliMonths = [
   { value: '12', label: 'ডিসেম্বর' },
 ];
 
+// Cart item interface
+interface CartItem {
+  id: string;
+  type: 'fee' | 'product';
+  name: string;
+  description?: string;
+  quantity: number;
+  unitPrice: number;
+  lateFine: number;
+  total: number;
+  feeRecord?: StudentFeeRecord;
+  product?: InventoryProduct;
+}
+
 export default function FeeCollection() {
   const { activeYear } = useAcademicYear();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithFees | null>(null);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<StudentFeeRecord | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [lateFine, setLateFine] = useState(0);
-  const [autoLateFineApplied, setAutoLateFineApplied] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Multi-select for batch payment
-  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
-  const [multiPaymentDialogOpen, setMultiPaymentDialogOpen] = useState(false);
+  // Cart state
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Success dialog state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [lastPaymentData, setLastPaymentData] = useState<{
+    receiptNumber: string;
+    totalAmount: number;
+  } | null>(null);
   
   // Receipt print state
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -113,15 +123,6 @@ export default function FeeCollection() {
   const [classFee, setClassFee] = useState<{ amount: number; admission_fee: number; session_charge: number } | null>(null);
   const [exams, setExams] = useState<{ id: string; name: string; name_bn: string | null; exam_fee_amount: number }[]>([]);
 
-  // Product cart for selling
-  const [productCart, setProductCart] = useState<Array<{
-    product: InventoryProduct;
-    quantity: number;
-  }>>([]);
-  const [productDialogOpen, setProductDialogOpen] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [productQuantity, setProductQuantity] = useState(1);
-
   // Fee settings for late fine
   const { data: feeSettings } = useFeeSettings();
 
@@ -129,13 +130,17 @@ export default function FeeCollection() {
   const { data: feeRecords, isLoading: isLoadingRecords } = useStudentFeeRecords(
     selectedStudent?.id
   );
-  const collectFee = useCollectFee();
   const collectMultipleFees = useCollectMultipleFees();
   const createFeeRecord = useCreateFeeRecord();
   
   // Inventory hooks
   const { data: activeProducts } = useActiveProducts();
   const sellProduct = useSellProduct();
+
+  // Calculate cart totals
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+  const cartLateFines = cart.reduce((sum, item) => sum + item.lateFine, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
 
   // Fetch class fees when student is selected
   useEffect(() => {
@@ -191,14 +196,17 @@ export default function FeeCollection() {
     }
   }, [newFeeType, classFee, newFeeExamId, exams]);
 
+  // Clear cart when student changes
+  useEffect(() => {
+    setCart([]);
+  }, [selectedStudent?.id]);
+
   const handleSearch = () => {
     if (!searchTerm.trim()) return;
     searchMutation.mutate(searchTerm, {
       onSuccess: (student) => {
         setSelectedStudent(student);
-        if (!student) {
-          // Show not found message handled in UI
-        }
+        setCart([]);
       },
     });
   };
@@ -209,228 +217,259 @@ export default function FeeCollection() {
     }
   };
 
-  const handleOpenPayment = (record: StudentFeeRecord) => {
-    setSelectedRecord(record);
-    const remaining = Number(record.amount_due) - Number(record.amount_paid);
-    setPaymentAmount(remaining > 0 ? remaining : 0);
-    
-    // Auto-calculate late fine
-    let autoFine = Number(record.late_fine) || 0;
-    setAutoLateFineApplied(false);
-    
-    if (feeSettings?.late_fine_enabled && record.fee_type === 'monthly' && record.fee_month) {
-      const today = new Date();
-      const feeMonthDate = new Date(record.fee_month);
-      const dueDate = new Date(feeMonthDate.getFullYear(), feeMonthDate.getMonth(), feeSettings.monthly_due_date);
-      
-      // If today is past the due date and no late fine already applied
-      if (today > dueDate && Number(record.late_fine) === 0) {
-        autoFine = Number(feeSettings.late_fine_amount);
-        setAutoLateFineApplied(true);
-      }
+  // Fee type label helper
+  const getFeeTypeLabel = (type: string) => {
+    switch (type) {
+      case 'monthly':
+        return 'মাসিক ফি';
+      case 'admission':
+        return 'ভর্তি ফি';
+      case 'session':
+        return 'সেশন চার্জ';
+      case 'exam':
+        return 'পরীক্ষা ফি';
+      case 'product':
+        return 'পণ্য বিক্রয়';
+      default:
+        return type;
     }
-    
-    setLateFine(autoFine);
-    setPaymentDialogOpen(true);
   };
 
-  // Toggle record selection for multi-payment
-  const toggleRecordSelection = (recordId: string) => {
-    const newSelected = new Set(selectedRecordIds);
-    if (newSelected.has(recordId)) {
-      newSelected.delete(recordId);
+  // Get fee label with month/exam name
+  const getFeeLabel = (record: StudentFeeRecord) => {
+    if (record.fee_type === 'monthly' && record.fee_month) {
+      try {
+        const date = new Date(record.fee_month);
+        return format(date, 'MMMM yyyy', { locale: bn });
+      } catch {
+        return record.fee_month;
+      }
+    }
+    if (record.fee_type === 'exam' && record.exam) {
+      return record.exam.name_bn || record.exam.name;
+    }
+    return getFeeTypeLabel(record.fee_type);
+  };
+
+  // Toggle fee in cart
+  const toggleFeeInCart = (record: StudentFeeRecord) => {
+    const existingIndex = cart.findIndex(
+      item => item.type === 'fee' && item.id === record.id
+    );
+    
+    if (existingIndex >= 0) {
+      // Remove from cart
+      setCart(cart.filter((_, i) => i !== existingIndex));
     } else {
-      newSelected.add(recordId);
+      // Add to cart
+      const remaining = Number(record.amount_due) - Number(record.amount_paid);
+      
+      // Calculate late fine for monthly fees
+      let lateFine = Number(record.late_fine) || 0;
+      
+      if (feeSettings?.late_fine_enabled && record.fee_type === 'monthly' && record.fee_month) {
+        const today = new Date();
+        const feeMonthDate = new Date(record.fee_month);
+        const dueDate = new Date(feeMonthDate.getFullYear(), feeMonthDate.getMonth(), feeSettings.monthly_due_date);
+        
+        if (today > dueDate && Number(record.late_fine) === 0) {
+          lateFine = Number(feeSettings.late_fine_amount);
+        }
+      }
+      
+      setCart([...cart, {
+        id: record.id,
+        type: 'fee',
+        name: getFeeTypeLabel(record.fee_type),
+        description: getFeeLabel(record),
+        quantity: 1,
+        unitPrice: remaining,
+        lateFine,
+        total: remaining + lateFine,
+        feeRecord: record,
+      }]);
     }
-    setSelectedRecordIds(newSelected);
   };
 
-  // Get selected unpaid records
-  const selectedUnpaidRecords = feeRecords?.filter(
-    r => selectedRecordIds.has(r.id) && r.status !== 'paid'
-  ) || [];
-
-  // Calculate total for selected records
-  const selectedTotal = selectedUnpaidRecords.reduce((sum, r) => {
-    return sum + (Number(r.amount_due) - Number(r.amount_paid));
-  }, 0);
-
-  // Calculate product cart total
-  const productCartTotal = productCart.reduce((sum, item) => {
-    return sum + (item.product.unit_price * item.quantity);
-  }, 0);
-
-  // Handle multi-payment
-  const handleMultiPayment = async () => {
-    if (selectedUnpaidRecords.length === 0 && productCart.length === 0) return;
-
-    // First sell products if any
-    if (productCart.length > 0 && selectedStudent) {
-      for (const item of productCart) {
-        await sellProduct.mutateAsync({
-          productId: item.product.id,
-          quantity: item.quantity,
-          unitPrice: item.product.unit_price,
-          studentId: selectedStudent.id,
-        });
+  // Add product to cart
+  const addProductToCart = (product: InventoryProduct) => {
+    const existingIndex = cart.findIndex(
+      item => item.type === 'product' && item.id === product.id
+    );
+    
+    if (existingIndex >= 0) {
+      const updated = [...cart];
+      const newQty = updated[existingIndex].quantity + 1;
+      if (newQty <= product.stock_quantity) {
+        updated[existingIndex].quantity = newQty;
+        updated[existingIndex].total = newQty * product.unit_price;
+        setCart(updated);
       }
+    } else {
+      setCart([...cart, {
+        id: product.id,
+        type: 'product',
+        name: product.name_bn || product.name,
+        quantity: 1,
+        unitPrice: product.unit_price,
+        lateFine: 0,
+        total: product.unit_price,
+        product,
+      }]);
     }
+  };
 
-    // Then collect fees if any
-    if (selectedUnpaidRecords.length > 0) {
-      const recordsToCollect = selectedUnpaidRecords.map(r => ({
-        id: r.id,
-        amountToPay: Number(r.amount_due) - Number(r.amount_paid),
-      }));
+  // Update product quantity in cart
+  const updateProductQuantity = (productId: string, delta: number) => {
+    const updated = cart.map(item => {
+      if (item.type === 'product' && item.id === productId) {
+        const product = item.product!;
+        const newQty = Math.max(0, Math.min(item.quantity + delta, product.stock_quantity));
+        if (newQty === 0) return null;
+        return {
+          ...item,
+          quantity: newQty,
+          total: newQty * item.unitPrice,
+        };
+      }
+      return item;
+    }).filter(Boolean) as CartItem[];
+    setCart(updated);
+  };
 
-      collectMultipleFees.mutate(
-        { records: recordsToCollect },
-        {
-          onSuccess: (result) => {
-            setMultiPaymentDialogOpen(false);
-            setSelectedRecordIds(new Set());
-            setProductCart([]);
-            
-            // Prepare receipt data with items
-            if (selectedStudent) {
-              const items = selectedUnpaidRecords.map(record => ({
-                feeType: record.fee_type,
-                feeMonth: record.fee_month || undefined,
-                examName: record.exam?.name_bn || record.exam?.name || undefined,
-                amountDue: Number(record.amount_due),
-                lateFine: Number(record.late_fine) || 0,
-                amountPaid: Number(record.amount_due) - Number(record.amount_paid),
-              }));
+  // Remove item from cart
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
 
-              // Add products to items
-              productCart.forEach(item => {
-                items.push({
-                  feeType: 'product' as any,
-                  feeMonth: undefined,
-                  examName: item.product.name_bn || item.product.name,
-                  amountDue: item.product.unit_price * item.quantity,
-                  lateFine: 0,
-                  amountPaid: item.product.unit_price * item.quantity,
-                });
-              });
+  // Handle checkout
+  const handleCheckout = async () => {
+    if (cart.length === 0 || !selectedStudent) return;
+    setIsProcessing(true);
 
-              setReceiptData({
-                receiptNumber: result.receiptNumber,
-                paymentDate: new Date().toISOString(),
-                studentName: selectedStudent.name,
-                studentNameBn: selectedStudent.name_bn || undefined,
-                className: selectedStudent.class?.name || '',
-                classNameBn: selectedStudent.class?.name_bn || undefined,
-                sectionName: selectedStudent.section?.name || undefined,
-                studentId: selectedStudent.student_id_number || undefined,
-                guardianMobile: selectedStudent.guardian_mobile || undefined,
-                feeType: 'multiple',
-                amountDue: selectedTotal + productCartTotal,
-                amountPaid: selectedTotal + productCartTotal,
-                lateFine: 0,
-                items,
-              });
-              setReceiptOpen(true);
-            }
-          },
+    try {
+      const feeItems = cart.filter(i => i.type === 'fee');
+      const productItems = cart.filter(i => i.type === 'product');
+
+      // 1. Sell products first
+      for (const item of productItems) {
+        if (item.product) {
+          await sellProduct.mutateAsync({
+            productId: item.product.id,
+            quantity: item.quantity,
+            unitPrice: item.product.unit_price,
+            studentId: selectedStudent.id,
+          });
         }
-      );
-    } else if (productCart.length > 0) {
-      // Only products, no fees
-      setMultiPaymentDialogOpen(false);
-      setProductCart([]);
-      
-      if (selectedStudent) {
-        const items = productCart.map(item => ({
-          feeType: 'product' as any,
-          feeMonth: undefined,
-          examName: item.product.name_bn || item.product.name,
-          amountDue: item.product.unit_price * item.quantity,
-          lateFine: 0,
-          amountPaid: item.product.unit_price * item.quantity,
+      }
+
+      // 2. Collect fees
+      let receiptNumber = `RCP-${Date.now()}`;
+      if (feeItems.length > 0) {
+        const recordsToCollect = feeItems.map(item => ({
+          id: item.id,
+          amountToPay: item.unitPrice,
         }));
 
-        setReceiptData({
-          receiptNumber: `PRD-${Date.now()}`,
-          paymentDate: new Date().toISOString(),
-          studentName: selectedStudent.name,
-          studentNameBn: selectedStudent.name_bn || undefined,
-          className: selectedStudent.class?.name || '',
-          classNameBn: selectedStudent.class?.name_bn || undefined,
-          sectionName: selectedStudent.section?.name || undefined,
-          studentId: selectedStudent.student_id_number || undefined,
-          guardianMobile: selectedStudent.guardian_mobile || undefined,
-          feeType: 'product',
-          amountDue: productCartTotal,
-          amountPaid: productCartTotal,
-          lateFine: 0,
-          items,
+        const lateFines: Record<string, number> = {};
+        feeItems.forEach(item => {
+          lateFines[item.id] = item.lateFine;
         });
-        setReceiptOpen(true);
+
+        const result = await collectMultipleFees.mutateAsync({
+          records: recordsToCollect,
+          lateFines,
+        });
+        receiptNumber = result.receiptNumber;
       }
+
+      // 3. Prepare receipt data
+      const receiptItems = [
+        ...feeItems.map(item => ({
+          feeType: item.feeRecord?.fee_type || 'monthly',
+          feeMonth: item.feeRecord?.fee_month || undefined,
+          examName: item.feeRecord?.exam?.name_bn || item.feeRecord?.exam?.name || undefined,
+          amountDue: item.unitPrice,
+          lateFine: item.lateFine,
+          amountPaid: item.total,
+        })),
+        ...productItems.map(item => ({
+          feeType: 'product',
+          examName: `${item.name} x${item.quantity}`,
+          amountDue: item.total,
+          lateFine: 0,
+          amountPaid: item.total,
+        })),
+      ];
+
+      setReceiptData({
+        receiptNumber,
+        paymentDate: new Date().toISOString(),
+        studentName: selectedStudent.name,
+        studentNameBn: selectedStudent.name_bn || undefined,
+        className: selectedStudent.class?.name || '',
+        classNameBn: selectedStudent.class?.name_bn || undefined,
+        sectionName: selectedStudent.section?.name || undefined,
+        studentId: selectedStudent.student_id_number || undefined,
+        guardianMobile: selectedStudent.guardian_mobile || undefined,
+        feeType: 'multiple',
+        amountDue: cartSubtotal,
+        amountPaid: cartTotal,
+        lateFine: cartLateFines,
+        items: receiptItems,
+      });
+
+      // 4. Show success dialog
+      setLastPaymentData({ receiptNumber, totalAmount: cartTotal });
+      setSuccessDialogOpen(true);
+
+    } catch (error) {
+      console.error('Payment failed:', error);
+      toast.error('পেমেন্ট প্রক্রিয়ায় সমস্যা হয়েছে');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleCollectPayment = () => {
-    if (!selectedRecord || paymentAmount <= 0) return;
-
-    collectFee.mutate(
-      {
-        recordId: selectedRecord.id,
-        amountPaid: paymentAmount,
-        lateFine,
-      },
-      {
-        onSuccess: (updatedRecord) => {
-          setPaymentDialogOpen(false);
-          setSelectedRecord(null);
-          
-          // Prepare receipt data for printing
-          if (selectedStudent && updatedRecord) {
-            setReceiptData({
-              receiptNumber: updatedRecord.receipt_number || `RCP-${Date.now()}`,
-              paymentDate: new Date().toISOString(),
-              studentName: selectedStudent.name,
-              studentNameBn: selectedStudent.name_bn || undefined,
-              className: selectedStudent.class?.name || '',
-              classNameBn: selectedStudent.class?.name_bn || undefined,
-              sectionName: selectedStudent.section?.name || undefined,
-              studentId: selectedStudent.student_id_number || undefined,
-              feeType: updatedRecord.fee_type,
-              feeMonth: updatedRecord.fee_month || undefined,
-              amountDue: Number(updatedRecord.amount_due),
-              amountPaid: Number(updatedRecord.amount_paid),
-              lateFine: Number(updatedRecord.late_fine),
-            });
-            setReceiptOpen(true);
-          }
-        },
-      }
-    );
-  };
-  
-  const handlePrintReceipt = (record: StudentFeeRecord) => {
-    if (!selectedStudent) return;
-    
-    setReceiptData({
-      receiptNumber: record.receipt_number || `RCP-${Date.now()}`,
-      paymentDate: record.payment_date || new Date().toISOString(),
-      studentName: selectedStudent.name,
-      studentNameBn: selectedStudent.name_bn || undefined,
-      className: selectedStudent.class?.name || '',
-      classNameBn: selectedStudent.class?.name_bn || undefined,
-      sectionName: selectedStudent.section?.name || undefined,
-      studentId: selectedStudent.student_id_number || undefined,
-      feeType: record.fee_type,
-      feeMonth: record.fee_month || undefined,
-      examName: record.exam?.name_bn || record.exam?.name || undefined,
-      amountDue: Number(record.amount_due),
-      amountPaid: Number(record.amount_paid),
-      lateFine: Number(record.late_fine),
-    });
+  // Print and continue
+  const handlePrintAndContinue = () => {
     setReceiptOpen(true);
+    setTimeout(() => {
+      window.print();
+      resetToSearch();
+    }, 200);
   };
-  
+
+  // Exit without print
+  const handleExitWithoutPrint = () => {
+    resetToSearch();
+  };
+
+  // Reset to search screen
+  const resetToSearch = () => {
+    setSuccessDialogOpen(false);
+    setSelectedStudent(null);
+    setCart([]);
+    setSearchTerm('');
+    setReceiptData(null);
+    setLastPaymentData(null);
+    
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+  };
+
+  // Go back to search
+  const handleBackToSearch = () => {
+    setSelectedStudent(null);
+    setCart([]);
+    setSearchTerm('');
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+  };
+
+  // Add new fee
   const handleAddNewFee = () => {
     if (!selectedStudent || newFeeAmount <= 0) return;
     
@@ -465,71 +504,6 @@ export default function FeeCollection() {
     );
   };
 
-  const getFeeTypeLabel = (type: string) => {
-    switch (type) {
-      case 'monthly':
-        return 'মাসিক ফি';
-      case 'admission':
-        return 'ভর্তি ফি';
-      case 'session':
-        return 'সেশন চার্জ';
-      case 'exam':
-        return 'পরীক্ষা ফি';
-      case 'product':
-        return 'পণ্য বিক্রয়';
-      default:
-        return type;
-    }
-  };
-
-  // Add product to cart
-  const handleAddProductToCart = () => {
-    if (!selectedProductId || productQuantity <= 0) return;
-    const product = activeProducts?.find(p => p.id === selectedProductId);
-    if (!product) return;
-    
-    // Check if already in cart
-    const existingIndex = productCart.findIndex(item => item.product.id === product.id);
-    if (existingIndex >= 0) {
-      const updated = [...productCart];
-      updated[existingIndex].quantity += productQuantity;
-      setProductCart(updated);
-    } else {
-      setProductCart([...productCart, { product, quantity: productQuantity }]);
-    }
-    
-    setProductDialogOpen(false);
-    setSelectedProductId('');
-    setProductQuantity(1);
-  };
-
-  // Remove product from cart
-  const removeProductFromCart = (productId: string) => {
-    setProductCart(productCart.filter(item => item.product.id !== productId));
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">পরিশোধিত</Badge>;
-      case 'partial':
-        return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">আংশিক</Badge>;
-      case 'unpaid':
-        return <Badge variant="destructive">বকেয়া</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
-  const formatMonth = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    try {
-      return format(new Date(dateStr), 'MMMM yyyy', { locale: bn });
-    } catch {
-      return dateStr;
-    }
-  };
-
   // Get monthly fee status for visual cards
   const getMonthlyFeeStatus = () => {
     if (!feeRecords) return [];
@@ -548,588 +522,468 @@ export default function FeeCollection() {
     });
   };
 
-  // Calculate totals
-  const totalDue = feeRecords?.reduce((sum, r) => sum + Number(r.amount_due), 0) || 0;
-  const totalPaid = feeRecords?.reduce((sum, r) => sum + Number(r.amount_paid), 0) || 0;
-  const totalRemaining = totalDue - totalPaid;
   const monthlyFeeStatus = getMonthlyFeeStatus();
+  const otherFees = feeRecords?.filter(r => r.fee_type !== 'monthly') || [];
+
+  // Check if fee is in cart
+  const isFeeInCart = (recordId: string) => {
+    return cart.some(item => item.type === 'fee' && item.id === recordId);
+  };
+
+  // Get product quantity in cart
+  const getProductQtyInCart = (productId: string) => {
+    const item = cart.find(i => i.type === 'product' && i.id === productId);
+    return item?.quantity || 0;
+  };
 
   return (
     <MainLayout title="ফি আদায়">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <CreditCard className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">ফি আদায়</h1>
-            <p className="text-muted-foreground">Fee Collection</p>
-          </div>
-        </div>
-
-        {/* Search Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Search className="w-5 h-5" />
-              শিক্ষার্থী খুঁজুন
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Student ID, নাম বা RFID কার্ড পাঞ্চ করুন - স্বয়ংক্রিয়ভাবে সার্চ হবে
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <Input
-                  placeholder="Student ID, নাম বা RFID Card পাঞ্চ করুন..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSearchTerm(value);
-                    // Auto-search when input looks like RFID (10+ digits) or after typing stops
-                    if (value.length >= 10 && /^\d+$/.test(value)) {
-                      // Likely RFID - search immediately
-                      setTimeout(() => {
-                        if (value === e.target.value) {
-                          handleSearch();
-                        }
-                      }, 300);
-                    }
-                  }}
-                  onKeyPress={handleKeyPress}
-                  className="text-lg h-12 font-mono"
-                  autoFocus
-                />
-                {searchMutation.isPending && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                  </div>
-                )}
-              </div>
-              <Button
-                onClick={handleSearch}
-                disabled={searchMutation.isPending || !searchTerm.trim()}
-                size="lg"
-                className="px-8"
-              >
-                <Search className="w-5 h-5 mr-2" />
-                খুঁজুন
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              RFID কার্ড রিডারে পাঞ্চ করলে স্বয়ংক্রিয়ভাবে শিক্ষার্থী খুঁজে পাবে
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Search Result */}
-        {searchMutation.isPending && (
-          <Card>
-            <CardContent className="py-8">
-              <div className="flex items-center justify-center gap-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                <span>খুঁজছি...</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {searchMutation.isSuccess && !selectedStudent && (
-          <Card>
-            <CardContent className="py-8">
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <AlertCircle className="w-12 h-12" />
-                <p className="text-lg">কোন শিক্ষার্থী পাওয়া যায়নি</p>
-                <p className="text-sm">সঠিক Student ID বা RFID নম্বর দিয়ে আবার চেষ্টা করুন</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {selectedStudent && (
-          <>
-            {/* Student Info Card */}
-            <Card>
-              <CardContent className="py-6">
-                <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-                  <Avatar className="w-16 h-16 sm:w-20 sm:h-20">
-                    <AvatarImage src={selectedStudent.photo_url || undefined} />
-                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                      {selectedStudent.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <User className="w-4 h-4" />
-                        নাম
-                      </div>
-                      <p className="font-semibold text-lg">{selectedStudent.name}</p>
-                      {selectedStudent.name_bn && (
-                        <p className="text-muted-foreground">{selectedStudent.name_bn}</p>
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <GraduationCap className="w-4 h-4" />
-                        শ্রেণী
-                      </div>
-                      <p className="font-semibold">
-                        {selectedStudent.class?.name || '-'}
-                        {selectedStudent.section && ` (${selectedStudent.section.name})`}
-                      </p>
-                      <p className="text-muted-foreground text-sm">
-                        {selectedStudent.shift?.name || ''}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <CreditCard className="w-4 h-4" />
-                        Student ID
-                      </div>
-                      <p className="font-semibold font-mono">
-                        {selectedStudent.student_id_number || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <Phone className="w-4 h-4" />
-                        অভিভাবক মোবাইল
-                      </div>
-                      <p className="font-semibold">{selectedStudent.guardian_mobile}</p>
-                    </div>
-                  </div>
+      <div className="h-[calc(100vh-100px)]">
+        {/* Search Screen */}
+        {!selectedStudent && (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="w-full max-w-xl space-y-6">
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CreditCard className="w-10 h-10 text-primary" />
                 </div>
-              </CardContent>
-            </Card>
+                <h1 className="text-3xl font-bold">ফি আদায়</h1>
+                <p className="text-muted-foreground mt-2">
+                  Student ID বা RFID কার্ড পাঞ্চ করুন
+                </p>
+              </div>
 
-            {/* Summary Cards */}
-            <div className="grid gap-4 grid-cols-3">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
-                <CardContent className="py-4 text-center">
-                  <div className="text-sm text-muted-foreground">মোট বকেয়া</div>
-                  <div className="text-xl sm:text-2xl font-bold text-primary">
-                    ৳ {totalDue.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
-                <CardContent className="py-4 text-center">
-                  <div className="text-sm text-muted-foreground">মোট পরিশোধিত</div>
-                  <div className="text-xl sm:text-2xl font-bold text-green-600">
-                    ৳ {totalPaid.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border-red-200 dark:border-red-800">
-                <CardContent className="py-4 text-center">
-                  <div className="text-sm text-muted-foreground">অবশিষ্ট বকেয়া</div>
-                  <div className="text-xl sm:text-2xl font-bold text-destructive">
-                    ৳ {totalRemaining.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Monthly Fee Visual Cards - 2 Rows, Larger */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Receipt className="w-5 h-5" />
-                  মাসিক বেতন
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {monthlyFeeStatus.map(({ month, label, status, record }) => (
-                    <button
-                      key={month}
-                      type="button"
-                      onClick={() => record && record.status !== 'paid' && handleOpenPayment(record)}
-                      disabled={!record || status === 'paid'}
-                      className={`
-                        p-3 sm:p-4 rounded-xl border-2 text-center transition-all
-                        ${status === 'paid' 
-                          ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
-                          : status === 'partial'
-                            ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:border-yellow-500 hover:shadow-md'
-                            : status === 'unpaid'
-                              ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:border-red-500 hover:shadow-md'
-                              : 'bg-muted/50 border-muted-foreground/20'
-                        }
-                      `}
-                    >
-                      <div className="font-bengali text-sm sm:text-base font-medium">{label}</div>
-                      <div className="mt-2">
-                        {status === 'paid' && <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-green-600" />}
-                        {status === 'partial' && <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-yellow-600" />}
-                        {status === 'unpaid' && <XCircle className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-red-600" />}
-                        {!status && <span className="text-xs text-muted-foreground">—</span>}
-                      </div>
-                      {record && status !== 'paid' && (
-                        <div className="mt-1 text-xs font-medium text-destructive">
-                          ৳{(Number(record.amount_due) - Number(record.amount_paid)).toLocaleString()}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Other Fees (Exam, Admission, Session) */}
-            {feeRecords && feeRecords.filter(r => r.fee_type !== 'monthly').length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">অন্যান্য ফি</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {feeRecords.filter(r => r.fee_type !== 'monthly').map(record => (
-                      <button
-                        key={record.id}
-                        type="button"
-                        onClick={() => record.status !== 'paid' && handleOpenPayment(record)}
-                        disabled={record.status === 'paid'}
-                        className={`
-                          p-3 sm:p-4 rounded-xl border-2 text-center transition-all
-                          ${record.status === 'paid' 
-                            ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
-                            : record.status === 'partial'
-                              ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:shadow-md'
-                              : 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:shadow-md'
+              <Card className="shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <Input
+                        ref={searchInputRef}
+                        placeholder="Student ID বা RFID Card পাঞ্চ করুন..."
+                        value={searchTerm}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSearchTerm(value);
+                          if (value.length >= 10 && /^\d+$/.test(value)) {
+                            setTimeout(() => {
+                              if (value === e.target.value) {
+                                handleSearch();
+                              }
+                            }, 300);
                           }
-                        `}
-                      >
-                        <div className="font-medium text-sm">{getFeeTypeLabel(record.fee_type)}</div>
-                        {record.exam && (
-                          <div className="text-xs text-muted-foreground">{record.exam.name_bn || record.exam.name}</div>
-                        )}
-                        <div className="mt-1 text-sm font-bold">
-                          ৳{Number(record.amount_due).toLocaleString()}
+                        }}
+                        onKeyPress={handleKeyPress}
+                        className="text-lg h-14 font-mono"
+                        autoFocus
+                      />
+                      {searchMutation.isPending && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
                         </div>
-                        {record.status === 'paid' && <CheckCircle2 className="w-4 h-4 mx-auto mt-1 text-green-600" />}
-                      </button>
-                    ))}
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleSearch}
+                      disabled={searchMutation.isPending || !searchTerm.trim()}
+                      size="lg"
+                      className="px-8 h-14"
+                    >
+                      <Search className="w-5 h-5" />
+                    </Button>
                   </div>
+                  <p className="text-sm text-muted-foreground mt-3 text-center flex items-center justify-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    RFID রিডারে কার্ড পাঞ্চ করুন
+                  </p>
                 </CardContent>
               </Card>
-            )}
 
-            {/* Product Sales Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Package className="w-5 h-5" />
+              {searchMutation.isSuccess && !selectedStudent && (
+                <div className="text-center p-6 bg-muted/50 rounded-lg">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-lg font-medium">কোন শিক্ষার্থী পাওয়া যায়নি</p>
+                  <p className="text-sm text-muted-foreground">সঠিক ID দিয়ে আবার চেষ্টা করুন</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* POS View - Two Column Layout */}
+        {selectedStudent && (
+          <div className="flex h-full gap-4">
+            {/* Left Panel - Selection Area */}
+            <div className="flex-1 overflow-auto pr-2">
+              {/* Student Header */}
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg mb-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToSearch}
+                  className="shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <Avatar className="w-14 h-14 border-2 border-primary/20">
+                  <AvatarImage src={selectedStudent.photo_url || undefined} />
+                  <AvatarFallback className="text-xl bg-primary/10 text-primary">
+                    {selectedStudent.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold truncate">
+                    {selectedStudent.name_bn || selectedStudent.name}
+                  </h2>
+                  <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <GraduationCap className="w-4 h-4" />
+                      {selectedStudent.class?.name_bn || selectedStudent.class?.name}
+                      {selectedStudent.section && ` (${selectedStudent.section.name})`}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-4 h-4" />
+                      {selectedStudent.guardian_mobile}
+                    </span>
+                  </div>
+                </div>
+                <Badge variant="outline" className="font-mono shrink-0">
+                  {selectedStudent.student_id_number}
+                </Badge>
+              </div>
+
+              {/* Monthly Fees Grid */}
+              <Card className="mb-4">
+                <CardHeader className="py-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Receipt className="w-4 h-4" />
+                      মাসিক বেতন
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddFeeDialogOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      নতুন ফি
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-4">
+                  {isLoadingRecords ? (
+                    <div className="grid grid-cols-6 gap-2">
+                      {[...Array(12)].map((_, i) => (
+                        <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {monthlyFeeStatus.map(({ month, label, status, record }) => {
+                        const isInCart = record ? isFeeInCart(record.id) : false;
+                        const isClickable = record && status !== 'paid';
+                        const remaining = record ? Number(record.amount_due) - Number(record.amount_paid) : 0;
+                        
+                        return (
+                          <button
+                            key={month}
+                            onClick={() => isClickable && toggleFeeInCart(record)}
+                            disabled={!isClickable}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-center transition-all",
+                              status === 'paid' && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 opacity-60",
+                              status === 'unpaid' && !isInCart && "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800 hover:border-red-400 cursor-pointer",
+                              status === 'partial' && !isInCart && "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 hover:border-amber-400 cursor-pointer",
+                              !status && "bg-muted/30 border-muted",
+                              isInCart && "bg-primary border-primary text-primary-foreground ring-2 ring-primary/50"
+                            )}
+                          >
+                            <div className="font-bengali text-sm font-medium">{label}</div>
+                            {status === 'paid' && <CheckCircle2 className="w-5 h-5 mx-auto mt-1 text-green-600" />}
+                            {status !== 'paid' && record && (
+                              <div className={cn(
+                                "text-xs mt-1 font-bold",
+                                isInCart ? "text-primary-foreground" : "text-destructive"
+                              )}>
+                                ৳{remaining.toLocaleString()}
+                              </div>
+                            )}
+                            {!record && <span className="text-xs text-muted-foreground">—</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Other Fees */}
+              {otherFees.length > 0 && (
+                <Card className="mb-4">
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-base">অন্যান্য ফি</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {otherFees.map(record => {
+                        const isInCart = isFeeInCart(record.id);
+                        const isClickable = record.status !== 'paid';
+                        const remaining = Number(record.amount_due) - Number(record.amount_paid);
+                        
+                        return (
+                          <button
+                            key={record.id}
+                            onClick={() => isClickable && toggleFeeInCart(record)}
+                            disabled={!isClickable}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-center transition-all",
+                              record.status === 'paid' && "bg-green-100 border-green-300 dark:bg-green-900/30 opacity-60",
+                              record.status !== 'paid' && !isInCart && "bg-muted hover:bg-muted/80 cursor-pointer",
+                              isInCart && "bg-primary border-primary text-primary-foreground"
+                            )}
+                          >
+                            <div className="font-medium text-sm">{getFeeTypeLabel(record.fee_type)}</div>
+                            {record.exam && (
+                              <div className={cn(
+                                "text-xs",
+                                isInCart ? "text-primary-foreground/80" : "text-muted-foreground"
+                              )}>
+                                {record.exam.name_bn || record.exam.name}
+                              </div>
+                            )}
+                            <div className={cn(
+                              "text-sm font-bold mt-1",
+                              isInCart ? "text-primary-foreground" : ""
+                            )}>
+                              ৳{remaining.toLocaleString()}
+                            </div>
+                            {record.status === 'paid' && (
+                              <CheckCircle2 className="w-4 h-4 mx-auto mt-1 text-green-600" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Products Grid */}
+              <Card>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="w-4 h-4" />
                     পণ্য বিক্রয়
                   </CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => setProductDialogOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    পণ্য যোগ করুন
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {productCart.length > 0 ? (
-                  <div className="space-y-2">
-                    {productCart.map(item => (
-                      <div key={item.product.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div>
-                          <div className="font-medium">{item.product.name_bn || item.product.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {item.quantity} × ৳{item.product.unit_price.toLocaleString()}
+                </CardHeader>
+                <CardContent>
+                  {activeProducts && activeProducts.length > 0 ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                      {activeProducts.map(product => {
+                        const qtyInCart = getProductQtyInCart(product.id);
+                        
+                        return (
+                          <div
+                            key={product.id}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-center transition-all",
+                              qtyInCart > 0 && "bg-primary/10 border-primary"
+                            )}
+                          >
+                            <div className="font-medium text-sm truncate">
+                              {product.name_bn || product.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              ৳{product.unit_price.toLocaleString()}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                onClick={() => updateProductQuantity(product.id, -1)}
+                                disabled={qtyInCart === 0}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-8 text-center font-bold">{qtyInCart}</span>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                onClick={() => addProductToCart(product)}
+                                disabled={qtyInCart >= product.stock_quantity}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              স্টক: {product.stock_quantity}
+                            </div>
                           </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">কোন পণ্য নেই</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Panel - Shopping Cart */}
+            <div className="w-80 shrink-0 bg-card border rounded-lg flex flex-col h-full">
+              {/* Cart Header */}
+              <div className="p-4 border-b bg-muted/50 rounded-t-lg">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  কার্ট
+                  {cart.length > 0 && (
+                    <Badge variant="secondary">{cart.length}</Badge>
+                  )}
+                </h3>
+              </div>
+
+              {/* Cart Items */}
+              <ScrollArea className="flex-1 p-4">
+                {cart.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>কার্ট খালি</p>
+                    <p className="text-sm">বাম দিক থেকে আইটেম সিলেক্ট করুন</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {cart.map(item => (
+                      <div
+                        key={item.id}
+                        className="flex items-start justify-between p-3 bg-muted/50 rounded-lg"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{item.name}</div>
+                          {item.description && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {item.description}
+                            </div>
+                          )}
+                          {item.type === 'product' && item.quantity > 1 && (
+                            <div className="text-xs text-muted-foreground">
+                              {item.quantity} × ৳{item.unitPrice.toLocaleString()}
+                            </div>
+                          )}
+                          {item.lateFine > 0 && (
+                            <div className="text-xs text-destructive">
+                              জরিমানা: ৳{item.lateFine.toLocaleString()}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="font-bold">৳{(item.product.unit_price * item.quantity).toLocaleString()}</div>
-                          <Button size="sm" variant="ghost" onClick={() => removeProductFromCart(item.product.id)}>
-                            <X className="w-4 h-4 text-destructive" />
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-bold">৳{item.total.toLocaleString()}</span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            onClick={() => removeFromCart(item.id)}
+                          >
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
                     ))}
-                    <div className="flex justify-between p-3 bg-primary/10 rounded-lg font-bold">
-                      <span>পণ্য মোট</span>
-                      <span>৳{productCartTotal.toLocaleString()}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">কোন পণ্য নির্বাচন করা হয়নি</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </ScrollArea>
 
-            {/* Fee Records Table */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Receipt className="w-5 h-5" />
-                    সকল ফি রেকর্ড
-                  </CardTitle>
-                  <div className="flex gap-2">
-                    {selectedUnpaidRecords.length > 0 && (
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => setMultiPaymentDialogOpen(true)}
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        নির্বাচিত ({selectedUnpaidRecords.length}) আদায় করুন
-                      </Button>
+              {/* Cart Footer */}
+              <div className="border-t p-4 space-y-3 bg-muted/30 rounded-b-lg">
+                {cart.length > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span>সাবটোটাল</span>
+                      <span>৳{cartSubtotal.toLocaleString()}</span>
+                    </div>
+                    {cartLateFines > 0 && (
+                      <div className="flex justify-between text-sm text-destructive">
+                        <span>জরিমানা</span>
+                        <span>৳{cartLateFines.toLocaleString()}</span>
+                      </div>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => setAddFeeDialogOpen(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      নতুন ফি
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoadingRecords ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-12 w-full" />
-                    ))}
-                  </div>
-                ) : feeRecords && feeRecords.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-10">
-                            <input
-                              type="checkbox"
-                              className="rounded border-muted-foreground"
-                              checked={feeRecords?.filter(r => r.status !== 'paid').every(r => selectedRecordIds.has(r.id)) || false}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedRecordIds(new Set(feeRecords?.filter(r => r.status !== 'paid').map(r => r.id) || []));
-                                } else {
-                                  setSelectedRecordIds(new Set());
-                                }
-                              }}
-                            />
-                          </TableHead>
-                          <TableHead>ফি এর ধরন</TableHead>
-                          <TableHead className="hidden sm:table-cell">মাস/পরীক্ষা</TableHead>
-                          <TableHead className="text-right">বকেয়া</TableHead>
-                          <TableHead className="text-right hidden md:table-cell">পরিশোধিত</TableHead>
-                          <TableHead className="hidden lg:table-cell">স্ট্যাটাস</TableHead>
-                          <TableHead className="w-24">অ্যাকশন</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {feeRecords.map((record) => (
-                          <TableRow key={record.id} className={selectedRecordIds.has(record.id) ? 'bg-primary/5' : ''}>
-                            <TableCell>
-                              {record.status !== 'paid' && (
-                                <input
-                                  type="checkbox"
-                                  className="rounded border-muted-foreground"
-                                  checked={selectedRecordIds.has(record.id)}
-                                  onChange={() => toggleRecordSelection(record.id)}
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              <div>{getFeeTypeLabel(record.fee_type)}</div>
-                              <div className="text-xs text-muted-foreground sm:hidden">
-                                {record.fee_type === 'exam' && record.exam
-                                  ? record.exam.name_bn || record.exam.name
-                                  : formatMonth(record.fee_month)}
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              {record.fee_type === 'exam' && record.exam
-                                ? record.exam.name_bn || record.exam.name
-                                : formatMonth(record.fee_month)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div>৳ {Number(record.amount_due).toLocaleString()}</div>
-                              {Number(record.late_fine) > 0 && (
-                                <div className="text-xs text-destructive">
-                                  +৳{Number(record.late_fine)} জরিমানা
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right hidden md:table-cell">
-                              ৳ {Number(record.amount_paid).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">{getStatusBadge(record.status)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                {record.status !== 'paid' && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleOpenPayment(record)}
-                                  >
-                                    আদায়
-                                  </Button>
-                                )}
-                                {record.amount_paid > 0 && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handlePrintReceipt(record)}
-                                  >
-                                    <Printer className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>এই শিক্ষার্থীর কোন ফি রেকর্ড নেই</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-4"
-                      onClick={() => setAddFeeDialogOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      নতুন ফি যুক্ত করুন
-                    </Button>
-                  </div>
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                      <span>মোট</span>
+                      <span className="text-primary">৳{cartTotal.toLocaleString()}</span>
+                    </div>
+                  </>
                 )}
-              </CardContent>
-            </Card>
-          </>
-        )}
 
-        {/* Payment Dialog */}
-        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>ফি আদায়</DialogTitle>
-            </DialogHeader>
-            {selectedRecord && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                  <div>
-                    <div className="text-sm text-muted-foreground">ফি এর ধরন</div>
-                    <div className="font-semibold">{getFeeTypeLabel(selectedRecord.fee_type)}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">মোট বকেয়া</div>
-                    <div className="font-semibold">
-                      ৳ {Number(selectedRecord.amount_due).toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">পূর্বে পরিশোধিত</div>
-                    <div className="font-semibold">
-                      ৳ {Number(selectedRecord.amount_paid).toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">অবশিষ্ট</div>
-                    <div className="font-semibold text-destructive">
-                      ৳{' '}
-                      {(
-                        Number(selectedRecord.amount_due) - Number(selectedRecord.amount_paid)
-                      ).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="payment-amount">আদায়ের পরিমাণ (টাকা)</Label>
-                  <Input
-                    id="payment-amount"
-                    type="number"
-                    min={0}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="late-fine" className="flex items-center gap-2">
-                    বিলম্ব জরিমানা (টাকা)
-                    {autoLateFineApplied && (
-                      <Badge variant="secondary" className="text-xs">স্বয়ংক্রিয়</Badge>
-                    )}
-                  </Label>
-                  <Input
-                    id="late-fine"
-                    type="number"
-                    min={0}
-                    value={lateFine}
-                    onChange={(e) => setLateFine(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="p-4 bg-primary/10 rounded-lg">
-                  <div className="text-sm text-muted-foreground">মোট আদায়</div>
-                  <div className="text-2xl font-bold text-primary">
-                    ৳ {(paymentAmount + lateFine).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
-                বাতিল
-              </Button>
-              <Button onClick={handleCollectPayment} disabled={collectFee.isPending}>
-                <CreditCard className="w-4 h-4 mr-2" />
-                আদায় করুন
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Multi-Payment Dialog */}
-        <Dialog open={multiPaymentDialogOpen} onOpenChange={setMultiPaymentDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>একাধিক ফি আদায়</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">নির্বাচিত আইটেম</div>
-                <div className="font-semibold">{selectedUnpaidRecords.length}টি ফি রেকর্ড</div>
-              </div>
-              <div className="space-y-2">
-                {selectedUnpaidRecords.map(record => (
-                  <div key={record.id} className="flex justify-between p-2 border rounded">
-                    <span>{getFeeTypeLabel(record.fee_type)}</span>
-                    <span>৳ {(Number(record.amount_due) - Number(record.amount_paid)).toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-primary/10 rounded-lg">
-                <div className="text-sm text-muted-foreground">মোট আদায়</div>
-                <div className="text-2xl font-bold text-primary">
-                  ৳ {selectedTotal.toLocaleString()}
-                </div>
+                <Button
+                  className="w-full h-14 text-lg"
+                  size="lg"
+                  disabled={cart.length === 0 || isProcessing}
+                  onClick={handleCheckout}
+                >
+                  {isProcessing ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                  ) : (
+                    <>
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      💰 আদায় করুন
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setMultiPaymentDialogOpen(false)}>
-                বাতিল
-              </Button>
-              <Button onClick={handleMultiPayment} disabled={collectMultipleFees.isPending}>
-                <CreditCard className="w-4 h-4 mr-2" />
-                সব আদায় করুন
-              </Button>
-            </DialogFooter>
+          </div>
+        )}
+
+        {/* Success Dialog */}
+        <Dialog open={successDialogOpen} onOpenChange={() => {}}>
+          <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+            <div className="text-center py-6">
+              {/* Success Animation */}
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-green-600" />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-green-700 dark:text-green-400 mb-2">
+                ফি আদায় সম্পন্ন!
+              </h2>
+              
+              <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                <div className="text-sm text-muted-foreground">রিসিপ্ট নম্বর</div>
+                <div className="font-mono font-bold text-lg">
+                  {lastPaymentData?.receiptNumber}
+                </div>
+                <div className="text-3xl font-bold text-primary mt-2">
+                  ৳ {lastPaymentData?.totalAmount.toLocaleString()}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <Button
+                  size="lg"
+                  className="w-full h-14 text-lg gap-2"
+                  onClick={handlePrintAndContinue}
+                >
+                  <Printer className="w-5 h-5" />
+                  🖨️ প্রিন্ট করুন
+                </Button>
+                
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExitWithoutPrint}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  এক্সিট (প্রিন্ট ছাড়া)
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
-        
+
         {/* Add New Fee Dialog */}
         <Dialog open={addFeeDialogOpen} onOpenChange={setAddFeeDialogOpen}>
           <DialogContent>

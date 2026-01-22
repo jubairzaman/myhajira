@@ -839,3 +839,14 @@
     margin-top: 30mm !important;
   }
 }
+
+/* POS Fee Collection Print Styles */
+@media print {
+  /* Hide success dialog during print */
+  [data-radix-dialog-overlay],
+  [role="dialog"]:not(.receipt-print-area),
+  .success-dialog,
+  .no-print {
+    display: none !important;
+  }
+}
