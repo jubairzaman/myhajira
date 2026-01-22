@@ -830,7 +830,7 @@ const FeeReports = () => {
                             {getFeeTypeLabel(record.feeType)}
                             {record.feeMonth && (
                               <span className="text-xs text-muted-foreground block">
-                                {format(new Date(record.feeMonth + '-01'), 'MMM yyyy', { locale: bn })}
+                                {formatMonth(record.feeMonth)}
                               </span>
                             )}
                           </TableCell>
