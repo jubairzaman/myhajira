@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { 
@@ -16,7 +16,9 @@ import {
   User,
   CheckCircle,
   XCircle,
-  MinusCircle
+  MinusCircle,
+  Download,
+  Calendar
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,11 +36,14 @@ import {
   useDefaulterList,
   useFeeCollectionStats 
 } from '@/hooks/queries/useFeeReports';
-import { useStudentFeeHistory, useSearchStudentsForFee } from '@/hooks/queries/useStudentFeeHistory';
+import { useStudentFeeHistory, useSearchStudentsForFee, useAcademicYears } from '@/hooks/queries/useStudentFeeHistory';
 import { useSendBulkFeeDueSms } from '@/hooks/queries/useFeeDueSms';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const FeeReports = () => {
+  const { activeYear } = useAcademicYear();
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedFeeType, setSelectedFeeType] = useState<string>('');
@@ -47,7 +52,12 @@ const FeeReports = () => {
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>('');
+  
+  // PDF export ref
+  const reportRef = useRef<HTMLDivElement>(null);
 
+  const { data: academicYears } = useAcademicYears();
   const { data: classes, isLoading: classesLoading } = useClassesQuery();
   const { data: stats, isLoading: statsLoading } = useFeeCollectionStats();
   const { data: classReport, isLoading: classReportLoading } = useClassCollectionReport(
@@ -62,7 +72,12 @@ const FeeReports = () => {
     selectedFeeType || undefined
   );
   const { data: searchResults, isLoading: searchLoading } = useSearchStudentsForFee(studentSearchTerm);
-  const { data: studentFeeHistory, isLoading: studentHistoryLoading } = useStudentFeeHistory(selectedStudentId);
+  // Use selected academic year or active year for fee history
+  const yearIdForHistory = selectedAcademicYearId || activeYear?.id || null;
+  const { data: studentFeeHistory, isLoading: studentHistoryLoading } = useStudentFeeHistory(
+    selectedStudentId, 
+    yearIdForHistory
+  );
   const sendBulkSms = useSendBulkFeeDueSms();
 
   const handleSendBulkSms = async () => {
@@ -115,10 +130,27 @@ const FeeReports = () => {
     window.print();
   };
 
+  const handleExportPdf = () => {
+    // Using browser print to PDF functionality
+    toast({
+      title: "PDF এক্সপোর্ট",
+      description: "প্রিন্ট ডায়ালগ থেকে 'Save as PDF' নির্বাচন করুন",
+    });
+    window.print();
+  };
+
   const handleSelectStudent = (studentId: string) => {
     setSelectedStudentId(studentId);
     setShowSearchResults(false);
     setStudentSearchTerm('');
+    // Reset academic year to current when selecting new student
+    setSelectedAcademicYearId('');
+  };
+
+  // Get selected academic year name
+  const getSelectedYearName = () => {
+    if (!selectedAcademicYearId) return activeYear?.name || '';
+    return academicYears?.find(y => y.id === selectedAcademicYearId)?.name || '';
   };
 
   const getStatusBadge = (status: string) => {
@@ -244,63 +276,92 @@ const FeeReports = () => {
               </TabsTrigger>
             </TabsList>
 
-            <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2">
-              <Printer className="h-4 w-4" />
-              প্রিন্ট করুন
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2">
+                <Printer className="h-4 w-4" />
+                প্রিন্ট
+              </Button>
+              <Button onClick={handleExportPdf} variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                PDF
+              </Button>
+            </div>
           </div>
 
           {/* Student Report Tab */}
           <TabsContent value="student-report">
-            <Card className="student-fee-report">
+            <Card className="student-fee-report" ref={reportRef}>
               <CardHeader className="no-print">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <User className="h-5 w-5" />
                   শিক্ষার্থী ফি রিপোর্ট
                 </CardTitle>
-                <div className="relative mt-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="শিক্ষার্থীর আইডি বা নাম দিয়ে খুঁজুন..."
-                    value={studentSearchTerm}
-                    onChange={(e) => {
-                      setStudentSearchTerm(e.target.value);
-                      setShowSearchResults(true);
-                    }}
-                    className="pl-10 max-w-md"
-                    onFocus={() => setShowSearchResults(true)}
-                  />
-                  
-                  {/* Search Results Dropdown */}
-                  {showSearchResults && studentSearchTerm.length >= 2 && (
-                    <div className="absolute z-10 top-full left-0 w-full max-w-md mt-1 bg-card border rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                      {searchLoading ? (
-                        <div className="p-4 text-center text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                          খোঁজা হচ্ছে...
-                        </div>
-                      ) : searchResults && searchResults.length > 0 ? (
-                        searchResults.map((student) => (
-                          <button
-                            key={student.id}
-                            className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 border-b last:border-b-0"
-                            onClick={() => handleSelectStudent(student.id)}
-                          >
-                            <div className="flex-1">
-                              <p className="font-medium">{student.nameBn || student.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {student.studentIdNumber} • {student.className}
-                                {student.sectionName && ` - ${student.sectionName}`}
-                              </p>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="p-4 text-center text-muted-foreground">
-                          কোনো শিক্ষার্থী পাওয়া যায়নি
-                        </div>
-                      )}
-                    </div>
+                <div className="flex flex-col md:flex-row gap-4 mt-4">
+                  {/* Student Search */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="শিক্ষার্থীর আইডি বা নাম দিয়ে খুঁজুন..."
+                      value={studentSearchTerm}
+                      onChange={(e) => {
+                        setStudentSearchTerm(e.target.value);
+                        setShowSearchResults(true);
+                      }}
+                      className="pl-10"
+                      onFocus={() => setShowSearchResults(true)}
+                    />
+                    
+                    {/* Search Results Dropdown */}
+                    {showSearchResults && studentSearchTerm.length >= 2 && (
+                      <div className="absolute z-10 top-full left-0 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                        {searchLoading ? (
+                          <div className="p-4 text-center text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                            খোঁজা হচ্ছে...
+                          </div>
+                        ) : searchResults && searchResults.length > 0 ? (
+                          searchResults.map((student) => (
+                            <button
+                              key={student.id}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 border-b last:border-b-0"
+                              onClick={() => handleSelectStudent(student.id)}
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium">{student.nameBn || student.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {student.studentIdNumber} • {student.className}
+                                  {student.sectionName && ` - ${student.sectionName}`}
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-muted-foreground">
+                            কোনো শিক্ষার্থী পাওয়া যায়নি
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Academic Year Selector */}
+                  {selectedStudentId && (
+                    <Select 
+                      value={selectedAcademicYearId || activeYear?.id || ''} 
+                      onValueChange={setSelectedAcademicYearId}
+                    >
+                      <SelectTrigger className="w-48">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="শিক্ষাবর্ষ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears?.map((year) => (
+                          <SelectItem key={year.id} value={year.id}>
+                            {year.name} {year.is_active && '(বর্তমান)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               </CardHeader>
@@ -315,11 +376,11 @@ const FeeReports = () => {
                     <Skeleton className="h-64" />
                   </div>
                 ) : studentFeeHistory ? (
-                  <div className="space-y-6">
+                  <div className="space-y-6" ref={reportRef}>
                     {/* Student Info Header - For Print */}
                     <div className="print-header hidden print:block text-center mb-6">
                       <h1 className="text-xl font-bold">শিক্ষার্থী ফি রিপোর্ট</h1>
-                      <p className="text-sm text-muted-foreground">শিক্ষাবর্ষ: ২০২৫-২০২৬</p>
+                      <p className="text-sm text-muted-foreground">শিক্ষাবর্ষ: {getSelectedYearName()}</p>
                     </div>
 
                     {/* Student Profile Card */}

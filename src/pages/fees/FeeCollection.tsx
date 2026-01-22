@@ -448,21 +448,42 @@ export default function FeeCollection() {
               <Search className="w-5 h-5" />
               শিক্ষার্থী খুঁজুন
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Student ID, নাম বা RFID কার্ড পাঞ্চ করুন - স্বয়ংক্রিয়ভাবে সার্চ হবে
+            </p>
           </CardHeader>
           <CardContent>
             <div className="flex gap-3">
-              <div className="flex-1">
+              <div className="flex-1 relative">
                 <Input
-                  placeholder="Student ID বা RFID Card নম্বর দিন..."
+                  placeholder="Student ID, নাম বা RFID Card পাঞ্চ করুন..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchTerm(value);
+                    // Auto-search when input looks like RFID (10+ digits) or after typing stops
+                    if (value.length >= 10 && /^\d+$/.test(value)) {
+                      // Likely RFID - search immediately
+                      setTimeout(() => {
+                        if (value === e.target.value) {
+                          handleSearch();
+                        }
+                      }, 300);
+                    }
+                  }}
                   onKeyPress={handleKeyPress}
-                  className="text-lg h-12"
+                  className="text-lg h-12 font-mono"
+                  autoFocus
                 />
+                {searchMutation.isPending && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                  </div>
+                )}
               </div>
               <Button
                 onClick={handleSearch}
-                disabled={searchMutation.isPending}
+                disabled={searchMutation.isPending || !searchTerm.trim()}
                 size="lg"
                 className="px-8"
               >
@@ -470,6 +491,10 @@ export default function FeeCollection() {
                 খুঁজুন
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              RFID কার্ড রিডারে পাঞ্চ করলে স্বয়ংক্রিয়ভাবে শিক্ষার্থী খুঁজে পাবে
+            </p>
           </CardContent>
         </Card>
 

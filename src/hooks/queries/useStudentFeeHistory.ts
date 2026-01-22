@@ -34,13 +34,15 @@ export interface StudentFeeHistorySummary {
   records: StudentFeeHistoryRecord[];
 }
 
-export function useStudentFeeHistory(studentId: string | null) {
+// Updated hook with optional academicYearId parameter
+export function useStudentFeeHistory(studentId: string | null, academicYearId?: string | null) {
   const { activeYear } = useAcademicYear();
+  const yearIdToUse = academicYearId || activeYear?.id;
 
   return useQuery({
-    queryKey: ['student-fee-history', activeYear?.id, studentId],
+    queryKey: ['student-fee-history', yearIdToUse, studentId],
     queryFn: async (): Promise<StudentFeeHistorySummary | null> => {
-      if (!activeYear?.id || !studentId) return null;
+      if (!yearIdToUse || !studentId) return null;
 
       // Fetch student info
       const { data: student, error: studentError } = await supabase
@@ -60,7 +62,7 @@ export function useStudentFeeHistory(studentId: string | null) {
 
       if (studentError || !student) return null;
 
-      // Fetch fee records
+      // Fetch fee records for specific academic year
       const { data: feeRecords, error: feeError } = await supabase
         .from('student_fee_records')
         .select(`
@@ -77,7 +79,7 @@ export function useStudentFeeHistory(studentId: string | null) {
           exams(name, name_bn)
         `)
         .eq('student_id', studentId)
-        .eq('academic_year_id', activeYear.id)
+        .eq('academic_year_id', yearIdToUse)
         .order('created_at', { ascending: true });
 
       if (feeError) throw feeError;
@@ -116,7 +118,23 @@ export function useStudentFeeHistory(studentId: string | null) {
 
       return summary;
     },
-    enabled: !!activeYear?.id && !!studentId,
+    enabled: !!yearIdToUse && !!studentId,
+  });
+}
+
+// Hook to fetch all academic years
+export function useAcademicYears() {
+  return useQuery({
+    queryKey: ['all-academic-years'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('academic_years')
+        .select('id, name, start_date, end_date, is_active')
+        .order('start_date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
   });
 }
 
@@ -156,5 +174,55 @@ export function useSearchStudentsForFee(searchTerm: string) {
       }));
     },
     enabled: !!activeYear?.id && searchTerm.length >= 2,
+  });
+}
+
+// Search student by RFID card number
+export function useSearchStudentByRfid(cardNumber: string) {
+  const { activeYear } = useAcademicYear();
+
+  return useQuery({
+    queryKey: ['search-student-rfid', activeYear?.id, cardNumber],
+    queryFn: async () => {
+      if (!activeYear?.id || !cardNumber.trim()) return null;
+
+      // First find the student ID from RFID card
+      const { data: rfidData, error: rfidError } = await supabase
+        .from('rfid_cards_students')
+        .select('student_id')
+        .eq('card_number', cardNumber.trim())
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (rfidError || !rfidData) return null;
+
+      // Then fetch student details
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select(`
+          id,
+          name,
+          name_bn,
+          student_id_number,
+          classes(name, name_bn),
+          sections(name)
+        `)
+        .eq('id', rfidData.student_id)
+        .eq('academic_year_id', activeYear.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (studentError || !student) return null;
+
+      return {
+        id: student.id,
+        name: student.name,
+        nameBn: student.name_bn,
+        studentIdNumber: student.student_id_number,
+        className: (student.classes as any)?.name_bn || (student.classes as any)?.name || '',
+        sectionName: (student.sections as any)?.name || null,
+      };
+    },
+    enabled: !!activeYear?.id && !!cardNumber.trim(),
   });
 }
