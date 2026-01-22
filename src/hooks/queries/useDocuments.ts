@@ -18,6 +18,7 @@ export interface StudentDocument {
   is_submitted: boolean;
   submitted_at: string | null;
   notes: string | null;
+  file_url: string | null;
   document?: RequiredDocument;
 }
 
@@ -74,6 +75,7 @@ export function useStudentDocuments(studentId: string | undefined) {
       if (error) throw error;
       return (data || []).map(d => ({
         ...d,
+        file_url: (d as any).file_url || null,
         document: Array.isArray(d.document) ? d.document[0] : d.document,
       })) as StudentDocument[];
     },
@@ -92,22 +94,31 @@ export function useUpsertStudentDocument() {
       documentId,
       isSubmitted,
       notes,
+      fileUrl,
     }: {
       studentId: string;
       documentId: string;
       isSubmitted: boolean;
       notes?: string;
+      fileUrl?: string | null;
     }) => {
+      const updateData: Record<string, unknown> = {
+        student_id: studentId,
+        document_id: documentId,
+        is_submitted: isSubmitted,
+        submitted_at: isSubmitted ? new Date().toISOString() : null,
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      };
+      
+      // Only update file_url if explicitly provided
+      if (fileUrl !== undefined) {
+        updateData.file_url = fileUrl;
+      }
+
       const { data, error } = await supabase
         .from('student_documents')
-        .upsert({
-          student_id: studentId,
-          document_id: documentId,
-          is_submitted: isSubmitted,
-          submitted_at: isSubmitted ? new Date().toISOString() : null,
-          notes: notes || null,
-          updated_at: new Date().toISOString(),
-        }, {
+        .upsert(updateData as any, {
           onConflict: 'student_id,document_id',
         })
         .select()
@@ -121,6 +132,125 @@ export function useUpsertStudentDocument() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'ডকুমেন্ট আপডেট ব্যর্থ হয়েছে');
+    },
+  });
+}
+
+// Upload document file
+export function useUploadDocumentFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+      documentId,
+      file,
+    }: {
+      studentId: string;
+      documentId: string;
+      file: File;
+    }) => {
+      // Generate unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${studentId}/${documentId}/${Date.now()}.${fileExt}`;
+
+      // Upload file to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('student-documents')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get signed URL (private bucket)
+      const { data: urlData } = await supabase.storage
+        .from('student-documents')
+        .createSignedUrl(uploadData.path, 60 * 60 * 24 * 365); // 1 year
+
+      const fileUrl = urlData?.signedUrl || uploadData.path;
+
+      // Update student_documents record
+      const { data, error } = await supabase
+        .from('student_documents')
+        .upsert({
+          student_id: studentId,
+          document_id: documentId,
+          is_submitted: true,
+          submitted_at: new Date().toISOString(),
+          file_url: fileUrl,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'student_id,document_id',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['student-documents', variables.studentId] });
+      toast.success('ফাইল আপলোড হয়েছে');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'ফাইল আপলোড ব্যর্থ হয়েছে');
+    },
+  });
+}
+
+// Delete document file
+export function useDeleteDocumentFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+      documentId,
+      filePath,
+    }: {
+      studentId: string;
+      documentId: string;
+      filePath: string;
+    }) => {
+      // Extract path from signed URL if needed
+      let path = filePath;
+      if (filePath.includes('student-documents/')) {
+        const match = filePath.match(/student-documents\/([^?]+)/);
+        if (match) path = match[1];
+      }
+
+      // Delete file from storage
+      const { error: deleteError } = await supabase.storage
+        .from('student-documents')
+        .remove([path]);
+
+      if (deleteError) {
+        console.error('Storage delete error:', deleteError);
+      }
+
+      // Update record to remove file_url
+      const { data, error } = await supabase
+        .from('student_documents')
+        .update({
+          file_url: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('student_id', studentId)
+        .eq('document_id', documentId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['student-documents', variables.studentId] });
+      toast.success('ফাইল মুছে ফেলা হয়েছে');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'ফাইল মুছতে ব্যর্থ হয়েছে');
     },
   });
 }

@@ -45,7 +45,10 @@ import {
   CheckCircle2,
   XCircle,
   Settings2,
-  FileText
+  FileText,
+  Upload,
+  Download,
+  Trash2
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -53,7 +56,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAcademicYear } from '@/hooks/useAcademicYear';
 import { useStudentFeeRecords, useCreateFeeRecord, useCollectFee, StudentFeeRecord } from '@/hooks/queries/useFeeCollection';
 import { useStudentCustomFee, useUpsertStudentCustomFee } from '@/hooks/queries/useStudentCustomFee';
-import { useRequiredDocuments, useStudentDocuments, useUpsertStudentDocument } from '@/hooks/queries/useDocuments';
+import { useRequiredDocuments, useStudentDocuments, useUpsertStudentDocument, useUploadDocumentFile, useDeleteDocumentFile } from '@/hooks/queries/useDocuments';
 
 interface Shift {
   id: string;
@@ -145,6 +148,8 @@ export default function StudentEdit() {
   const { data: requiredDocuments = [], isLoading: docsLoading } = useRequiredDocuments();
   const { data: studentDocuments = [], isLoading: studentDocsLoading } = useStudentDocuments(id);
   const upsertStudentDocument = useUpsertStudentDocument();
+  const uploadDocumentFile = useUploadDocumentFile();
+  const deleteDocumentFile = useDeleteDocumentFile();
 
   const [formData, setFormData] = useState({
     nameEnglish: '',
@@ -525,6 +530,37 @@ export default function StudentEdit() {
   const getDocumentStatus = (documentId: string) => {
     const studentDoc = studentDocuments.find(d => d.document_id === documentId);
     return studentDoc?.is_submitted ?? false;
+  };
+
+  // Get document file URL
+  const getDocumentFileUrl = (documentId: string) => {
+    const studentDoc = studentDocuments.find(d => d.document_id === documentId);
+    return studentDoc?.file_url || null;
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (documentId: string, file: File) => {
+    if (!id) return;
+    
+    await uploadDocumentFile.mutateAsync({
+      studentId: id,
+      documentId,
+      file,
+    });
+  };
+
+  // Handle file delete
+  const handleFileDelete = async (documentId: string) => {
+    if (!id) return;
+    
+    const fileUrl = getDocumentFileUrl(documentId);
+    if (!fileUrl) return;
+    
+    await deleteDocumentFile.mutateAsync({
+      studentId: id,
+      documentId,
+      filePath: fileUrl,
+    });
   };
 
   // Document summary
@@ -1081,50 +1117,120 @@ export default function StudentEdit() {
                     <div className="space-y-3">
                       {requiredDocuments.map((doc) => {
                         const isSubmitted = getDocumentStatus(doc.id);
-                        const isPending = upsertStudentDocument.isPending;
+                        const fileUrl = getDocumentFileUrl(doc.id);
+                        const isPending = upsertStudentDocument.isPending || uploadDocumentFile.isPending || deleteDocumentFile.isPending;
                         
                         return (
                           <div
                             key={doc.id}
                             className={`
-                              flex items-center justify-between p-4 rounded-lg border-2 transition-all
+                              p-4 rounded-lg border-2 transition-all
                               ${isSubmitted 
                                 ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
                                 : 'bg-muted/50 border-muted-foreground/20 hover:border-primary/30'
                               }
                             `}
                           >
-                            <div className="flex items-center gap-3">
-                              <Checkbox
-                                id={`doc-${doc.id}`}
-                                checked={isSubmitted}
-                                disabled={isPending}
-                                onCheckedChange={(checked) => handleDocumentToggle(doc.id, !!checked)}
-                                className="h-5 w-5"
-                              />
-                              <div>
-                                <label
-                                  htmlFor={`doc-${doc.id}`}
-                                  className="font-medium cursor-pointer font-bengali"
-                                >
-                                  {doc.name_bn || doc.name}
-                                </label>
-                                {doc.name_bn && (
-                                  <p className="text-xs text-muted-foreground">{doc.name}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Checkbox
+                                  id={`doc-${doc.id}`}
+                                  checked={isSubmitted}
+                                  disabled={isPending}
+                                  onCheckedChange={(checked) => handleDocumentToggle(doc.id, !!checked)}
+                                  className="h-5 w-5"
+                                />
+                                <div>
+                                  <label
+                                    htmlFor={`doc-${doc.id}`}
+                                    className="font-medium cursor-pointer font-bengali"
+                                  >
+                                    {doc.name_bn || doc.name}
+                                  </label>
+                                  {doc.name_bn && (
+                                    <p className="text-xs text-muted-foreground">{doc.name}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {doc.is_mandatory && (
+                                  <Badge variant="destructive" className="text-xs font-bengali">
+                                    বাধ্যতামূলক
+                                  </Badge>
+                                )}
+                                {isSubmitted ? (
+                                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                ) : (
+                                  <XCircle className="w-5 h-5 text-muted-foreground/50" />
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {doc.is_mandatory && (
-                                <Badge variant="destructive" className="text-xs font-bengali">
-                                  বাধ্যতামূলক
-                                </Badge>
-                              )}
-                              {isSubmitted ? (
-                                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                              ) : (
-                                <XCircle className="w-5 h-5 text-muted-foreground/50" />
-                              )}
+                            
+                            {/* File Upload/Download Section */}
+                            <div className="mt-3 pt-3 border-t border-dashed flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <FileText className="w-4 h-4" />
+                                <span className="font-bengali">
+                                  {fileUrl ? 'স্ক্যান কপি আপলোড হয়েছে' : 'স্ক্যান কপি (ঐচ্ছিক)'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {fileUrl ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1"
+                                      onClick={() => window.open(fileUrl, '_blank')}
+                                    >
+                                      <Download className="w-4 h-4" />
+                                      <span className="hidden sm:inline font-bengali">ডাউনলোড</span>
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="gap-1 text-destructive hover:text-destructive"
+                                      disabled={isPending}
+                                      onClick={() => handleFileDelete(doc.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      <span className="hidden sm:inline font-bengali">মুছুন</span>
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <label className="cursor-pointer">
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*,.pdf"
+                                      disabled={isPending}
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          handleFileUpload(doc.id, file);
+                                          e.target.value = '';
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 pointer-events-none"
+                                      disabled={isPending}
+                                    >
+                                      {uploadDocumentFile.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Upload className="w-4 h-4" />
+                                      )}
+                                      <span className="font-bengali">আপলোড</span>
+                                    </Button>
+                                  </label>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
