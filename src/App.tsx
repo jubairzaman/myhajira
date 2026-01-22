@@ -42,6 +42,9 @@ import FeeSettings from "./pages/fees/FeeSettings";
 import FeeCollection from "./pages/fees/FeeCollection";
 import FeeReports from "./pages/fees/FeeReports";
 
+// Inventory Page
+import InventoryManagement from "./pages/inventory/InventoryManagement";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -156,6 +159,13 @@ const App = () => (
               <Route path="/fees/reports" element={
                 <ProtectedRoute>
                   <FeeReports />
+                </ProtectedRoute>
+              } />
+              
+              {/* Inventory */}
+              <Route path="/inventory" element={
+                <ProtectedRoute requireAdmin>
+                  <InventoryManagement />
                 </ProtectedRoute>
               } />
               

@@ -41,6 +41,9 @@ import {
   Plus,
   CheckCircle2,
   XCircle,
+  Package,
+  ShoppingCart,
+  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
@@ -57,6 +60,12 @@ import {
 } from '@/hooks/queries/useFeeCollection';
 import { useFeeSettings } from '@/hooks/queries/useFeesQuery';
 import { ReceiptPrint, type ReceiptData } from '@/components/fees/ReceiptPrint';
+import { 
+  useActiveProducts, 
+  useSellProduct,
+  getCategoryLabel,
+  type InventoryProduct 
+} from '@/hooks/queries/useInventory';
 
 // Bengali month names
 const bengaliMonths = [
@@ -104,6 +113,15 @@ export default function FeeCollection() {
   const [classFee, setClassFee] = useState<{ amount: number; admission_fee: number; session_charge: number } | null>(null);
   const [exams, setExams] = useState<{ id: string; name: string; name_bn: string | null; exam_fee_amount: number }[]>([]);
 
+  // Product cart for selling
+  const [productCart, setProductCart] = useState<Array<{
+    product: InventoryProduct;
+    quantity: number;
+  }>>([]);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [productQuantity, setProductQuantity] = useState(1);
+
   // Fee settings for late fine
   const { data: feeSettings } = useFeeSettings();
 
@@ -114,6 +132,10 @@ export default function FeeCollection() {
   const collectFee = useCollectFee();
   const collectMultipleFees = useCollectMultipleFees();
   const createFeeRecord = useCreateFeeRecord();
+  
+  // Inventory hooks
+  const { data: activeProducts } = useActiveProducts();
+  const sellProduct = useSellProduct();
 
   // Fetch class fees when student is selected
   useEffect(() => {
@@ -233,43 +255,120 @@ export default function FeeCollection() {
     return sum + (Number(r.amount_due) - Number(r.amount_paid));
   }, 0);
 
+  // Calculate product cart total
+  const productCartTotal = productCart.reduce((sum, item) => {
+    return sum + (item.product.unit_price * item.quantity);
+  }, 0);
+
   // Handle multi-payment
-  const handleMultiPayment = () => {
-    if (selectedUnpaidRecords.length === 0) return;
+  const handleMultiPayment = async () => {
+    if (selectedUnpaidRecords.length === 0 && productCart.length === 0) return;
 
-    const recordsToCollect = selectedUnpaidRecords.map(r => ({
-      id: r.id,
-      amountToPay: Number(r.amount_due) - Number(r.amount_paid),
-    }));
-
-    collectMultipleFees.mutate(
-      { records: recordsToCollect },
-      {
-        onSuccess: (result) => {
-          setMultiPaymentDialogOpen(false);
-          setSelectedRecordIds(new Set());
-          
-          // Prepare receipt data for multi-item
-          if (selectedStudent) {
-            setReceiptData({
-              receiptNumber: result.receiptNumber,
-              paymentDate: new Date().toISOString(),
-              studentName: selectedStudent.name,
-              studentNameBn: selectedStudent.name_bn || undefined,
-              className: selectedStudent.class?.name || '',
-              classNameBn: selectedStudent.class?.name_bn || undefined,
-              sectionName: selectedStudent.section?.name || undefined,
-              studentId: selectedStudent.student_id_number || undefined,
-              feeType: 'multiple',
-              amountDue: selectedTotal,
-              amountPaid: selectedTotal,
-              lateFine: 0,
-            });
-            setReceiptOpen(true);
-          }
-        },
+    // First sell products if any
+    if (productCart.length > 0 && selectedStudent) {
+      for (const item of productCart) {
+        await sellProduct.mutateAsync({
+          productId: item.product.id,
+          quantity: item.quantity,
+          unitPrice: item.product.unit_price,
+          studentId: selectedStudent.id,
+        });
       }
-    );
+    }
+
+    // Then collect fees if any
+    if (selectedUnpaidRecords.length > 0) {
+      const recordsToCollect = selectedUnpaidRecords.map(r => ({
+        id: r.id,
+        amountToPay: Number(r.amount_due) - Number(r.amount_paid),
+      }));
+
+      collectMultipleFees.mutate(
+        { records: recordsToCollect },
+        {
+          onSuccess: (result) => {
+            setMultiPaymentDialogOpen(false);
+            setSelectedRecordIds(new Set());
+            setProductCart([]);
+            
+            // Prepare receipt data with items
+            if (selectedStudent) {
+              const items = selectedUnpaidRecords.map(record => ({
+                feeType: record.fee_type,
+                feeMonth: record.fee_month || undefined,
+                examName: record.exam?.name_bn || record.exam?.name || undefined,
+                amountDue: Number(record.amount_due),
+                lateFine: Number(record.late_fine) || 0,
+                amountPaid: Number(record.amount_due) - Number(record.amount_paid),
+              }));
+
+              // Add products to items
+              productCart.forEach(item => {
+                items.push({
+                  feeType: 'product' as any,
+                  feeMonth: undefined,
+                  examName: item.product.name_bn || item.product.name,
+                  amountDue: item.product.unit_price * item.quantity,
+                  lateFine: 0,
+                  amountPaid: item.product.unit_price * item.quantity,
+                });
+              });
+
+              setReceiptData({
+                receiptNumber: result.receiptNumber,
+                paymentDate: new Date().toISOString(),
+                studentName: selectedStudent.name,
+                studentNameBn: selectedStudent.name_bn || undefined,
+                className: selectedStudent.class?.name || '',
+                classNameBn: selectedStudent.class?.name_bn || undefined,
+                sectionName: selectedStudent.section?.name || undefined,
+                studentId: selectedStudent.student_id_number || undefined,
+                guardianMobile: selectedStudent.guardian_mobile || undefined,
+                feeType: 'multiple',
+                amountDue: selectedTotal + productCartTotal,
+                amountPaid: selectedTotal + productCartTotal,
+                lateFine: 0,
+                items,
+              });
+              setReceiptOpen(true);
+            }
+          },
+        }
+      );
+    } else if (productCart.length > 0) {
+      // Only products, no fees
+      setMultiPaymentDialogOpen(false);
+      setProductCart([]);
+      
+      if (selectedStudent) {
+        const items = productCart.map(item => ({
+          feeType: 'product' as any,
+          feeMonth: undefined,
+          examName: item.product.name_bn || item.product.name,
+          amountDue: item.product.unit_price * item.quantity,
+          lateFine: 0,
+          amountPaid: item.product.unit_price * item.quantity,
+        }));
+
+        setReceiptData({
+          receiptNumber: `PRD-${Date.now()}`,
+          paymentDate: new Date().toISOString(),
+          studentName: selectedStudent.name,
+          studentNameBn: selectedStudent.name_bn || undefined,
+          className: selectedStudent.class?.name || '',
+          classNameBn: selectedStudent.class?.name_bn || undefined,
+          sectionName: selectedStudent.section?.name || undefined,
+          studentId: selectedStudent.student_id_number || undefined,
+          guardianMobile: selectedStudent.guardian_mobile || undefined,
+          feeType: 'product',
+          amountDue: productCartTotal,
+          amountPaid: productCartTotal,
+          lateFine: 0,
+          items,
+        });
+        setReceiptOpen(true);
+      }
+    }
   };
 
   const handleCollectPayment = () => {
@@ -376,9 +475,37 @@ export default function FeeCollection() {
         return 'সেশন চার্জ';
       case 'exam':
         return 'পরীক্ষা ফি';
+      case 'product':
+        return 'পণ্য বিক্রয়';
       default:
         return type;
     }
+  };
+
+  // Add product to cart
+  const handleAddProductToCart = () => {
+    if (!selectedProductId || productQuantity <= 0) return;
+    const product = activeProducts?.find(p => p.id === selectedProductId);
+    if (!product) return;
+    
+    // Check if already in cart
+    const existingIndex = productCart.findIndex(item => item.product.id === product.id);
+    if (existingIndex >= 0) {
+      const updated = [...productCart];
+      updated[existingIndex].quantity += productQuantity;
+      setProductCart(updated);
+    } else {
+      setProductCart([...productCart, { product, quantity: productQuantity }]);
+    }
+    
+    setProductDialogOpen(false);
+    setSelectedProductId('');
+    setProductQuantity(1);
+  };
+
+  // Remove product from cart
+  const removeProductFromCart = (productId: string) => {
+    setProductCart(productCart.filter(item => item.product.id !== productId));
   };
 
   const getStatusBadge = (status: string) => {
@@ -607,16 +734,16 @@ export default function FeeCollection() {
               </Card>
             </div>
 
-            {/* Monthly Fee Visual Cards */}
+            {/* Monthly Fee Visual Cards - 2 Rows, Larger */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Receipt className="w-5 h-5" />
-                  মাসিক ফি স্ট্যাটাস
+                  মাসিক বেতন
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {monthlyFeeStatus.map(({ month, label, status, record }) => (
                     <button
                       key={month}
@@ -624,27 +751,118 @@ export default function FeeCollection() {
                       onClick={() => record && record.status !== 'paid' && handleOpenPayment(record)}
                       disabled={!record || status === 'paid'}
                       className={`
-                        p-2 sm:p-3 rounded-lg border-2 text-center transition-all
+                        p-3 sm:p-4 rounded-xl border-2 text-center transition-all
                         ${status === 'paid' 
                           ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
                           : status === 'partial'
-                            ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:border-yellow-500'
+                            ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:border-yellow-500 hover:shadow-md'
                             : status === 'unpaid'
-                              ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:border-red-500'
+                              ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:border-red-500 hover:shadow-md'
                               : 'bg-muted/50 border-muted-foreground/20'
                         }
                       `}
                     >
-                      <div className="font-bengali text-xs sm:text-sm font-medium truncate">{label}</div>
-                      <div className="mt-1">
-                        {status === 'paid' && <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-green-600" />}
-                        {status === 'partial' && <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-yellow-600" />}
-                        {status === 'unpaid' && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-red-600" />}
+                      <div className="font-bengali text-sm sm:text-base font-medium">{label}</div>
+                      <div className="mt-2">
+                        {status === 'paid' && <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-green-600" />}
+                        {status === 'partial' && <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-yellow-600" />}
+                        {status === 'unpaid' && <XCircle className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-red-600" />}
                         {!status && <span className="text-xs text-muted-foreground">—</span>}
                       </div>
+                      {record && status !== 'paid' && (
+                        <div className="mt-1 text-xs font-medium text-destructive">
+                          ৳{(Number(record.amount_due) - Number(record.amount_paid)).toLocaleString()}
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Fees (Exam, Admission, Session) */}
+            {feeRecords && feeRecords.filter(r => r.fee_type !== 'monthly').length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">অন্যান্য ফি</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {feeRecords.filter(r => r.fee_type !== 'monthly').map(record => (
+                      <button
+                        key={record.id}
+                        type="button"
+                        onClick={() => record.status !== 'paid' && handleOpenPayment(record)}
+                        disabled={record.status === 'paid'}
+                        className={`
+                          p-3 sm:p-4 rounded-xl border-2 text-center transition-all
+                          ${record.status === 'paid' 
+                            ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
+                            : record.status === 'partial'
+                              ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700 cursor-pointer hover:shadow-md'
+                              : 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 cursor-pointer hover:shadow-md'
+                          }
+                        `}
+                      >
+                        <div className="font-medium text-sm">{getFeeTypeLabel(record.fee_type)}</div>
+                        {record.exam && (
+                          <div className="text-xs text-muted-foreground">{record.exam.name_bn || record.exam.name}</div>
+                        )}
+                        <div className="mt-1 text-sm font-bold">
+                          ৳{Number(record.amount_due).toLocaleString()}
+                        </div>
+                        {record.status === 'paid' && <CheckCircle2 className="w-4 h-4 mx-auto mt-1 text-green-600" />}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Product Sales Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    পণ্য বিক্রয়
+                  </CardTitle>
+                  <Button size="sm" variant="outline" onClick={() => setProductDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    পণ্য যোগ করুন
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {productCart.length > 0 ? (
+                  <div className="space-y-2">
+                    {productCart.map(item => (
+                      <div key={item.product.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div>
+                          <div className="font-medium">{item.product.name_bn || item.product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {item.quantity} × ৳{item.product.unit_price.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-bold">৳{(item.product.unit_price * item.quantity).toLocaleString()}</div>
+                          <Button size="sm" variant="ghost" onClick={() => removeProductFromCart(item.product.id)}>
+                            <X className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between p-3 bg-primary/10 rounded-lg font-bold">
+                      <span>পণ্য মোট</span>
+                      <span>৳{productCartTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">কোন পণ্য নির্বাচন করা হয়নি</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

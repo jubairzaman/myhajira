@@ -342,6 +342,133 @@ export type Database = {
           },
         ]
       }
+      inventory_products: {
+        Row: {
+          academic_year_id: string | null
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          min_stock_alert: number | null
+          name: string
+          name_bn: string | null
+          sku: string | null
+          stock_quantity: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          min_stock_alert?: number | null
+          name: string
+          name_bn?: string | null
+          sku?: string | null
+          stock_quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          min_stock_alert?: number | null
+          name?: string
+          name_bn?: string | null
+          sku?: string | null
+          stock_quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_products_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_transactions: {
+        Row: {
+          academic_year_id: string | null
+          created_at: string
+          fee_record_id: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          sold_by: string | null
+          student_id: string | null
+          total_amount: number
+          transaction_type: string
+          unit_price: number
+        }
+        Insert: {
+          academic_year_id?: string | null
+          created_at?: string
+          fee_record_id?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          sold_by?: string | null
+          student_id?: string | null
+          total_amount?: number
+          transaction_type: string
+          unit_price?: number
+        }
+        Update: {
+          academic_year_id?: string | null
+          created_at?: string
+          fee_record_id?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          sold_by?: string | null
+          student_id?: string | null
+          total_amount?: number
+          transaction_type?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_fee_record_id_fkey"
+            columns: ["fee_record_id"]
+            isOneToOne: false
+            referencedRelation: "student_fee_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manual_attendance_logs: {
         Row: {
           admin_id: string

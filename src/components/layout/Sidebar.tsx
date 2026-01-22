@@ -19,6 +19,7 @@ import {
   X,
   Tv,
   Wallet,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -90,6 +91,12 @@ const navItems: NavItem[] = [
       { label: 'Fee Collection', labelBn: 'ফি আদায়', icon: ChevronRight, href: '/fees/collection' },
       { label: 'Fee Reports', labelBn: 'ফি রিপোর্ট', icon: ChevronRight, href: '/fees/reports' },
     ],
+  },
+  {
+    label: 'Inventory',
+    labelBn: 'ইনভেন্টরি',
+    icon: Package,
+    href: '/inventory',
   },
   {
     label: 'Reports',
