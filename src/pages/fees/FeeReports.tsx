@@ -749,12 +749,12 @@ const FeeReports = () => {
                   বকেয়া তালিকা
                 </CardTitle>
                 <div className="flex gap-4 mt-4">
-                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <Select value={selectedClass || 'all'} onValueChange={(val) => setSelectedClass(val === 'all' ? '' : val)}>
                     <SelectTrigger className="w-48">
                       <SelectValue placeholder="সব শ্রেণী" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">সব শ্রেণী</SelectItem>
+                      <SelectItem value="all">সব শ্রেণী</SelectItem>
                       {classes?.map((cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
                           {cls.name_bn || cls.name}
@@ -762,12 +762,12 @@ const FeeReports = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={selectedFeeType} onValueChange={setSelectedFeeType}>
+                  <Select value={selectedFeeType || 'all'} onValueChange={(val) => setSelectedFeeType(val === 'all' ? '' : val)}>
                     <SelectTrigger className="w-48">
                       <SelectValue placeholder="সব ফি টাইপ" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">সব ফি টাইপ</SelectItem>
+                      <SelectItem value="all">সব ফি টাইপ</SelectItem>
                       <SelectItem value="admission">ভর্তি ফি</SelectItem>
                       <SelectItem value="session">সেশন চার্জ</SelectItem>
                       <SelectItem value="monthly">মাসিক বেতন</SelectItem>
