@@ -44,8 +44,8 @@ export const NewsScroller = forwardRef<HTMLDivElement, NewsScrollerProps>(
       ...settings,
     }), [settings]);
 
-    // Duplicate items for seamless loop
-    const displayItems = [...items, ...items];
+    // Triple items for seamless loop (animation scrolls 33.33%)
+    const displayItems = [...items, ...items, ...items];
 
     if (items.length === 0) {
       return null;
@@ -104,7 +104,7 @@ export const NewsScroller = forwardRef<HTMLDivElement, NewsScrollerProps>(
           <div 
             ref={scrollRef}
             className={cn(
-              "news-scroller-content flex items-center h-full whitespace-nowrap will-change-transform",
+              "news-scroller-content inline-flex items-center h-full whitespace-nowrap will-change-transform",
               !isPaused && "animate-news-scroll"
             )}
             style={{ 

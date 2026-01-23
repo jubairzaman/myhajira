@@ -410,18 +410,23 @@
   scrollbar-color: hsl(0 0% 100% / 0.2) transparent;
 }
 
-/* News Scroller Animation */
+/* News Scroller Animation - scrolls 33.33% for tripled content */
 @keyframes news-scroll {
   0% {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translateX(-33.33%);
   }
 }
 
 .animate-news-scroll {
   animation: news-scroll linear infinite;
+}
+
+/* Monitor Display - Fixed viewport height */
+.monitor-display {
+  @apply h-screen overflow-hidden;
 }
 
 /* Video overlay transition */

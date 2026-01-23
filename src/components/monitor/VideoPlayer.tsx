@@ -142,7 +142,7 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
           onEnded={handleVideoEnd}
           onError={handleVideoError}
           onLoadedData={handleVideoLoaded}
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
         {/* Pause overlay */}
