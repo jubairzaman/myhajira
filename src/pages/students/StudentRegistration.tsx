@@ -411,38 +411,42 @@ export default function StudentRegistration() {
                       {docStats.submitted}/{docStats.total} জমা দেওয়া হয়েছে
                     </p>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    {requiredDocuments.map((doc) => (
-                      <div
-                        key={doc.id}
-                        className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer hover:bg-muted/50 ${
-                          documentChecklist[doc.id] 
-                            ? 'bg-success/5 border-success/20' 
-                            : doc.is_mandatory 
-                              ? 'bg-destructive/5 border-destructive/20'
-                              : ''
-                        }`}
-                        onClick={() => toggleDocument(doc.id)}
-                      >
-                        <Checkbox
-                          checked={documentChecklist[doc.id] || false}
-                          onCheckedChange={() => toggleDocument(doc.id)}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">
-                            {doc.name_bn || doc.name}
-                          </p>
-                          {doc.is_mandatory && (
-                            <span className="text-xs text-destructive">বাধ্যতামূলক</span>
+                    <CardContent className="space-y-2">
+                    {requiredDocuments.map((doc) => {
+                      const isChecked = documentChecklist[doc.id] ?? false;
+                      return (
+                        <label
+                          key={doc.id}
+                          htmlFor={`doc-${doc.id}`}
+                          className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer hover:bg-muted/50 ${
+                            isChecked 
+                              ? 'bg-success/5 border-success/20' 
+                              : doc.is_mandatory 
+                                ? 'bg-destructive/5 border-destructive/20'
+                                : ''
+                          }`}
+                        >
+                          <Checkbox
+                            id={`doc-${doc.id}`}
+                            checked={isChecked}
+                            onCheckedChange={() => toggleDocument(doc.id)}
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">
+                              {doc.name_bn || doc.name}
+                            </p>
+                            {doc.is_mandatory && (
+                              <span className="text-xs text-destructive">বাধ্যতামূলক</span>
+                            )}
+                          </div>
+                          {isChecked ? (
+                            <CheckCircle2 className="w-4 h-4 text-success" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-muted-foreground" />
                           )}
-                        </div>
-                        {documentChecklist[doc.id] ? (
-                          <CheckCircle2 className="w-4 h-4 text-success" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    ))}
+                        </label>
+                      );
+                    })}
                   </CardContent>
                 </Card>
               )}
