@@ -6,11 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// BulkSMSBD response codes mapping
+const BULKSMSBD_CODES: Record<string, string> = {
+  "202": "SMS Sent Successfully",
+  "1001": "Invalid Number",
+  "1002": "Sender ID invalid or disabled",
+  "1003": "Missing required fields",
+  "1007": "Insufficient balance",
+  "1031": "Account not verified",
+  "1032": "IP not whitelisted",
+};
+
 interface SmsRequest {
   mobile_number: string;
   message: string;
   student_id?: string;
-  sms_type: "absent" | "late" | "present" | "custom" | "monthly_summary" | "punch" | "custom_notice";
+  sms_type: "absent" | "late" | "present" | "custom" | "monthly_summary" | "punch" | "custom_notice" | "fee_due" | "otp";
+  sent_by?: "admin" | "system";
 }
 
 interface BulkSmsRequest {
@@ -34,8 +46,19 @@ interface PunchSmsRequest {
   late_minutes?: number;
 }
 
+interface BalanceCheckRequest {
+  action: "check_balance";
+  provider: "mim_sms" | "bulksmsbd";
+}
+
+interface TestSmsRequest {
+  action: "test_sms";
+  mobile_number: string;
+  message: string;
+  provider: "mim_sms" | "bulksmsbd";
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -46,19 +69,29 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    console.log("SMS request received:", body);
+    console.log("SMS request received:", JSON.stringify(body));
 
-    // Check if it's a custom notice bulk SMS request
+    // Handle balance check
+    if (body.action === "check_balance") {
+      return await handleBalanceCheck(supabase, body as BalanceCheckRequest);
+    }
+
+    // Handle test SMS
+    if (body.action === "test_sms") {
+      return await handleTestSms(supabase, body as TestSmsRequest);
+    }
+
+    // Handle custom notice bulk SMS
     if (body.sms_type === "custom_notice") {
       return await handleCustomNoticeSms(supabase, body as CustomNoticeRequest);
     }
 
-    // Check if it's a punch or late SMS from process-punch
+    // Handle punch/late SMS
     if (body.sms_type === "punch" || (body.sms_type === "late" && body.student_id && body.punch_time)) {
       return await handlePunchLateSms(supabase, body as PunchSmsRequest);
     }
 
-    // Check if it's a bulk absent SMS request
+    // Handle bulk absent SMS
     if (body.date && body.academic_year_id && !body.mobile_number) {
       return await handleBulkSms(supabase, body as BulkSmsRequest);
     }
@@ -69,10 +102,7 @@ serve(async (req) => {
     console.error("Error in send-sms function:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
@@ -91,7 +121,7 @@ async function getSmsSettings(supabase: any) {
   return settings;
 }
 
-// Get system settings for school name
+// Get system settings
 async function getSystemSettings(supabase: any) {
   const { data } = await supabase
     .from("system_settings")
@@ -101,23 +131,27 @@ async function getSystemSettings(supabase: any) {
   return data;
 }
 
-// Unified send message function with channel preference
+// Unified send message function with provider selection
 async function sendMessage(
   supabase: any,
   settings: any,
   mobile: string,
   message: string,
   studentId: string | null,
-  smsType: string
+  smsType: string,
+  sentBy: "admin" | "system" = "system"
 ) {
   let result;
   let channel = "sms";
   let fallbackUsed = false;
   let whatsappMessageId = null;
+  let providerName = settings.active_sms_provider || "mim_sms";
+  let responseCode = null;
+  let responseMessage = null;
 
   const preferredChannel = settings.preferred_channel || "sms_only";
 
-  // Try WhatsApp first if enabled and preferred
+  // Try WhatsApp first if enabled
   if (
     (preferredChannel === "whatsapp_first" || preferredChannel === "whatsapp_only") &&
     settings.whatsapp_enabled &&
@@ -134,17 +168,23 @@ async function sendMessage(
     if (result.success) {
       channel = "whatsapp";
       whatsappMessageId = result.messageId;
+      providerName = "whatsapp";
     } else if (preferredChannel === "whatsapp_first" && settings.whatsapp_fallback_to_sms) {
-      // Fallback to SMS
       console.log("WhatsApp failed, falling back to SMS:", result.error);
-      result = await sendViaMimSms(settings.api_key, settings.sender_id, mobile, message);
+      result = await sendViaSmsProvider(settings, mobile, message);
       channel = "sms";
       fallbackUsed = true;
+      providerName = settings.active_sms_provider || "mim_sms";
+      responseCode = result.responseCode;
+      responseMessage = result.responseMessage;
     }
   } else {
-    // Default: SMS only
-    result = await sendViaMimSms(settings.api_key, settings.sender_id, mobile, message);
+    // Use active SMS provider
+    result = await sendViaSmsProvider(settings, mobile, message);
     channel = "sms";
+    providerName = settings.active_sms_provider || "mim_sms";
+    responseCode = result.responseCode;
+    responseMessage = result.responseMessage;
   }
 
   // Log the message
@@ -155,17 +195,239 @@ async function sendMessage(
     sms_type: smsType,
     status: result.success ? "sent" : "failed",
     channel,
+    provider_name: providerName,
+    response_code: responseCode,
+    response_message: responseMessage,
     whatsapp_message_id: whatsappMessageId,
     fallback_used: fallbackUsed,
     error_message: result.error || null,
     sent_at: result.success ? new Date().toISOString() : null,
+    sent_by: sentBy,
   });
 
   return result;
 }
 
+// Send via active SMS provider
+async function sendViaSmsProvider(settings: any, mobile: string, message: string) {
+  const provider = settings.active_sms_provider || "mim_sms";
+  
+  if (provider === "bulksmsbd") {
+    return await sendViaBulkSmsBD(
+      settings.bulksmsbd_api_key,
+      settings.bulksmsbd_sender_id,
+      mobile,
+      message
+    );
+  } else {
+    return await sendViaMimSms(
+      settings.api_key,
+      settings.sender_id,
+      mobile,
+      message
+    );
+  }
+}
+
+// BulkSMSBD API
+async function sendViaBulkSmsBD(apiKey: string, senderId: string, mobile: string, message: string) {
+  try {
+    if (!apiKey || !senderId) {
+      return { success: false, error: "BulkSMSBD API key or sender ID not configured", responseCode: null, responseMessage: null };
+    }
+
+    // Format mobile number (Bangladesh: 01712345678 → 88017XXXXXXXX)
+    let formattedMobile = mobile.replace(/[^0-9]/g, "");
+    if (formattedMobile.startsWith("0")) {
+      formattedMobile = "88" + formattedMobile;
+    } else if (!formattedMobile.startsWith("88")) {
+      formattedMobile = "88" + formattedMobile;
+    }
+
+    const url = "http://bulksmsbd.net/api/smsapi";
+    
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      senderid: senderId,
+      number: formattedMobile,
+      message: message,
+    });
+
+    console.log("Sending via BulkSMSBD:", formattedMobile);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+
+    const result = await response.json();
+    console.log("BulkSMSBD response:", result);
+
+    const responseCode = String(result.response_code || result.code || "");
+    const responseMessage = BULKSMSBD_CODES[responseCode] || result.error_message || result.message || "Unknown response";
+
+    if (responseCode === "202") {
+      return { success: true, responseCode, responseMessage };
+    } else {
+      return { success: false, error: responseMessage, responseCode, responseMessage };
+    }
+  } catch (error: any) {
+    console.error("BulkSMSBD API error:", error);
+    return { success: false, error: error.message, responseCode: null, responseMessage: null };
+  }
+}
+
+// BulkSMSBD Bulk SMS (comma-separated numbers)
+async function sendBulkViaBulkSmsBD(apiKey: string, senderId: string, mobiles: string[], message: string) {
+  try {
+    if (!apiKey || !senderId) {
+      return { success: false, error: "BulkSMSBD API key or sender ID not configured" };
+    }
+
+    // Format and join mobile numbers
+    const formattedNumbers = mobiles.map(m => {
+      let formatted = m.replace(/[^0-9]/g, "");
+      if (formatted.startsWith("0")) {
+        formatted = "88" + formatted;
+      } else if (!formatted.startsWith("88")) {
+        formatted = "88" + formatted;
+      }
+      return formatted;
+    }).join(",");
+
+    const url = "http://bulksmsbd.net/api/smsapi";
+    
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      senderid: senderId,
+      number: formattedNumbers,
+      message: message,
+    });
+
+    console.log("Sending bulk via BulkSMSBD to", mobiles.length, "numbers");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+
+    const result = await response.json();
+    console.log("BulkSMSBD bulk response:", result);
+
+    const responseCode = String(result.response_code || result.code || "");
+
+    if (responseCode === "202") {
+      return { success: true, sentCount: mobiles.length };
+    } else {
+      return { success: false, error: BULKSMSBD_CODES[responseCode] || result.error_message || "Unknown error" };
+    }
+  } catch (error: any) {
+    console.error("BulkSMSBD bulk API error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Check BulkSMSBD balance
+async function checkBulkSmsBDBalance(apiKey: string) {
+  try {
+    const url = `http://bulksmsbd.net/api/getBalanceApi?api_key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url);
+    const result = await response.json();
+    console.log("BulkSMSBD balance response:", result);
+    
+    // Response format: { balance: "123.45" } or error
+    if (result.balance !== undefined) {
+      return { success: true, balance: parseFloat(result.balance) || 0 };
+    } else {
+      return { success: false, error: result.error_message || "Failed to get balance" };
+    }
+  } catch (error: any) {
+    console.error("BulkSMSBD balance check error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Handle balance check request
+async function handleBalanceCheck(supabase: any, request: BalanceCheckRequest) {
+  const settings = await getSmsSettings(supabase);
+  
+  if (request.provider === "bulksmsbd") {
+    if (!settings.bulksmsbd_api_key) {
+      return new Response(
+        JSON.stringify({ success: false, error: "BulkSMSBD API key not configured" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const result = await checkBulkSmsBDBalance(settings.bulksmsbd_api_key);
+    
+    if (result.success) {
+      // Update cached balance
+      await supabase.from("sms_settings").update({
+        bulksmsbd_balance: result.balance,
+        bulksmsbd_balance_updated_at: new Date().toISOString(),
+      }).eq("id", settings.id);
+    }
+
+    return new Response(
+      JSON.stringify(result),
+      { status: result.success ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } else {
+    // MIM SMS balance - return cached value
+    return new Response(
+      JSON.stringify({ success: true, balance: settings.balance || 0 }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// Handle test SMS
+async function handleTestSms(supabase: any, request: TestSmsRequest) {
+  const settings = await getSmsSettings(supabase);
+  
+  let result;
+  if (request.provider === "bulksmsbd") {
+    result = await sendViaBulkSmsBD(
+      settings.bulksmsbd_api_key,
+      settings.bulksmsbd_sender_id,
+      request.mobile_number,
+      request.message
+    );
+  } else {
+    result = await sendViaMimSms(
+      settings.api_key,
+      settings.sender_id,
+      request.mobile_number,
+      request.message
+    );
+  }
+
+  // Log test SMS
+  await supabase.from("sms_logs").insert({
+    mobile_number: request.mobile_number,
+    message: request.message,
+    sms_type: "custom",
+    status: result.success ? "sent" : "failed",
+    channel: "sms",
+    provider_name: request.provider,
+    response_code: result.responseCode || null,
+    response_message: result.responseMessage || null,
+    error_message: result.error || null,
+    sent_at: result.success ? new Date().toISOString() : null,
+    sent_by: "admin",
+  });
+
+  return new Response(
+    JSON.stringify(result),
+    { status: result.success ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
 async function handleSingleSms(supabase: any, request: SmsRequest) {
-  const { mobile_number, message, student_id, sms_type } = request;
+  const { mobile_number, message, student_id, sms_type, sent_by } = request;
 
   const settings = await getSmsSettings(supabase);
 
@@ -176,14 +438,11 @@ async function handleSingleSms(supabase: any, request: SmsRequest) {
     );
   }
 
-  const result = await sendMessage(supabase, settings, mobile_number, message, student_id || null, sms_type);
+  const result = await sendMessage(supabase, settings, mobile_number, message, student_id || null, sms_type, sent_by || "system");
 
   return new Response(
     JSON.stringify(result),
-    {
-      status: result.success ? 200 : 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
+    { status: result.success ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
 
@@ -200,7 +459,6 @@ async function handlePunchLateSms(supabase: any, request: PunchSmsRequest) {
     );
   }
 
-  // Check if this SMS type is enabled
   if (sms_type === "punch" && !settings.punch_sms_enabled) {
     console.log("Punch SMS is disabled");
     return new Response(
@@ -217,7 +475,6 @@ async function handlePunchLateSms(supabase: any, request: PunchSmsRequest) {
     );
   }
 
-  // Get student details
   const { data: student, error: studentError } = await supabase
     .from("students")
     .select(`
@@ -247,12 +504,10 @@ async function handlePunchLateSms(supabase: any, request: PunchSmsRequest) {
   const systemSettings = await getSystemSettings(supabase);
   const schoolName = systemSettings?.school_name_bn || systemSettings?.school_name || "স্কুল";
 
-  // Format date and time
   const punchDate = new Date(punch_time);
   const dateStr = punchDate.toLocaleDateString("bn-BD");
   const timeStr = punchDate.toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" });
 
-  // Get template and format message
   const template = sms_type === "punch" 
     ? settings.punch_sms_template || "প্রিয় অভিভাবক, আপনার সন্তান {{StudentName}} ({{Class}}) আজ {{Date}} সকাল {{Time}} এ স্কুলে এসেছে। - {{SchoolName}}"
     : settings.late_sms_template || "প্রিয় অভিভাবক, আপনার সন্তান {{StudentName}} ({{Class}}) আজ {{Date}} স্কুলে {{LateMinutes}} মিনিট দেরিতে এসেছে। - {{SchoolName}}";
@@ -271,10 +526,7 @@ async function handlePunchLateSms(supabase: any, request: PunchSmsRequest) {
 
   return new Response(
     JSON.stringify(result),
-    {
-      status: result.success ? 200 : 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
+    { status: result.success ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
 
@@ -290,7 +542,6 @@ async function handleCustomNoticeSms(supabase: any, request: CustomNoticeRequest
     );
   }
 
-  // Get students based on filters
   let query = supabase
     .from("students")
     .select("id, guardian_mobile")
@@ -298,59 +549,66 @@ async function handleCustomNoticeSms(supabase: any, request: CustomNoticeRequest
     .eq("is_active", true)
     .not("guardian_mobile", "is", null);
 
-  if (class_id) {
-    query = query.eq("class_id", class_id);
-  }
-  if (section_id) {
-    query = query.eq("section_id", section_id);
-  }
+  if (class_id) query = query.eq("class_id", class_id);
+  if (section_id) query = query.eq("section_id", section_id);
 
   const { data: students, error: studentsError } = await query;
 
-  if (studentsError) {
-    throw studentsError;
-  }
+  if (studentsError) throw studentsError;
 
   console.log(`Sending custom notice to ${students?.length || 0} students`);
 
   let sentCount = 0;
   let failedCount = 0;
 
-  for (const student of students || []) {
-    if (!student.guardian_mobile) continue;
+  // If BulkSMSBD is active and has enough recipients, use bulk API
+  if (settings.active_sms_provider === "bulksmsbd" && students && students.length > 1) {
+    const mobiles = students.map((s: any) => s.guardian_mobile).filter(Boolean);
+    const bulkResult = await sendBulkViaBulkSmsBD(
+      settings.bulksmsbd_api_key,
+      settings.bulksmsbd_sender_id,
+      mobiles,
+      message
+    );
 
-    try {
-      const result = await sendMessage(
-        supabase,
-        settings,
-        student.guardian_mobile,
-        message,
-        student.id,
-        "custom_notice"
-      );
+    if (bulkResult.success) {
+      sentCount = mobiles.length;
+      // Log bulk SMS
+      for (const student of students) {
+        await supabase.from("sms_logs").insert({
+          mobile_number: student.guardian_mobile,
+          message,
+          student_id: student.id,
+          sms_type: "custom_notice",
+          status: "sent",
+          channel: "sms",
+          provider_name: "bulksmsbd",
+          sent_at: new Date().toISOString(),
+          sent_by: "admin",
+        });
+      }
+    } else {
+      failedCount = mobiles.length;
+    }
+  } else {
+    // Send individually
+    for (const student of students || []) {
+      if (!student.guardian_mobile) continue;
 
-      if (result.success) {
-        sentCount++;
-      } else {
+      try {
+        const result = await sendMessage(supabase, settings, student.guardian_mobile, message, student.id, "custom_notice", "admin");
+        if (result.success) sentCount++;
+        else failedCount++;
+      } catch (error) {
+        console.error(`Failed to send to ${student.guardian_mobile}:`, error);
         failedCount++;
       }
-    } catch (error) {
-      console.error(`Failed to send to ${student.guardian_mobile}:`, error);
-      failedCount++;
     }
   }
 
   return new Response(
-    JSON.stringify({
-      success: true,
-      total: students?.length || 0,
-      sent: sentCount,
-      failed: failedCount,
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
+    JSON.stringify({ success: true, total: students?.length || 0, sent: sentCount, failed: failedCount }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
 
@@ -369,7 +627,6 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
   const systemSettings = await getSystemSettings(supabase);
   const schoolName = systemSettings?.school_name_bn || systemSettings?.school_name || "স্কুল";
 
-  // Get all students who are absent today
   const { data: allStudents, error: studentsError } = await supabase
     .from("students")
     .select(`
@@ -382,7 +639,6 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
 
   if (studentsError) throw studentsError;
 
-  // Get students who have attendance records for today
   const { data: attendanceRecords } = await supabase
     .from("student_attendance")
     .select("student_id, status")
@@ -390,8 +646,6 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
     .eq("academic_year_id", academic_year_id);
 
   const attendedStudentIds = new Set((attendanceRecords || []).map((r: any) => r.student_id));
-
-  // Find absent students (no attendance record = absent)
   const absentStudents = (allStudents || []).filter((s: any) => !attendedStudentIds.has(s.id));
 
   console.log(`Found ${absentStudents.length} absent students for ${date}`);
@@ -405,7 +659,6 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
 
     const className = `${student.class?.name_bn || student.class?.name || ""}-${student.section?.name_bn || student.section?.name || ""}`;
 
-    // Format message using template
     const message = template
       .replace("{{StudentName}}", student.name_bn || student.name)
       .replace("{{Class}}", className)
@@ -413,20 +666,9 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
       .replace("{{SchoolName}}", schoolName);
 
     try {
-      const result = await sendMessage(
-        supabase,
-        settings,
-        student.guardian_mobile,
-        message,
-        student.id,
-        "absent"
-      );
-
-      if (result.success) {
-        sentCount++;
-      } else {
-        failedCount++;
-      }
+      const result = await sendMessage(supabase, settings, student.guardian_mobile, message, student.id, "absent");
+      if (result.success) sentCount++;
+      else failedCount++;
     } catch (error) {
       console.error(`Failed to send SMS to ${student.guardian_mobile}:`, error);
       failedCount++;
@@ -434,23 +676,14 @@ async function handleBulkSms(supabase: any, request: BulkSmsRequest) {
   }
 
   return new Response(
-    JSON.stringify({
-      success: true,
-      total_absent: absentStudents.length,
-      sent: sentCount,
-      failed: failedCount,
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
+    JSON.stringify({ success: true, total_absent: absentStudents.length, sent: sentCount, failed: failedCount }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
 
 async function sendViaWhatsApp(phoneNumberId: string, accessToken: string, mobile: string, message: string) {
   try {
-    // Format mobile number for WhatsApp (Bangladesh: 01712345678 → 8801712345678)
-    let formattedMobile = mobile.replace(/[^0-9]/g, ""); // Remove non-numeric chars
+    let formattedMobile = mobile.replace(/[^0-9]/g, "");
     if (formattedMobile.startsWith("0")) {
       formattedMobile = "88" + formattedMobile;
     } else if (!formattedMobile.startsWith("88")) {
@@ -490,37 +723,33 @@ async function sendViaWhatsApp(phoneNumberId: string, accessToken: string, mobil
 async function sendViaMimSms(apiKey: string, senderId: string, mobile: string, message: string) {
   try {
     if (!apiKey || !senderId) {
-      return { success: false, error: "SMS API key or sender ID not configured" };
+      return { success: false, error: "SMS API key or sender ID not configured", responseCode: null, responseMessage: null };
     }
 
-    // mimSMS API endpoint
     const url = `https://api.mimsms.com/api/SmsSending/MimSingleSms`;
 
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ApiKey: apiKey,
         SenderId: senderId,
         MobileNo: mobile,
         Message: message,
-        MsgType: "UNI", // Unicode for Bengali
+        MsgType: "UNI",
       }),
     });
 
     const result = await response.json();
     console.log("mimSMS response:", result);
 
-    // Check response status
     if (result.Status === "Success" || result.status === "success") {
-      return { success: true };
+      return { success: true, responseCode: "200", responseMessage: "Success" };
     } else {
-      return { success: false, error: result.Message || result.message || "Unknown error" };
+      return { success: false, error: result.Message || result.message || "Unknown error", responseCode: null, responseMessage: result.Message || result.message };
     }
   } catch (error: any) {
     console.error("mimSMS API error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, responseCode: null, responseMessage: null };
   }
 }
