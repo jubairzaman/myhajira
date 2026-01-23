@@ -785,7 +785,7 @@ export default function GateMonitor() {
   const showVideoMode = isIdle && hasVideos;
 
   return (
-    <div className="monitor-display flex flex-col">
+    <div className="monitor-display h-screen flex flex-col overflow-hidden">
       {/* Debug Panel Toggle */}
       <Button
         variant="outline"
@@ -892,9 +892,9 @@ export default function GateMonitor() {
       </header>
 
       {/* Main Content - Two Column Layout */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* Left: Main Display Area */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
+        <div className="flex-1 relative min-h-0">
           {/* Scanning Indicator */}
           {isScanning && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -909,24 +909,26 @@ export default function GateMonitor() {
           {isIdle ? (
             // IDLE MODE: Video + Scroller (or Top Students if no videos)
             hasVideos ? (
-              <div className="flex-1 flex flex-col">
-                {/* Video Player */}
-                <div className="flex-1 relative">
+              <div className="absolute inset-0 flex flex-col">
+                {/* Video Player - fills remaining space */}
+                <div className="flex-1 relative min-h-0">
                   <VideoPlayer 
                     videos={videoItems} 
                     hideControls={true}
-                    className="absolute inset-0"
+                    className="absolute inset-0 w-full h-full"
                   />
                 </div>
                 
-                {/* News Scroller - Only in idle mode with videos */}
+                {/* News Scroller - Fixed at bottom */}
                 {newsItems.length > 0 && (
-                  <NewsScroller 
-                    items={newsItems} 
-                    logoUrl={monitorLogo} 
-                    schoolLogoUrl={schoolLogo}
-                    settings={scrollerSettings}
-                  />
+                  <div className="shrink-0">
+                    <NewsScroller 
+                      items={newsItems} 
+                      logoUrl={monitorLogo} 
+                      schoolLogoUrl={schoolLogo}
+                      settings={scrollerSettings}
+                    />
+                  </div>
                 )}
               </div>
             ) : (
@@ -1047,13 +1049,13 @@ export default function GateMonitor() {
         </div>
 
         {/* Right: Recent Punches Sidebar - ALWAYS VISIBLE */}
-        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 flex flex-col">
+        <div className="w-full lg:w-80 bg-white/5 backdrop-blur-sm border-l border-white/10 flex flex-col min-h-0 max-h-full">
           <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between shrink-0">
             <h3 className="font-bold font-bengali text-sm sm:text-base">সাম্প্রতিক পাঞ্চ</h3>
             <span className="text-white/40 text-xs sm:text-sm">{latestPunches.length} জন</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {latestPunches.slice(0, 15).map((punch) => (
               <div
                 key={punch.id}
