@@ -4,10 +4,10 @@ project_id = "bxavfvznpfugnkjakygl"
 verify_jwt = false
 
 [functions.send-sms]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-device]
-verify_jwt = true
+verify_jwt = false
 
 [functions.create-super-admin]
 verify_jwt = false
