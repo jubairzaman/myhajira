@@ -945,8 +945,12 @@ export type Database = {
           id: string
           message: string
           mobile_number: string
+          provider_name: string | null
+          response_code: string | null
+          response_message: string | null
           retry_count: number | null
           sent_at: string | null
+          sent_by: string | null
           sms_type: string
           status: string
           student_id: string | null
@@ -960,8 +964,12 @@ export type Database = {
           id?: string
           message: string
           mobile_number: string
+          provider_name?: string | null
+          response_code?: string | null
+          response_message?: string | null
           retry_count?: number | null
           sent_at?: string | null
+          sent_by?: string | null
           sms_type: string
           status: string
           student_id?: string | null
@@ -975,8 +983,12 @@ export type Database = {
           id?: string
           message?: string
           mobile_number?: string
+          provider_name?: string | null
+          response_code?: string | null
+          response_message?: string | null
           retry_count?: number | null
           sent_at?: string | null
+          sent_by?: string | null
           sms_type?: string
           status?: string
           student_id?: string | null
@@ -995,8 +1007,13 @@ export type Database = {
       sms_settings: {
         Row: {
           absent_sms_enabled: boolean
+          active_sms_provider: string | null
           api_key: string | null
           balance: number | null
+          bulksmsbd_api_key: string | null
+          bulksmsbd_balance: number | null
+          bulksmsbd_balance_updated_at: string | null
+          bulksmsbd_sender_id: string | null
           created_at: string
           id: string
           is_enabled: boolean
@@ -1017,8 +1034,13 @@ export type Database = {
         }
         Insert: {
           absent_sms_enabled?: boolean
+          active_sms_provider?: string | null
           api_key?: string | null
           balance?: number | null
+          bulksmsbd_api_key?: string | null
+          bulksmsbd_balance?: number | null
+          bulksmsbd_balance_updated_at?: string | null
+          bulksmsbd_sender_id?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
@@ -1039,8 +1061,13 @@ export type Database = {
         }
         Update: {
           absent_sms_enabled?: boolean
+          active_sms_provider?: string | null
           api_key?: string | null
           balance?: number | null
+          bulksmsbd_api_key?: string | null
+          bulksmsbd_balance?: number | null
+          bulksmsbd_balance_updated_at?: string | null
+          bulksmsbd_sender_id?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
