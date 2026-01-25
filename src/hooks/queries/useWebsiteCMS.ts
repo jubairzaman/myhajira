@@ -956,3 +956,98 @@ export function useDeleteWebsiteAcademic() {
     },
   });
 }
+
+// ============ ALUMNI FORM FIELDS ============
+export interface AlumniFormField {
+  id: string;
+  field_name: string;
+  field_label: string;
+  field_label_bn: string | null;
+  field_type: 'text' | 'textarea' | 'number' | 'select' | 'email' | 'phone';
+  is_required: boolean;
+  display_order: number;
+  is_enabled: boolean;
+  options: { value: string; label: string }[] | null;
+  placeholder: string | null;
+  placeholder_bn: string | null;
+}
+
+export function useAlumniFormFields() {
+  return useQuery({
+    queryKey: ['alumni-form-fields'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('website_alumni_form_fields')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(item => ({
+        ...item,
+        field_type: item.field_type as AlumniFormField['field_type'],
+        options: item.options as AlumniFormField['options'],
+      })) as AlumniFormField[];
+    },
+  });
+}
+
+export function useCreateAlumniFormField() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (field: Omit<AlumniFormField, 'id'>) => {
+      const { data, error } = await supabase
+        .from('website_alumni_form_fields')
+        .insert(field)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alumni-form-fields'] });
+      toast({ title: 'ফিল্ড যোগ করা হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useUpdateAlumniFormField() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<AlumniFormField> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_alumni_form_fields')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alumni-form-fields'] });
+      toast({ title: 'ফিল্ড আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteAlumniFormField() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_alumni_form_fields')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alumni-form-fields'] });
+      toast({ title: 'ফিল্ড মুছে ফেলা হয়েছে' });
+    },
+  });
+}

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { useWebsiteAlumni, useSubmitAlumniApplication, useWebsiteAlumniPodcasts } from '@/hooks/queries/useWebsiteCMS';
+import { useWebsiteAlumni, useSubmitAlumniApplication, useWebsiteAlumniPodcasts, useAlumniFormFields } from '@/hooks/queries/useWebsiteCMS';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,6 +27,7 @@ function getYouTubeVideoId(url: string): string | null {
 export default function Alumni() {
   const { data: alumni } = useWebsiteAlumni(true);
   const { data: podcasts } = useWebsiteAlumniPodcasts(true);
+  const { data: customFields } = useAlumniFormFields();
   const submitApplication = useSubmitAlumniApplication();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +38,7 @@ export default function Alumni() {
     current_position: '',
     comment: '',
   });
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -45,6 +47,7 @@ export default function Alumni() {
   const bubbleAlumni = alumni?.filter(a => a.show_in_bubble && a.comment) || [];
   const featuredPodcast = podcasts?.find(p => p.is_featured);
   const otherPodcasts = podcasts?.filter(p => !p.is_featured) || [];
+  const enabledCustomFields = customFields?.filter(f => f.is_enabled) || [];
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -419,6 +422,42 @@ export default function Alumni() {
                       className="mt-1"
                     />
                   </div>
+
+                  {/* Dynamic Custom Fields */}
+                  {enabledCustomFields.map((field) => (
+                    <div key={field.id}>
+                      <Label className="font-bengali">
+                        {field.field_label_bn || field.field_label}
+                        {field.is_required && ' *'}
+                      </Label>
+                      {field.field_type === 'textarea' ? (
+                        <Textarea
+                          value={customFieldValues[field.field_name] || ''}
+                          onChange={(e) => setCustomFieldValues({
+                            ...customFieldValues,
+                            [field.field_name]: e.target.value
+                          })}
+                          placeholder={field.placeholder_bn || field.placeholder || ''}
+                          required={field.is_required}
+                          rows={3}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <Input
+                          type={field.field_type === 'number' ? 'number' : field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text'}
+                          value={customFieldValues[field.field_name] || ''}
+                          onChange={(e) => setCustomFieldValues({
+                            ...customFieldValues,
+                            [field.field_name]: e.target.value
+                          })}
+                          placeholder={field.placeholder_bn || field.placeholder || ''}
+                          required={field.is_required}
+                          className="mt-1"
+                        />
+                      )}
+                    </div>
+                  ))}
+
                   <Button 
                     type="submit" 
                     className="w-full bg-[#4B0082] hover:bg-[#3a0066]" 

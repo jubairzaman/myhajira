@@ -1684,6 +1684,7 @@ export type Database = {
           created_at: string
           current_position: string | null
           current_position_bn: string | null
+          custom_fields: Json | null
           id: string
           is_approved: boolean
           is_featured: boolean
@@ -1703,6 +1704,7 @@ export type Database = {
           created_at?: string
           current_position?: string | null
           current_position_bn?: string | null
+          custom_fields?: Json | null
           id?: string
           is_approved?: boolean
           is_featured?: boolean
@@ -1722,6 +1724,7 @@ export type Database = {
           created_at?: string
           current_position?: string | null
           current_position_bn?: string | null
+          custom_fields?: Json | null
           id?: string
           is_approved?: boolean
           is_featured?: boolean
@@ -1732,6 +1735,54 @@ export type Database = {
           show_in_bubble?: boolean
           submitted_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      website_alumni_form_fields: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          field_label: string
+          field_label_bn: string | null
+          field_name: string
+          field_type: string | null
+          id: string
+          is_enabled: boolean | null
+          is_required: boolean | null
+          options: Json | null
+          placeholder: string | null
+          placeholder_bn: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          field_label: string
+          field_label_bn?: string | null
+          field_name: string
+          field_type?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_required?: boolean | null
+          options?: Json | null
+          placeholder?: string | null
+          placeholder_bn?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          field_label?: string
+          field_label_bn?: string | null
+          field_name?: string
+          field_type?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_required?: boolean | null
+          options?: Json | null
+          placeholder?: string | null
+          placeholder_bn?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

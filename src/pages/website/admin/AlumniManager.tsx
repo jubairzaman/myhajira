@@ -22,7 +22,8 @@ import {
   useDeleteWebsiteAlumniPodcast,
 } from '@/hooks/queries/useWebsiteCMS';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Trash2, Check, Star, User, Youtube, Plus, ExternalLink } from 'lucide-react';
+import { Loader2, Pencil, Trash2, Check, Star, User, Youtube, Plus, ExternalLink, Settings2 } from 'lucide-react';
+import AlumniFormFieldsManager from './AlumniFormFieldsManager';
 
 interface AlumniFormData {
   name: string;
@@ -330,6 +331,10 @@ export default function AlumniManager() {
               <Youtube className="w-4 h-4" />
               Podcasts ({podcasts?.length || 0})
             </TabsTrigger>
+            <TabsTrigger value="form-fields" className="gap-2">
+              <Settings2 className="w-4 h-4" />
+              Form Fields
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -445,6 +450,10 @@ export default function AlumniManager() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="form-fields">
+            <AlumniFormFieldsManager />
           </TabsContent>
         </Tabs>
 
