@@ -45,6 +45,18 @@ import FeeReports from "./pages/fees/FeeReports";
 // Inventory Page
 import InventoryManagement from "./pages/inventory/InventoryManagement";
 
+// Public Website Pages
+import PublicLayout from "./pages/website/PublicLayout";
+import WebsiteHome from "./pages/website/Home";
+import WebsiteAbout from "./pages/website/About";
+import WebsiteAcademics from "./pages/website/Academics";
+import WebsiteAdmissions from "./pages/website/Admissions";
+import WebsiteNotices from "./pages/website/Notices";
+import WebsiteNoticeDetail from "./pages/website/NoticeDetail";
+import WebsiteResults from "./pages/website/Results";
+import WebsiteAlumni from "./pages/website/Alumni";
+import WebsiteContact from "./pages/website/Contact";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -221,6 +233,19 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
+              {/* Public Website (No Auth Required) */}
+              <Route path="/website" element={<PublicLayout />}>
+                <Route index element={<WebsiteHome />} />
+                <Route path="about" element={<WebsiteAbout />} />
+                <Route path="academics" element={<WebsiteAcademics />} />
+                <Route path="admissions" element={<WebsiteAdmissions />} />
+                <Route path="notices" element={<WebsiteNotices />} />
+                <Route path="notices/:id" element={<WebsiteNoticeDetail />} />
+                <Route path="results" element={<WebsiteResults />} />
+                <Route path="alumni" element={<WebsiteAlumni />} />
+                <Route path="contact" element={<WebsiteContact />} />
+              </Route>
+
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
