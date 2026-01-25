@@ -1622,6 +1622,506 @@ export type Database = {
         }
         Relationships: []
       }
+      website_academics: {
+        Row: {
+          category: string | null
+          class_id: string | null
+          created_at: string
+          description: string | null
+          description_bn: string | null
+          display_order: number
+          id: string
+          is_enabled: boolean
+          syllabus_pdf_url: string | null
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          class_id?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          syllabus_pdf_url?: string | null
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          class_id?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          syllabus_pdf_url?: string | null
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_academics_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      website_alumni: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          comment: string | null
+          comment_bn: string | null
+          created_at: string
+          current_position: string | null
+          current_position_bn: string | null
+          id: string
+          is_approved: boolean
+          is_featured: boolean
+          name: string
+          name_bn: string | null
+          passing_year: number
+          photo_url: string | null
+          show_in_bubble: boolean
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          comment?: string | null
+          comment_bn?: string | null
+          created_at?: string
+          current_position?: string | null
+          current_position_bn?: string | null
+          id?: string
+          is_approved?: boolean
+          is_featured?: boolean
+          name: string
+          name_bn?: string | null
+          passing_year: number
+          photo_url?: string | null
+          show_in_bubble?: boolean
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          comment?: string | null
+          comment_bn?: string | null
+          created_at?: string
+          current_position?: string | null
+          current_position_bn?: string | null
+          id?: string
+          is_approved?: boolean
+          is_featured?: boolean
+          name?: string
+          name_bn?: string | null
+          passing_year?: number
+          photo_url?: string | null
+          show_in_bubble?: boolean
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_read: boolean
+          message: string
+          name: string
+          phone: string | null
+          replied_at: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_read?: boolean
+          message: string
+          name: string
+          phone?: string | null
+          replied_at?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          name?: string
+          phone?: string | null
+          replied_at?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      website_notices: {
+        Row: {
+          attachment_url: string | null
+          category: string
+          content: string
+          content_bn: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_pinned: boolean
+          is_published: boolean
+          publish_date: string | null
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          category?: string
+          content: string
+          content_bn?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          is_published?: boolean
+          publish_date?: string | null
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachment_url?: string | null
+          category?: string
+          content?: string
+          content_bn?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          is_published?: boolean
+          publish_date?: string | null
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_pages: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_enabled: boolean
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_results: {
+        Row: {
+          academic_year_id: string
+          class_id: string
+          created_at: string
+          exam_id: string
+          id: string
+          is_published: boolean
+          pdf_url: string
+          published_at: string | null
+          title: string | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          academic_year_id: string
+          class_id: string
+          created_at?: string
+          exam_id: string
+          id?: string
+          is_published?: boolean
+          pdf_url: string
+          published_at?: string | null
+          title?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string
+          created_at?: string
+          exam_id?: string
+          id?: string
+          is_published?: boolean
+          pdf_url?: string
+          published_at?: string | null
+          title?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_results_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_results_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_results_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      website_sections: {
+        Row: {
+          content: string | null
+          content_bn: string | null
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string | null
+          is_enabled: boolean
+          metadata: Json | null
+          page_slug: string
+          section_type: string
+          title: string | null
+          title_bn: string | null
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean
+          metadata?: Json | null
+          page_slug: string
+          section_type: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean
+          metadata?: Json | null
+          page_slug?: string
+          section_type?: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_sections_page_slug_fkey"
+            columns: ["page_slug"]
+            isOneToOne: false
+            referencedRelation: "website_pages"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      website_settings: {
+        Row: {
+          contact_address: string | null
+          contact_address_bn: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          facebook_url: string | null
+          favicon_url: string | null
+          google_map_embed: string | null
+          hero_image_url: string | null
+          hero_subtitle: string | null
+          hero_subtitle_bn: string | null
+          hero_title: string | null
+          hero_title_bn: string | null
+          hero_video_url: string | null
+          id: string
+          instagram_url: string | null
+          is_website_enabled: boolean
+          logo_url: string | null
+          office_hours: string | null
+          office_hours_bn: string | null
+          primary_color: string | null
+          school_name: string | null
+          school_name_bn: string | null
+          secondary_color: string | null
+          seo_description: string | null
+          seo_title: string | null
+          twitter_url: string | null
+          updated_at: string
+          youtube_url: string | null
+        }
+        Insert: {
+          contact_address?: string | null
+          contact_address_bn?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          facebook_url?: string | null
+          favicon_url?: string | null
+          google_map_embed?: string | null
+          hero_image_url?: string | null
+          hero_subtitle?: string | null
+          hero_subtitle_bn?: string | null
+          hero_title?: string | null
+          hero_title_bn?: string | null
+          hero_video_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          is_website_enabled?: boolean
+          logo_url?: string | null
+          office_hours?: string | null
+          office_hours_bn?: string | null
+          primary_color?: string | null
+          school_name?: string | null
+          school_name_bn?: string | null
+          secondary_color?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          twitter_url?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Update: {
+          contact_address?: string | null
+          contact_address_bn?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          facebook_url?: string | null
+          favicon_url?: string | null
+          google_map_embed?: string | null
+          hero_image_url?: string | null
+          hero_subtitle?: string | null
+          hero_subtitle_bn?: string | null
+          hero_title?: string | null
+          hero_title_bn?: string | null
+          hero_video_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          is_website_enabled?: boolean
+          logo_url?: string | null
+          office_hours?: string | null
+          office_hours_bn?: string | null
+          primary_color?: string | null
+          school_name?: string | null
+          school_name_bn?: string | null
+          secondary_color?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          twitter_url?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Relationships: []
+      }
+      website_testimonials: {
+        Row: {
+          content: string
+          content_bn: string | null
+          created_at: string
+          display_order: number
+          id: string
+          is_enabled: boolean
+          name: string
+          name_bn: string | null
+          photo_url: string | null
+          rating: number | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          name: string
+          name_bn?: string | null
+          photo_url?: string | null
+          rating?: number | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          name?: string
+          name_bn?: string | null
+          photo_url?: string | null
+          rating?: number | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       weekly_holidays: {
         Row: {
           academic_year_id: string
