@@ -17,6 +17,7 @@ export default function WebsiteSettings() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
+    id: '',
     school_name: '',
     school_name_bn: '',
     hero_title: '',
@@ -43,6 +44,7 @@ export default function WebsiteSettings() {
   useEffect(() => {
     if (settings) {
       setFormData({
+        id: settings.id,
         school_name: settings.school_name || '',
         school_name_bn: settings.school_name_bn || '',
         hero_title: settings.hero_title || '',

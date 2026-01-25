@@ -188,6 +188,10 @@ export default {
 			'scroll-left': {
 				'0%': { transform: 'translateX(0)' },
 				'100%': { transform: 'translateX(-50%)' }
+			},
+			'scroll-right': {
+				'0%': { transform: 'translateX(-50%)' },
+				'100%': { transform: 'translateX(0)' }
 			}
 		},
 		animation: {
@@ -197,7 +201,8 @@ export default {
 			'slide-in-right': 'slide-in-right 0.4s ease-out',
 			'scale-in': 'scale-in 0.3s ease-out',
 			'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-			'scroll-left': 'scroll-left 30s linear infinite'
+			'scroll-left': 'scroll-left 30s linear infinite',
+			'scroll-right': 'scroll-right 35s linear infinite'
 		}
   	}
   },

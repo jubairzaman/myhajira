@@ -182,10 +182,12 @@ export function useWebsiteSettings() {
 export function useUpdateWebsiteSettings() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (settings: Partial<WebsiteSettings>) => {
+    mutationFn: async (settings: Partial<WebsiteSettings> & { id: string }) => {
+      const { id, ...updateData } = settings;
       const { data, error } = await supabase
         .from('website_settings')
-        .update(settings)
+        .update(updateData)
+        .eq('id', id)
         .select()
         .single();
       if (error) throw error;
