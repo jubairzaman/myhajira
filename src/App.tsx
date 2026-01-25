@@ -87,11 +87,24 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Public Website at root */}
+              <Route element={<PublicLayout />}>
+                <Route path="/" element={<WebsiteHome />} />
+                <Route path="/about" element={<WebsiteAbout />} />
+                <Route path="/academics" element={<WebsiteAcademics />} />
+                <Route path="/admissions" element={<WebsiteAdmissions />} />
+                <Route path="/notices" element={<WebsiteNotices />} />
+                <Route path="/notices/:id" element={<WebsiteNoticeDetail />} />
+                <Route path="/results" element={<WebsiteResults />} />
+                <Route path="/alumni" element={<WebsiteAlumni />} />
+                <Route path="/contact" element={<WebsiteContact />} />
+              </Route>
+              
               {/* Auth */}
               <Route path="/login" element={<Login />} />
               
               {/* Dashboard */}
-              <Route path="/" element={
+              <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Index />
                 </ProtectedRoute>
@@ -267,18 +280,7 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
-              {/* Public Website (No Auth Required) */}
-              <Route path="/website" element={<PublicLayout />}>
-                <Route index element={<WebsiteHome />} />
-                <Route path="about" element={<WebsiteAbout />} />
-                <Route path="academics" element={<WebsiteAcademics />} />
-                <Route path="admissions" element={<WebsiteAdmissions />} />
-                <Route path="notices" element={<WebsiteNotices />} />
-                <Route path="notices/:id" element={<WebsiteNoticeDetail />} />
-                <Route path="results" element={<WebsiteResults />} />
-                <Route path="alumni" element={<WebsiteAlumni />} />
-                <Route path="contact" element={<WebsiteContact />} />
-              </Route>
+              {/* Legacy /website redirect - remove this section */}
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

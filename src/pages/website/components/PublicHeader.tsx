@@ -16,12 +16,12 @@ export function PublicHeader() {
   const enabledPages = pages?.filter(p => p.is_enabled) || [];
 
   const isActive = (slug: string) => {
-    if (slug === 'home') return location.pathname === '/website' || location.pathname === '/website/';
-    return location.pathname === `/website/${slug}`;
+    if (slug === 'home') return location.pathname === '/';
+    return location.pathname === `/${slug}`;
   };
 
   const getPagePath = (slug: string) => {
-    return slug === 'home' ? '/website' : `/website/${slug}`;
+    return slug === 'home' ? '/' : `/${slug}`;
   };
 
   return (
@@ -62,7 +62,7 @@ export function PublicHeader() {
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/website" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             {settings?.logo_url ? (
               <img src={settings.logo_url} alt="Logo" className="h-12 w-auto" />
             ) : (
@@ -98,7 +98,7 @@ export function PublicHeader() {
             ))}
             
             {/* Login/Dashboard Button */}
-            <Link to={user ? "/" : "/login"} className="ml-4">
+            <Link to={user ? "/dashboard" : "/login"} className="ml-4">
               <Button variant="hero" size="sm">
                 {user ? (
                   <>
@@ -148,7 +148,7 @@ export function PublicHeader() {
               
               {/* Mobile Login/Dashboard Button */}
               <Link 
-                to={user ? "/" : "/login"} 
+                to={user ? "/dashboard" : "/login"} 
                 onClick={() => setMobileMenuOpen(false)}
                 className="mt-2"
               >
