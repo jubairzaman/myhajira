@@ -106,7 +106,7 @@ export default function Alumni() {
 
   // Get bubble animation class based on index
   const getBubbleAnimation = (index: number) => {
-    const animations = ['animate-float-bubble-1', 'animate-float-bubble-2', 'animate-float-bubble-3'];
+    const animations = ['animate-flow-left-slow', 'animate-flow-left-medium', 'animate-flow-left-fast'];
     return animations[index % 3];
   };
 
@@ -173,33 +173,27 @@ export default function Alumni() {
             <p className="text-white/60 mb-12">তাদের স্মৃতি ও অনুভূতি</p>
           </div>
 
-          {/* Floating Bubble Cards */}
-          <div className="relative h-[400px] max-w-6xl mx-auto">
+          {/* Flowing Bubble Cards - Right to Left */}
+          <div className="relative h-[350px] w-full overflow-hidden">
             {bubbleAlumni.slice(0, 8).map((person, index) => {
-              // Calculate positions
-              const positions = [
-                { left: '5%', top: '10%' },
-                { left: '25%', top: '45%' },
-                { left: '45%', top: '15%' },
-                { left: '65%', top: '55%' },
-                { left: '80%', top: '20%' },
-                { left: '15%', top: '70%' },
-                { left: '55%', top: '75%' },
-                { left: '85%', top: '65%' },
+              // Calculate vertical positions (staggered rows)
+              const rows = [
+                { top: '5%' },
+                { top: '35%' },
+                { top: '65%' },
               ];
-              const pos = positions[index] || { left: `${10 + (index * 12) % 80}%`, top: `${15 + (index * 18) % 65}%` };
+              const row = rows[index % 3];
               
               return (
                 <div
                   key={person.id}
-                  className={`absolute ${getBubbleAnimation(index)} hover:!transform-none transition-all duration-300 cursor-default`}
+                  className={`absolute ${getBubbleAnimation(index)} cursor-default`}
                   style={{
-                    left: pos.left,
-                    top: pos.top,
-                    animationDelay: `${index * 0.5}s`,
+                    top: row.top,
+                    animationDelay: `${index * -3}s`,
                   }}
                 >
-                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 max-w-[220px] border border-white/20 shadow-2xl hover:bg-white/20 transition-all group">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 w-[240px] border border-white/20 shadow-2xl hover:bg-white/20 hover:scale-105 transition-all duration-300 group">
                     {/* Photo */}
                     {person.photo_url && (
                       <img 
@@ -209,11 +203,11 @@ export default function Alumni() {
                       />
                     )}
                     {/* Quote */}
-                    <p className="text-white text-sm font-bengali leading-relaxed">
+                    <p className="text-white text-sm font-bengali leading-relaxed text-center">
                       "{(person.comment_bn || person.comment || '').slice(0, 80)}{(person.comment_bn || person.comment || '').length > 80 ? '...' : ''}"
                     </p>
                     {/* Name & Year */}
-                    <div className="mt-3 pt-2 border-t border-white/10">
+                    <div className="mt-3 pt-2 border-t border-white/10 text-center">
                       <p className="text-[#00D4FF] text-xs font-medium">{person.name_bn || person.name}</p>
                       <p className="text-white/50 text-xs">ব্যাচ {person.passing_year}</p>
                     </div>
