@@ -23,6 +23,7 @@ function getYouTubeVideoId(url: string): string | null {
   return null;
 }
 
+// Alumni page with horizontal scrolling testimonials
 export default function Alumni() {
   const { data: alumni } = useWebsiteAlumni(true);
   const { data: podcasts } = useWebsiteAlumniPodcasts(true);
