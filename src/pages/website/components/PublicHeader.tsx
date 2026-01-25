@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Phone, Mail, Facebook, Youtube } from 'lucide-react';
+import { Menu, X, Phone, Mail, Facebook, Youtube, LogIn, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWebsiteSettings, useWebsitePages } from '@/hooks/queries/useWebsiteCMS';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
 export function PublicHeader() {
@@ -10,6 +11,7 @@ export function PublicHeader() {
   const location = useLocation();
   const { data: settings } = useWebsiteSettings();
   const { data: pages } = useWebsitePages();
+  const { user } = useAuth();
 
   const enabledPages = pages?.filter(p => p.is_enabled) || [];
 
@@ -94,6 +96,23 @@ export function PublicHeader() {
                 {page.title_bn || page.title}
               </Link>
             ))}
+            
+            {/* Login/Dashboard Button */}
+            <Link to={user ? "/" : "/login"} className="ml-4">
+              <Button variant="hero" size="sm">
+                {user ? (
+                  <>
+                    <LayoutDashboard className="w-4 h-4 mr-1" />
+                    ড্যাশবোর্ড
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 mr-1" />
+                    লগইন
+                  </>
+                )}
+              </Button>
+            </Link>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -126,6 +145,27 @@ export function PublicHeader() {
                   {page.title_bn || page.title}
                 </Link>
               ))}
+              
+              {/* Mobile Login/Dashboard Button */}
+              <Link 
+                to={user ? "/" : "/login"} 
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-2"
+              >
+                <Button variant="hero" size="default" className="w-full">
+                  {user ? (
+                    <>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      ড্যাশবোর্ড
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4 mr-2" />
+                      লগইন
+                    </>
+                  )}
+                </Button>
+              </Link>
             </div>
           </nav>
         )}
