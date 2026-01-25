@@ -57,6 +57,13 @@ import WebsiteResults from "./pages/website/Results";
 import WebsiteAlumni from "./pages/website/Alumni";
 import WebsiteContact from "./pages/website/Contact";
 
+// Admin Website CMS Pages
+import WebsiteSettingsAdmin from "./pages/website/admin/WebsiteSettings";
+import NoticesManager from "./pages/website/admin/NoticesManager";
+import ResultsManager from "./pages/website/admin/ResultsManager";
+import AlumniManager from "./pages/website/admin/AlumniManager";
+import ContactsManager from "./pages/website/admin/ContactsManager";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -230,6 +237,33 @@ const App = () => (
               <Route path="/settings/documents" element={
                 <ProtectedRoute requireAdmin>
                   <DocumentSettings />
+                </ProtectedRoute>
+              } />
+              
+              {/* Website CMS Admin */}
+              <Route path="/website/admin/settings" element={
+                <ProtectedRoute requireAdmin>
+                  <WebsiteSettingsAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/notices" element={
+                <ProtectedRoute requireAdmin>
+                  <NoticesManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/results" element={
+                <ProtectedRoute requireAdmin>
+                  <ResultsManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/alumni" element={
+                <ProtectedRoute requireAdmin>
+                  <AlumniManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/contacts" element={
+                <ProtectedRoute requireAdmin>
+                  <ContactsManager />
                 </ProtectedRoute>
               } />
               

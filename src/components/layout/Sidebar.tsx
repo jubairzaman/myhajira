@@ -20,6 +20,7 @@ import {
   Tv,
   Wallet,
   Package,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,6 +98,18 @@ const navItems: NavItem[] = [
     labelBn: 'ইনভেন্টরি',
     icon: Package,
     href: '/inventory',
+  },
+  {
+    label: 'Website CMS',
+    labelBn: 'ওয়েবসাইট',
+    icon: Globe,
+    children: [
+      { label: 'Settings', labelBn: 'সেটিংস', icon: ChevronRight, href: '/website/admin/settings' },
+      { label: 'Notices', labelBn: 'নোটিশ', icon: ChevronRight, href: '/website/admin/notices' },
+      { label: 'Results', labelBn: 'ফলাফল', icon: ChevronRight, href: '/website/admin/results' },
+      { label: 'Alumni', labelBn: 'প্রাক্তন ছাত্র', icon: ChevronRight, href: '/website/admin/alumni' },
+      { label: 'Contact Messages', labelBn: 'বার্তা', icon: ChevronRight, href: '/website/admin/contacts' },
+    ],
   },
   {
     label: 'Reports',

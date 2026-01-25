@@ -513,6 +513,29 @@ export function useSubmitAlumniApplication() {
   });
 }
 
+export function useApproveWebsiteAlumni() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('website_alumni')
+        .update({ is_approved: true, approved_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-alumni'] });
+      toast({ title: 'প্রাক্তন ছাত্র অনুমোদিত হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 export function useUpdateWebsiteAlumni() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -588,6 +611,25 @@ export function useSubmitContact() {
     },
     onError: (error) => {
       toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useMarkWebsiteContactRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('website_contacts')
+        .update({ is_read: true })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-contacts'] });
     },
   });
 }
