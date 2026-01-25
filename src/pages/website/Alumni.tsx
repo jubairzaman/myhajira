@@ -172,34 +172,74 @@ export default function Alumni() {
             <p className="text-white/60 mb-8 md:mb-12 text-sm md:text-base">তাদের স্মৃতি ও অনুভূতি</p>
           </div>
 
-          {/* Mobile Grid View */}
-          <div className="md:hidden container mx-auto px-4 relative z-10">
-            <div className="grid grid-cols-2 gap-3">
-              {bubbleAlumni.slice(0, 4).map((person) => (
-                <div
-                  key={`mobile-${person.id}`}
-                  className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 shadow-xl"
-                >
-                  {person.photo_url ? (
-                    <img 
-                      src={person.photo_url} 
-                      alt={person.name}
-                      className="w-16 h-16 rounded-xl mx-auto mb-2 object-cover ring-2 ring-white/30"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl mx-auto mb-2 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-xl font-bold ring-2 ring-white/30">
-                      {person.name.charAt(0)}
+          {/* Mobile Scroll View */}
+          <div className="md:hidden relative z-10">
+            {/* Mobile Row 1 - Scroll Left */}
+            <div className="relative overflow-hidden py-2">
+              <div 
+                className="flex gap-3 animate-scroll-left hover:[animation-play-state:paused]"
+                style={{ width: 'fit-content' }}
+              >
+                {[...bubbleAlumni.filter((_, i) => i % 2 === 0), ...bubbleAlumni.filter((_, i) => i % 2 === 0)].map((person, index) => (
+                  <div
+                    key={`mobile-row1-${person.id}-${index}`}
+                    className="flex-shrink-0 bg-white/10 backdrop-blur-md rounded-xl p-3 w-[140px] border border-white/20 shadow-xl"
+                  >
+                    {person.photo_url ? (
+                      <img 
+                        src={person.photo_url} 
+                        alt={person.name}
+                        className="w-14 h-14 rounded-lg mx-auto mb-2 object-cover ring-2 ring-white/30"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg mx-auto mb-2 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/30">
+                        {person.name.charAt(0)}
+                      </div>
+                    )}
+                    <p className="text-white text-[10px] font-bengali leading-relaxed text-center line-clamp-2 min-h-[28px]">
+                      "{(person.comment_bn || person.comment || '').slice(0, 40)}..."
+                    </p>
+                    <div className="mt-1.5 pt-1.5 border-t border-white/10 text-center">
+                      <p className="text-[#00D4FF] text-[10px] font-medium truncate">{person.name_bn || person.name}</p>
+                      <p className="text-white/50 text-[8px]">ব্যাচ {person.passing_year}</p>
                     </div>
-                  )}
-                  <p className="text-white text-xs font-bengali leading-relaxed text-center line-clamp-2">
-                    "{(person.comment_bn || person.comment || '').slice(0, 50)}..."
-                  </p>
-                  <div className="mt-2 pt-2 border-t border-white/10 text-center">
-                    <p className="text-[#00D4FF] text-xs font-medium truncate">{person.name_bn || person.name}</p>
-                    <p className="text-white/50 text-[10px]">ব্যাচ {person.passing_year}</p>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile Row 2 - Scroll Right */}
+            <div className="relative overflow-hidden py-2 mt-2">
+              <div 
+                className="flex gap-3 animate-scroll-right hover:[animation-play-state:paused]"
+                style={{ width: 'fit-content' }}
+              >
+                {[...bubbleAlumni.filter((_, i) => i % 2 === 1), ...bubbleAlumni.filter((_, i) => i % 2 === 1)].map((person, index) => (
+                  <div
+                    key={`mobile-row2-${person.id}-${index}`}
+                    className="flex-shrink-0 bg-white/10 backdrop-blur-md rounded-xl p-3 w-[140px] border border-white/20 shadow-xl"
+                  >
+                    {person.photo_url ? (
+                      <img 
+                        src={person.photo_url} 
+                        alt={person.name}
+                        className="w-14 h-14 rounded-lg mx-auto mb-2 object-cover ring-2 ring-white/30"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg mx-auto mb-2 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/30">
+                        {person.name.charAt(0)}
+                      </div>
+                    )}
+                    <p className="text-white text-[10px] font-bengali leading-relaxed text-center line-clamp-2 min-h-[28px]">
+                      "{(person.comment_bn || person.comment || '').slice(0, 40)}..."
+                    </p>
+                    <div className="mt-1.5 pt-1.5 border-t border-white/10 text-center">
+                      <p className="text-[#00D4FF] text-[10px] font-medium truncate">{person.name_bn || person.name}</p>
+                      <p className="text-white/50 text-[8px]">ব্যাচ {person.passing_year}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
