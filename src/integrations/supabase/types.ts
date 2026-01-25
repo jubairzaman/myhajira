@@ -1735,6 +1735,62 @@ export type Database = {
         }
         Relationships: []
       }
+      website_alumni_podcasts: {
+        Row: {
+          alumni_id: string | null
+          created_at: string | null
+          description: string | null
+          description_bn: string | null
+          display_order: number | null
+          id: string
+          is_enabled: boolean | null
+          is_featured: boolean | null
+          thumbnail_url: string | null
+          title: string
+          title_bn: string | null
+          updated_at: string | null
+          youtube_url: string
+        }
+        Insert: {
+          alumni_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          is_featured?: boolean | null
+          thumbnail_url?: string | null
+          title: string
+          title_bn?: string | null
+          updated_at?: string | null
+          youtube_url: string
+        }
+        Update: {
+          alumni_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          is_featured?: boolean | null
+          thumbnail_url?: string | null
+          title?: string
+          title_bn?: string | null
+          updated_at?: string | null
+          youtube_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_alumni_podcasts_alumni_id_fkey"
+            columns: ["alumni_id"]
+            isOneToOne: false
+            referencedRelation: "website_alumni"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       website_contacts: {
         Row: {
           created_at: string

@@ -11,9 +11,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useWebsiteAlumni, useApproveWebsiteAlumni, useUpdateWebsiteAlumni, useDeleteWebsiteAlumni } from '@/hooks/queries/useWebsiteCMS';
+import { 
+  useWebsiteAlumni, 
+  useApproveWebsiteAlumni, 
+  useUpdateWebsiteAlumni, 
+  useDeleteWebsiteAlumni,
+  useWebsiteAlumniPodcasts,
+  useCreateWebsiteAlumniPodcast,
+  useUpdateWebsiteAlumniPodcast,
+  useDeleteWebsiteAlumniPodcast,
+} from '@/hooks/queries/useWebsiteCMS';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Trash2, Check, Star, User } from 'lucide-react';
+import { Loader2, Pencil, Trash2, Check, Star, User, Youtube, Plus, ExternalLink } from 'lucide-react';
 
 interface AlumniFormData {
   name: string;
@@ -28,13 +37,41 @@ interface AlumniFormData {
   show_in_bubble: boolean;
 }
 
+interface PodcastFormData {
+  title: string;
+  title_bn: string;
+  description: string;
+  description_bn: string;
+  youtube_url: string;
+  thumbnail_url: string;
+  is_featured: boolean;
+  display_order: number;
+}
+
 const currentYear = new Date().getFullYear();
+
+// Extract YouTube video ID
+function getYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
 
 export default function AlumniManager() {
   const { data: alumni, isLoading } = useWebsiteAlumni();
+  const { data: podcasts, isLoading: podcastsLoading } = useWebsiteAlumniPodcasts();
   const approveAlumni = useApproveWebsiteAlumni();
   const updateAlumni = useUpdateWebsiteAlumni();
   const deleteAlumni = useDeleteWebsiteAlumni();
+  const createPodcast = useCreateWebsiteAlumniPodcast();
+  const updatePodcast = useUpdateWebsiteAlumniPodcast();
+  const deletePodcast = useDeleteWebsiteAlumniPodcast();
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -50,6 +87,19 @@ export default function AlumniManager() {
     photo_url: '',
     is_featured: false,
     show_in_bubble: true,
+  });
+
+  const [isPodcastDialogOpen, setIsPodcastDialogOpen] = useState(false);
+  const [editingPodcastId, setEditingPodcastId] = useState<string | null>(null);
+  const [podcastForm, setPodcastForm] = useState<PodcastFormData>({
+    title: '',
+    title_bn: '',
+    description: '',
+    description_bn: '',
+    youtube_url: '',
+    thumbnail_url: '',
+    is_featured: false,
+    display_order: 0,
   });
 
   const pendingAlumni = alumni?.filter((a) => !a.is_approved) || [];
@@ -116,6 +166,60 @@ export default function AlumniManager() {
     try {
       await deleteAlumni.mutateAsync(id);
       toast({ title: 'Alumni deleted successfully' });
+    } catch (error) {
+      toast({ title: 'Delete failed', variant: 'destructive' });
+    }
+  };
+
+  // Podcast handlers
+  const resetPodcastForm = () => {
+    setPodcastForm({
+      title: '',
+      title_bn: '',
+      description: '',
+      description_bn: '',
+      youtube_url: '',
+      thumbnail_url: '',
+      is_featured: false,
+      display_order: 0,
+    });
+    setEditingPodcastId(null);
+  };
+
+  const handlePodcastSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingPodcastId) {
+        await updatePodcast.mutateAsync({ id: editingPodcastId, ...podcastForm });
+      } else {
+        await createPodcast.mutateAsync(podcastForm);
+      }
+      setIsPodcastDialogOpen(false);
+      resetPodcastForm();
+    } catch (error) {
+      toast({ title: 'Operation failed', variant: 'destructive' });
+    }
+  };
+
+  const handleEditPodcast = (podcast: any) => {
+    setPodcastForm({
+      title: podcast.title,
+      title_bn: podcast.title_bn || '',
+      description: podcast.description || '',
+      description_bn: podcast.description_bn || '',
+      youtube_url: podcast.youtube_url,
+      thumbnail_url: podcast.thumbnail_url || '',
+      is_featured: podcast.is_featured,
+      display_order: podcast.display_order,
+    });
+    setEditingPodcastId(podcast.id);
+    setIsPodcastDialogOpen(true);
+  };
+
+  const handleDeletePodcast = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this podcast?')) return;
+    try {
+      await deletePodcast.mutateAsync(id);
     } catch (error) {
       toast({ title: 'Delete failed', variant: 'destructive' });
     }
@@ -222,6 +326,10 @@ export default function AlumniManager() {
               )}
             </TabsTrigger>
             <TabsTrigger value="approved">Approved ({approvedAlumni.length})</TabsTrigger>
+            <TabsTrigger value="podcasts" className="gap-2">
+              <Youtube className="w-4 h-4" />
+              Podcasts ({podcasts?.length || 0})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -245,8 +353,102 @@ export default function AlumniManager() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="podcasts">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Youtube className="w-5 h-5 text-red-500" />
+                  YouTube Podcasts
+                </CardTitle>
+                <Button onClick={() => { resetPodcastForm(); setIsPodcastDialogOpen(true); }}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Podcast
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {podcastsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Thumbnail</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Order</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {podcasts?.map((podcast) => {
+                        const videoId = getYouTubeVideoId(podcast.youtube_url);
+                        return (
+                          <TableRow key={podcast.id}>
+                            <TableCell>
+                              <img
+                                src={podcast.thumbnail_url || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
+                                alt={podcast.title}
+                                className="w-24 h-14 object-cover rounded"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{podcast.title}</p>
+                                {podcast.title_bn && (
+                                  <p className="text-sm text-muted-foreground font-bengali">{podcast.title_bn}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {podcast.is_featured && (
+                                  <Badge className="bg-red-500">Featured</Badge>
+                                )}
+                                {podcast.is_enabled ? (
+                                  <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-gray-400">Hidden</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{podcast.display_order}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button size="icon" variant="ghost" asChild>
+                                  <a href={podcast.youtube_url} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="w-4 h-4" />
+                                  </a>
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => handleEditPodcast(podcast)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => handleDeletePodcast(podcast.id)}>
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {(!podcasts || podcasts.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No podcasts yet. Add your first YouTube video!
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
+        {/* Alumni Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
@@ -358,6 +560,114 @@ export default function AlumniManager() {
                 <Button type="submit" disabled={updateAlumni.isPending}>
                   {updateAlumni.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Update
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Podcast Dialog */}
+        <Dialog open={isPodcastDialogOpen} onOpenChange={(open) => {
+          setIsPodcastDialogOpen(open);
+          if (!open) resetPodcastForm();
+        }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingPodcastId ? 'Edit Podcast' : 'Add New Podcast'}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handlePodcastSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>YouTube URL *</Label>
+                <Input
+                  value={podcastForm.youtube_url}
+                  onChange={(e) => setPodcastForm({ ...podcastForm, youtube_url: e.target.value })}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  required
+                />
+                {podcastForm.youtube_url && getYouTubeVideoId(podcastForm.youtube_url) && (
+                  <img
+                    src={`https://img.youtube.com/vi/${getYouTubeVideoId(podcastForm.youtube_url)}/mqdefault.jpg`}
+                    alt="Thumbnail preview"
+                    className="w-40 h-auto rounded mt-2"
+                  />
+                )}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Title (English) *</Label>
+                  <Input
+                    value={podcastForm.title}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Title (বাংলা)</Label>
+                  <Input
+                    value={podcastForm.title_bn}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, title_bn: e.target.value })}
+                    className="font-bengali"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Description (English)</Label>
+                  <Textarea
+                    value={podcastForm.description}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description (বাংলা)</Label>
+                  <Textarea
+                    value={podcastForm.description_bn}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, description_bn: e.target.value })}
+                    rows={3}
+                    className="font-bengali"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Custom Thumbnail URL (optional)</Label>
+                  <Input
+                    value={podcastForm.thumbnail_url}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, thumbnail_url: e.target.value })}
+                    placeholder="Leave empty to use YouTube thumbnail"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Display Order</Label>
+                  <Input
+                    type="number"
+                    value={podcastForm.display_order}
+                    onChange={(e) => setPodcastForm({ ...podcastForm, display_order: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={podcastForm.is_featured}
+                  onCheckedChange={(checked) => setPodcastForm({ ...podcastForm, is_featured: checked })}
+                />
+                <Label>Featured (shows as main video)</Label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsPodcastDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createPodcast.isPending || updatePodcast.isPending}>
+                  {(createPodcast.isPending || updatePodcast.isPending) && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  {editingPodcastId ? 'Update' : 'Add Podcast'}
                 </Button>
               </div>
             </form>

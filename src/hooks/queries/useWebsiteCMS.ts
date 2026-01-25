@@ -108,6 +108,23 @@ export interface WebsiteAlumni {
   approved_at: string | null;
 }
 
+export interface WebsiteAlumniPodcast {
+  id: string;
+  title: string;
+  title_bn: string | null;
+  description: string | null;
+  description_bn: string | null;
+  youtube_url: string;
+  thumbnail_url: string | null;
+  alumni_id: string | null;
+  is_featured: boolean;
+  is_enabled: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  alumni?: WebsiteAlumni;
+}
+
 export interface WebsiteContact {
   id: string;
   name: string;
@@ -814,6 +831,106 @@ export function useUpdateWebsiteAcademic() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['website-academics'] });
       toast({ title: 'একাডেমিক আইটেম আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// ============ ALUMNI PODCASTS ============
+export function useWebsiteAlumniPodcasts(enabledOnly = false) {
+  return useQuery({
+    queryKey: ['website-alumni-podcasts', enabledOnly],
+    queryFn: async () => {
+      let query = supabase
+        .from('website_alumni_podcasts')
+        .select(`
+          *,
+          alumni:website_alumni(id, name, name_bn, photo_url)
+        `)
+        .order('display_order');
+      
+      if (enabledOnly) {
+        query = query.eq('is_enabled', true);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as (WebsiteAlumniPodcast & { alumni: WebsiteAlumni | null })[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateWebsiteAlumniPodcast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (podcast: { 
+      title: string; 
+      title_bn?: string; 
+      description?: string;
+      description_bn?: string;
+      youtube_url: string; 
+      thumbnail_url?: string;
+      alumni_id?: string;
+      is_featured?: boolean;
+      display_order?: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('website_alumni_podcasts')
+        .insert(podcast)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-alumni-podcasts'] });
+      toast({ title: 'পডকাস্ট যোগ হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useUpdateWebsiteAlumniPodcast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<WebsiteAlumniPodcast> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_alumni_podcasts')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-alumni-podcasts'] });
+      toast({ title: 'পডকাস্ট আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteWebsiteAlumniPodcast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_alumni_podcasts')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-alumni-podcasts'] });
+      toast({ title: 'পডকাস্ট মুছে ফেলা হয়েছে' });
     },
     onError: (error) => {
       toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
