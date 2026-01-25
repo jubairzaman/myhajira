@@ -40,8 +40,8 @@ export default function Results() {
   });
 
   const filteredResults = results?.filter(result => {
-    const matchesClass = !selectedClass || result.class_id === selectedClass;
-    const matchesExam = !selectedExam || result.exam_id === selectedExam;
+    const matchesClass = !selectedClass || selectedClass === 'all' || result.class_id === selectedClass;
+    const matchesExam = !selectedExam || selectedExam === 'all' || result.exam_id === selectedExam;
     return matchesClass && matchesExam;
   }) || [];
 
@@ -65,7 +65,7 @@ export default function Results() {
                   <SelectValue placeholder="শ্রেণী নির্বাচন করুন" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">সব শ্রেণী</SelectItem>
+                  <SelectItem value="all">সব শ্রেণী</SelectItem>
                   {classes?.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.name_bn || cls.name}
@@ -80,7 +80,7 @@ export default function Results() {
                   <SelectValue placeholder="পরীক্ষা নির্বাচন করুন" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">সব পরীক্ষা</SelectItem>
+                  <SelectItem value="all">সব পরীক্ষা</SelectItem>
                   {exams?.map((exam) => (
                     <SelectItem key={exam.id} value={exam.id}>
                       {exam.name_bn || exam.name}
@@ -91,7 +91,7 @@ export default function Results() {
             </div>
             <Button 
               variant="outline" 
-              onClick={() => { setSelectedClass(''); setSelectedExam(''); }}
+              onClick={() => { setSelectedClass('all'); setSelectedExam('all'); }}
             >
               রিসেট
             </Button>
