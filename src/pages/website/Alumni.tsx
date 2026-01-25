@@ -157,9 +157,9 @@ export default function Alumni() {
         </section>
       )}
 
-      {/* Animated Bubble Flow Section - 2 Row Scroll */}
+      {/* Animated Bubble Flow Section - 2 Row Scroll (Desktop) / Grid (Mobile) */}
       {bubbleAlumni.length > 0 && (
-        <section className="py-20 bg-gradient-to-br from-[#0D0221] via-[#1A0533] to-[#4B0082] relative overflow-hidden">
+        <section className="py-12 md:py-20 bg-gradient-to-br from-[#0D0221] via-[#1A0533] to-[#4B0082] relative overflow-hidden">
           {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-20 left-10 w-32 h-32 bg-[#00D4FF]/10 rounded-full blur-3xl" />
@@ -168,12 +168,43 @@ export default function Alumni() {
           </div>
 
           <div className="container mx-auto px-4 text-center relative z-10">
-            <h2 className="text-3xl font-bold text-white font-bengali mb-4">প্রাক্তনদের কথা</h2>
-            <p className="text-white/60 mb-12">তাদের স্মৃতি ও অনুভূতি</p>
+            <h2 className="text-2xl md:text-3xl font-bold text-white font-bengali mb-3 md:mb-4">প্রাক্তনদের কথা</h2>
+            <p className="text-white/60 mb-8 md:mb-12 text-sm md:text-base">তাদের স্মৃতি ও অনুভূতি</p>
           </div>
 
-          {/* Row 1 - Scroll Left */}
-          <div className="relative overflow-hidden py-4">
+          {/* Mobile Grid View */}
+          <div className="md:hidden container mx-auto px-4 relative z-10">
+            <div className="grid grid-cols-2 gap-3">
+              {bubbleAlumni.slice(0, 4).map((person) => (
+                <div
+                  key={`mobile-${person.id}`}
+                  className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 shadow-xl"
+                >
+                  {person.photo_url ? (
+                    <img 
+                      src={person.photo_url} 
+                      alt={person.name}
+                      className="w-16 h-16 rounded-xl mx-auto mb-2 object-cover ring-2 ring-white/30"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl mx-auto mb-2 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-xl font-bold ring-2 ring-white/30">
+                      {person.name.charAt(0)}
+                    </div>
+                  )}
+                  <p className="text-white text-xs font-bengali leading-relaxed text-center line-clamp-2">
+                    "{(person.comment_bn || person.comment || '').slice(0, 50)}..."
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-white/10 text-center">
+                    <p className="text-[#00D4FF] text-xs font-medium truncate">{person.name_bn || person.name}</p>
+                    <p className="text-white/50 text-[10px]">ব্যাচ {person.passing_year}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop: Row 1 - Scroll Left */}
+          <div className="hidden md:block relative overflow-hidden py-4">
             <div 
               className="flex gap-8 animate-scroll-left hover:[animation-play-state:paused]"
               style={{ width: 'fit-content' }}
@@ -207,8 +238,8 @@ export default function Alumni() {
             </div>
           </div>
 
-          {/* Row 2 - Scroll Right (opposite direction, slightly slower) */}
-          <div className="relative overflow-hidden py-4 mt-4">
+          {/* Desktop: Row 2 - Scroll Right (opposite direction, slightly slower) */}
+          <div className="hidden md:block relative overflow-hidden py-4 mt-4">
             <div 
               className="flex gap-8 animate-scroll-right hover:[animation-play-state:paused]"
               style={{ width: 'fit-content' }}
