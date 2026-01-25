@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
     label: 'Dashboard',
     labelBn: 'ড্যাশবোর্ড',
     icon: LayoutDashboard,
-    href: '/',
+    href: '/dashboard',
   },
   {
     label: 'Structure',
