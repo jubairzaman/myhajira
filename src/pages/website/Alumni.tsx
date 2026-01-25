@@ -104,11 +104,6 @@ export default function Alumni() {
     }
   };
 
-  // Get bubble animation class based on index
-  const getBubbleAnimation = (index: number) => {
-    const animations = ['animate-flow-left-slow', 'animate-flow-left-medium', 'animate-flow-left-fast'];
-    return animations[index % 3];
-  };
 
   return (
     <div>
@@ -160,7 +155,7 @@ export default function Alumni() {
 
       {/* Animated Bubble Flow Section */}
       {bubbleAlumni.length > 0 && (
-        <section className="py-20 bg-gradient-to-br from-[#0D0221] via-[#1A0533] to-[#4B0082] relative overflow-hidden min-h-[500px]">
+        <section className="py-20 bg-gradient-to-br from-[#0D0221] via-[#1A0533] to-[#4B0082] relative overflow-hidden">
           {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-20 left-10 w-32 h-32 bg-[#00D4FF]/10 rounded-full blur-3xl" />
@@ -173,54 +168,42 @@ export default function Alumni() {
             <p className="text-white/60 mb-12">তাদের স্মৃতি ও অনুভূতি</p>
           </div>
 
-          {/* Flowing Bubble Cards - Right to Left */}
-          <div className="relative h-[400px] w-full overflow-hidden">
-            {bubbleAlumni.slice(0, 6).map((person, index) => {
-              // Calculate vertical positions (2 rows with more spacing)
-              const rows = [
-                { top: '10%' },
-                { top: '55%' },
-              ];
-              const row = rows[index % 2];
-              
-              // Stagger the delays more to prevent overlap
-              const delays = [0, -10, -5, -15, -8, -18];
-              
-              return (
+          {/* Horizontal Scrolling Cards - No Overlap */}
+          <div className="relative overflow-hidden py-6">
+            <div 
+              className="flex gap-8 animate-scroll-left hover:[animation-play-state:paused]"
+              style={{ width: 'fit-content' }}
+            >
+              {/* Duplicate cards for seamless infinite loop */}
+              {[...bubbleAlumni, ...bubbleAlumni].map((person, index) => (
                 <div
-                  key={person.id}
-                  className={`absolute ${getBubbleAnimation(index)} cursor-default`}
-                  style={{
-                    top: row.top,
-                    animationDelay: `${delays[index]}s`,
-                  }}
+                  key={`${person.id}-${index}`}
+                  className="flex-shrink-0 bg-white/10 backdrop-blur-md rounded-2xl p-6 w-[300px] border border-white/20 shadow-2xl hover:bg-white/20 hover:scale-105 transition-all duration-300 group cursor-default"
                 >
-                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 w-[260px] border border-white/20 shadow-2xl hover:bg-white/20 hover:scale-105 transition-all duration-300 group">
-                    {/* Photo - Larger size */}
-                    {person.photo_url ? (
-                      <img 
-                        src={person.photo_url} 
-                        alt={person.name}
-                        className="w-20 h-20 rounded-full mx-auto mb-4 object-cover ring-3 ring-white/40 group-hover:ring-[#00D4FF]/60 transition-all shadow-lg"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-full mx-auto mb-4 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-2xl font-bold ring-3 ring-white/40">
-                        {person.name.charAt(0)}
-                      </div>
-                    )}
-                    {/* Quote */}
-                    <p className="text-white text-sm font-bengali leading-relaxed text-center">
-                      "{(person.comment_bn || person.comment || '').slice(0, 70)}{(person.comment_bn || person.comment || '').length > 70 ? '...' : ''}"
-                    </p>
-                    {/* Name & Year */}
-                    <div className="mt-3 pt-2 border-t border-white/10 text-center">
-                      <p className="text-[#00D4FF] text-sm font-medium">{person.name_bn || person.name}</p>
-                      <p className="text-white/50 text-xs">ব্যাচ {person.passing_year}</p>
+                  {/* Photo - Large Rounded Box */}
+                  {person.photo_url ? (
+                    <img 
+                      src={person.photo_url} 
+                      alt={person.name}
+                      className="w-32 h-32 rounded-2xl mx-auto mb-4 object-cover ring-4 ring-white/30 group-hover:ring-[#00D4FF]/60 transition-all shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 rounded-2xl mx-auto mb-4 bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white text-4xl font-bold ring-4 ring-white/30">
+                      {person.name.charAt(0)}
                     </div>
+                  )}
+                  {/* Quote */}
+                  <p className="text-white text-sm font-bengali leading-relaxed text-center min-h-[60px]">
+                    "{(person.comment_bn || person.comment || '').slice(0, 80)}{(person.comment_bn || person.comment || '').length > 80 ? '...' : ''}"
+                  </p>
+                  {/* Name & Year */}
+                  <div className="mt-4 pt-3 border-t border-white/10 text-center">
+                    <p className="text-[#00D4FF] text-base font-medium">{person.name_bn || person.name}</p>
+                    <p className="text-white/50 text-sm">ব্যাচ {person.passing_year}</p>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </section>
       )}
