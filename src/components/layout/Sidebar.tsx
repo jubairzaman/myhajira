@@ -105,10 +105,15 @@ const navItems: NavItem[] = [
     icon: Globe,
     children: [
       { label: 'Settings', labelBn: 'সেটিংস', icon: ChevronRight, href: '/website/admin/settings' },
+      { label: 'Home Page', labelBn: 'হোম পেজ', icon: ChevronRight, href: '/website/admin/home-page' },
+      { label: 'Hero Slides', labelBn: 'হিরো স্লাইড', icon: ChevronRight, href: '/website/admin/hero-slides' },
+      { label: 'About', labelBn: 'আমাদের সম্পর্কে', icon: ChevronRight, href: '/website/admin/about' },
+      { label: 'Academics', labelBn: 'শিক্ষা কার্যক্রম', icon: ChevronRight, href: '/website/admin/academics' },
       { label: 'Notices', labelBn: 'নোটিশ', icon: ChevronRight, href: '/website/admin/notices' },
       { label: 'Results', labelBn: 'ফলাফল', icon: ChevronRight, href: '/website/admin/results' },
       { label: 'Alumni', labelBn: 'প্রাক্তন ছাত্র', icon: ChevronRight, href: '/website/admin/alumni' },
-      { label: 'Contact Messages', labelBn: 'বার্তা', icon: ChevronRight, href: '/website/admin/contacts' },
+      { label: 'Testimonials', labelBn: 'অভিভাবক মতামত', icon: ChevronRight, href: '/website/admin/parent-testimonials' },
+      { label: 'Contacts', labelBn: 'বার্তা', icon: ChevronRight, href: '/website/admin/contacts' },
     ],
   },
   {

@@ -65,6 +65,9 @@ import AlumniManager from "./pages/website/admin/AlumniManager";
 import ContactsManager from "./pages/website/admin/ContactsManager";
 import HeroSlidesManager from "./pages/website/admin/HeroSlidesManager";
 import ParentTestimonialsManager from "./pages/website/admin/ParentTestimonialsManager";
+import HomePageManager from "./pages/website/admin/HomePageManager";
+import AboutManager from "./pages/website/admin/AboutManager";
+import AcademicsManager from "./pages/website/admin/AcademicsManager";
 
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
@@ -289,6 +292,21 @@ const App = () => (
               <Route path="/website/admin/parent-testimonials" element={
                 <ProtectedRoute requireAdmin>
                   <ParentTestimonialsManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/home-page" element={
+                <ProtectedRoute requireAdmin>
+                  <HomePageManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/about" element={
+                <ProtectedRoute requireAdmin>
+                  <AboutManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/academics" element={
+                <ProtectedRoute requireAdmin>
+                  <AcademicsManager />
                 </ProtectedRoute>
               } />
               

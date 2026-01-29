@@ -33,6 +33,8 @@ export default function WebsiteSettings() {
     hero_image_url: '',
     primary_color: '#4B0082',
     secondary_color: '#00D4FF',
+    cta_button_color: '#00D4FF',
+    secondary_button_color: '#4B0082',
     facebook_url: '',
     youtube_url: '',
     twitter_url: '',
@@ -61,6 +63,8 @@ export default function WebsiteSettings() {
         hero_image_url: settings.hero_image_url || '',
         primary_color: settings.primary_color || '#4B0082',
         secondary_color: settings.secondary_color || '#00D4FF',
+        cta_button_color: (settings as any).cta_button_color || '#00D4FF',
+        secondary_button_color: (settings as any).secondary_button_color || '#4B0082',
         facebook_url: settings.facebook_url || '',
         youtube_url: settings.youtube_url || '',
         twitter_url: settings.twitter_url || '',
@@ -264,6 +268,41 @@ export default function WebsiteSettings() {
                           value={formData.secondary_color}
                           onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
                           placeholder="#00D4FF"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>CTA Button Color (প্রধান বাটন)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.cta_button_color}
+                          onChange={(e) => setFormData({ ...formData, cta_button_color: e.target.value })}
+                          className="w-16 h-10 p-1 cursor-pointer"
+                        />
+                        <Input
+                          value={formData.cta_button_color}
+                          onChange={(e) => setFormData({ ...formData, cta_button_color: e.target.value })}
+                          placeholder="#00D4FF"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Secondary Button Color (গৌণ বাটন)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.secondary_button_color}
+                          onChange={(e) => setFormData({ ...formData, secondary_button_color: e.target.value })}
+                          className="w-16 h-10 p-1 cursor-pointer"
+                        />
+                        <Input
+                          value={formData.secondary_button_color}
+                          onChange={(e) => setFormData({ ...formData, secondary_button_color: e.target.value })}
+                          placeholder="#4B0082"
                         />
                       </div>
                     </div>
