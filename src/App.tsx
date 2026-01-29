@@ -63,6 +63,8 @@ import NoticesManager from "./pages/website/admin/NoticesManager";
 import ResultsManager from "./pages/website/admin/ResultsManager";
 import AlumniManager from "./pages/website/admin/AlumniManager";
 import ContactsManager from "./pages/website/admin/ContactsManager";
+import HeroSlidesManager from "./pages/website/admin/HeroSlidesManager";
+import ParentTestimonialsManager from "./pages/website/admin/ParentTestimonialsManager";
 
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
@@ -277,6 +279,16 @@ const App = () => (
               <Route path="/website/admin/contacts" element={
                 <ProtectedRoute requireAdmin>
                   <ContactsManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/hero-slides" element={
+                <ProtectedRoute requireAdmin>
+                  <HeroSlidesManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/parent-testimonials" element={
+                <ProtectedRoute requireAdmin>
+                  <ParentTestimonialsManager />
                 </ProtectedRoute>
               } />
               

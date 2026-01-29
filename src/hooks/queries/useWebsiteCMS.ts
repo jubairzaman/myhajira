@@ -150,6 +150,37 @@ export interface WebsiteTestimonial {
   display_order: number;
 }
 
+export interface HeroSlide {
+  id: string;
+  image_url: string;
+  title: string | null;
+  title_bn: string | null;
+  subtitle: string | null;
+  subtitle_bn: string | null;
+  link_url: string | null;
+  display_order: number;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ParentTestimonial {
+  id: string;
+  name: string;
+  name_bn: string | null;
+  relation: string | null;
+  relation_bn: string | null;
+  student_class: string | null;
+  photo_url: string | null;
+  comment: string;
+  comment_bn: string | null;
+  rating: number | null;
+  is_enabled: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WebsiteAcademic {
   id: string;
   title: string;
@@ -1048,6 +1079,168 @@ export function useDeleteAlumniFormField() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alumni-form-fields'] });
       toast({ title: 'ফিল্ড মুছে ফেলা হয়েছে' });
+    },
+  });
+}
+
+// ============ HERO SLIDES ============
+export function useHeroSlides() {
+  return useQuery({
+    queryKey: ['hero-slides'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('website_hero_slides')
+        .select('*')
+        .order('display_order');
+      if (error) throw error;
+      return data as HeroSlide[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateHeroSlide() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (slide: Omit<HeroSlide, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase
+        .from('website_hero_slides')
+        .insert(slide)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hero-slides'] });
+      toast({ title: 'স্লাইড যোগ হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useUpdateHeroSlide() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<HeroSlide> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_hero_slides')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hero-slides'] });
+      toast({ title: 'স্লাইড আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteHeroSlide() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_hero_slides')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hero-slides'] });
+      toast({ title: 'স্লাইড মুছে ফেলা হয়েছে' });
+    },
+  });
+}
+
+// ============ PARENT TESTIMONIALS ============
+export function useParentTestimonials(enabledOnly = false) {
+  return useQuery({
+    queryKey: ['parent-testimonials', enabledOnly],
+    queryFn: async () => {
+      let query = supabase
+        .from('website_parent_testimonials')
+        .select('*')
+        .order('display_order');
+      
+      if (enabledOnly) {
+        query = query.eq('is_enabled', true);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ParentTestimonial[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateParentTestimonial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (testimonial: Omit<ParentTestimonial, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase
+        .from('website_parent_testimonials')
+        .insert(testimonial)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-testimonials'] });
+      toast({ title: 'মতামত যোগ হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useUpdateParentTestimonial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ParentTestimonial> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_parent_testimonials')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-testimonials'] });
+      toast({ title: 'মতামত আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteParentTestimonial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_parent_testimonials')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-testimonials'] });
+      toast({ title: 'মতামত মুছে ফেলা হয়েছে' });
     },
   });
 }

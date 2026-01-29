@@ -29,9 +29,10 @@ export default function WebsiteSettings() {
     contact_phone: '',
     contact_email: '',
     logo_url: '',
+    favicon_url: '',
     hero_image_url: '',
-    primary_color: '#1e40af',
-    secondary_color: '#0ea5e9',
+    primary_color: '#4B0082',
+    secondary_color: '#00D4FF',
     facebook_url: '',
     youtube_url: '',
     twitter_url: '',
@@ -56,9 +57,10 @@ export default function WebsiteSettings() {
         contact_phone: settings.contact_phone || '',
         contact_email: settings.contact_email || '',
         logo_url: settings.logo_url || '',
+        favicon_url: settings.favicon_url || '',
         hero_image_url: settings.hero_image_url || '',
-        primary_color: settings.primary_color || '#1e40af',
-        secondary_color: settings.secondary_color || '#0ea5e9',
+        primary_color: settings.primary_color || '#4B0082',
+        secondary_color: settings.secondary_color || '#00D4FF',
         facebook_url: settings.facebook_url || '',
         youtube_url: settings.youtube_url || '',
         twitter_url: settings.twitter_url || '',
@@ -203,47 +205,65 @@ export default function WebsiteSettings() {
                         onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
                         placeholder="https://..."
                       />
+                      {formData.logo_url && (
+                        <img src={formData.logo_url} alt="Logo Preview" className="h-12 w-auto mt-2 border rounded" />
+                      )}
                     </div>
                     <div className="space-y-2">
-                      <Label>Hero Image URL</Label>
+                      <Label>Favicon URL (ব্রাউজার ট্যাব আইকন)</Label>
                       <Input
-                        value={formData.hero_image_url}
-                        onChange={(e) => setFormData({ ...formData, hero_image_url: e.target.value })}
-                        placeholder="https://..."
+                        value={formData.favicon_url}
+                        onChange={(e) => setFormData({ ...formData, favicon_url: e.target.value })}
+                        placeholder="https://... (.ico, .png, .svg)"
                       />
+                      {formData.favicon_url && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <img src={formData.favicon_url} alt="Favicon Preview" className="h-8 w-8 border rounded" />
+                          <span className="text-xs text-muted-foreground">প্রিভিউ</span>
+                        </div>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Hero Image URL</Label>
+                    <Input
+                      value={formData.hero_image_url}
+                      onChange={(e) => setFormData({ ...formData, hero_image_url: e.target.value })}
+                      placeholder="https://..."
+                    />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Primary Color</Label>
+                      <Label>Primary Color (প্রাথমিক রং)</Label>
                       <div className="flex gap-2">
                         <Input
                           type="color"
                           value={formData.primary_color}
                           onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-                          className="w-16 h-10 p-1"
+                          className="w-16 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={formData.primary_color}
                           onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-                          placeholder="#1e40af"
+                          placeholder="#4B0082"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Secondary Color</Label>
+                      <Label>Secondary Color (গৌণ রং)</Label>
                       <div className="flex gap-2">
                         <Input
                           type="color"
                           value={formData.secondary_color}
                           onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-                          className="w-16 h-10 p-1"
+                          className="w-16 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={formData.secondary_color}
                           onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-                          placeholder="#0ea5e9"
+                          placeholder="#00D4FF"
                         />
                       </div>
                     </div>

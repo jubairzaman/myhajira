@@ -1878,6 +1878,48 @@ export type Database = {
         }
         Relationships: []
       }
+      website_hero_slides: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          id: string
+          image_url: string
+          is_enabled: boolean | null
+          link_url: string | null
+          subtitle: string | null
+          subtitle_bn: string | null
+          title: string | null
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url: string
+          is_enabled?: boolean | null
+          link_url?: string | null
+          subtitle?: string | null
+          subtitle_bn?: string | null
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url?: string
+          is_enabled?: boolean | null
+          link_url?: string | null
+          subtitle?: string | null
+          subtitle_bn?: string | null
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       website_notices: {
         Row: {
           attachment_url: string | null
@@ -1961,6 +2003,57 @@ export type Database = {
           slug?: string
           title?: string
           title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_parent_testimonials: {
+        Row: {
+          comment: string
+          comment_bn: string | null
+          created_at: string
+          display_order: number | null
+          id: string
+          is_enabled: boolean | null
+          name: string
+          name_bn: string | null
+          photo_url: string | null
+          rating: number | null
+          relation: string | null
+          relation_bn: string | null
+          student_class: string | null
+          updated_at: string
+        }
+        Insert: {
+          comment: string
+          comment_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          name: string
+          name_bn?: string | null
+          photo_url?: string | null
+          rating?: number | null
+          relation?: string | null
+          relation_bn?: string | null
+          student_class?: string | null
+          updated_at?: string
+        }
+        Update: {
+          comment?: string
+          comment_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          name?: string
+          name_bn?: string | null
+          photo_url?: string | null
+          rating?: number | null
+          relation?: string | null
+          relation_bn?: string | null
+          student_class?: string | null
           updated_at?: string
         }
         Relationships: []
