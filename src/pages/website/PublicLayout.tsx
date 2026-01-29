@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { PublicHeader } from './components/PublicHeader';
 import { PublicFooter } from './components/PublicFooter';
@@ -5,6 +6,17 @@ import { useWebsiteSettings } from '@/hooks/queries/useWebsiteCMS';
 
 export default function PublicLayout() {
   const { data: settings, isLoading } = useWebsiteSettings();
+
+  // Dynamic favicon
+  useEffect(() => {
+    if (settings?.favicon_url) {
+      const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement || document.createElement('link');
+      link.type = 'image/x-icon';
+      link.rel = 'shortcut icon';
+      link.href = settings.favicon_url;
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+  }, [settings?.favicon_url]);
 
   if (isLoading) {
     return (

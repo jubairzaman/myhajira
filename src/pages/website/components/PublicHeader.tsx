@@ -64,17 +64,18 @@ export function PublicHeader() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
             {settings?.logo_url ? (
-              <img src={settings.logo_url} alt="Logo" className="h-12 w-auto" />
+              <img src={settings.logo_url} alt="Logo" className="h-10 sm:h-12 w-auto" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white font-bold text-xl">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center text-white font-bold text-lg sm:text-xl flex-shrink-0">
                 {settings?.school_name?.charAt(0) || 'S'}
               </div>
             )}
-            <div className="hidden sm:block">
-              <h1 className="font-bold text-lg text-[#4B0082] font-bengali">
+            {/* Always show school name - responsive sizing */}
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm sm:text-lg text-[#4B0082] font-bengali truncate max-w-[150px] sm:max-w-none">
                 {settings?.school_name_bn || settings?.school_name || 'স্কুল নাম'}
               </h1>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                 {settings?.school_name || 'School Name'}
               </p>
             </div>
