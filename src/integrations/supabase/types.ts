@@ -1622,6 +1622,48 @@ export type Database = {
         }
         Relationships: []
       }
+      website_about_content: {
+        Row: {
+          content: string | null
+          content_bn: string | null
+          created_at: string
+          display_order: number | null
+          id: string
+          image_url: string | null
+          is_enabled: boolean | null
+          section_key: string
+          title: string | null
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean | null
+          section_key: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean | null
+          section_key?: string
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       website_academics: {
         Row: {
           category: string | null
@@ -1674,6 +1716,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      website_admission_info: {
+        Row: {
+          content: string | null
+          content_bn: string | null
+          created_at: string
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_enabled: boolean | null
+          section_key: string
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          section_key: string
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          content_bn?: string | null
+          created_at?: string
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          section_key?: string
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       website_alumni: {
         Row: {
@@ -1878,6 +1962,45 @@ export type Database = {
         }
         Relationships: []
       }
+      website_facilities: {
+        Row: {
+          created_at: string
+          description: string | null
+          description_bn: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_enabled: boolean | null
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          title?: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       website_hero_slides: {
         Row: {
           created_at: string
@@ -1915,6 +2038,78 @@ export type Database = {
           subtitle?: string | null
           subtitle_bn?: string | null
           title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_home_sections: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          id: string
+          is_enabled: boolean | null
+          section_key: string
+          section_name: string
+          section_name_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          section_key: string
+          section_name: string
+          section_name_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          section_key?: string
+          section_name?: string
+          section_name_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_methodologies: {
+        Row: {
+          created_at: string
+          description: string | null
+          description_bn: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_enabled: boolean | null
+          title: string
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          title: string
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          title?: string
           title_bn?: string | null
           updated_at?: string
         }
@@ -2058,6 +2253,57 @@ export type Database = {
         }
         Relationships: []
       }
+      website_programs: {
+        Row: {
+          color_from: string | null
+          color_to: string | null
+          created_at: string
+          description: string | null
+          description_bn: string | null
+          display_order: number | null
+          grades: string | null
+          grades_bn: string | null
+          icon: string | null
+          id: string
+          is_enabled: boolean | null
+          level: string
+          level_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          color_from?: string | null
+          color_to?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          grades?: string | null
+          grades_bn?: string | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          level: string
+          level_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color_from?: string | null
+          color_to?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_order?: number | null
+          grades?: string | null
+          grades_bn?: string | null
+          icon?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          level?: string
+          level_bn?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       website_results: {
         Row: {
           academic_year_id: string
@@ -2188,6 +2434,7 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string
+          cta_button_color: string | null
           facebook_url: string | null
           favicon_url: string | null
           google_map_embed: string | null
@@ -2206,6 +2453,7 @@ export type Database = {
           primary_color: string | null
           school_name: string | null
           school_name_bn: string | null
+          secondary_button_color: string | null
           secondary_color: string | null
           seo_description: string | null
           seo_title: string | null
@@ -2219,6 +2467,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          cta_button_color?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
           google_map_embed?: string | null
@@ -2237,6 +2486,7 @@ export type Database = {
           primary_color?: string | null
           school_name?: string | null
           school_name_bn?: string | null
+          secondary_button_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null
           seo_title?: string | null
@@ -2250,6 +2500,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          cta_button_color?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
           google_map_embed?: string | null
@@ -2268,6 +2519,7 @@ export type Database = {
           primary_color?: string | null
           school_name?: string | null
           school_name_bn?: string | null
+          secondary_button_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null
           seo_title?: string | null

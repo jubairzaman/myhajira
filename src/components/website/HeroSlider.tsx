@@ -53,9 +53,9 @@ export function HeroSlider() {
               <img
                 src={currentSlideData.image_url}
                 alt={currentSlideData.title || 'Hero'}
-                className="w-full h-full object-cover opacity-40 transition-opacity duration-700"
+                className="w-full h-full object-cover opacity-60 transition-opacity duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0D0221]/90 via-[#0D0221]/70 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0D0221]/70 via-[#0D0221]/40 to-transparent" />
             </div>
           )}
 
@@ -63,10 +63,10 @@ export function HeroSlider() {
           <div className="relative z-10 h-full flex items-center">
             <div className="container mx-auto px-4 lg:px-8">
               <div className="max-w-2xl">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 font-bengali leading-tight animate-fade-in">
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 font-bengali leading-tight animate-fade-in">
                   {currentSlideData?.title_bn || currentSlideData?.title || settings?.hero_title_bn || 'আমাদের স্কুলে স্বাগতম'}
                 </h1>
-                <p className="text-lg md:text-xl text-white/80 mb-6 font-bengali animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                <p className="text-base md:text-lg text-white/80 mb-5 font-bengali animate-fade-in" style={{ animationDelay: '0.1s' }}>
                   {currentSlideData?.subtitle_bn || currentSlideData?.subtitle || settings?.hero_subtitle_bn || 'আজকের শিক্ষায় আগামীর নেতৃত্ব'}
                 </p>
                 <div className="flex flex-wrap gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
