@@ -505,3 +505,180 @@ export function useDeleteWebsiteAdmissionInfo() {
     },
   });
 }
+
+// ============ POPUP NOTICE ============
+export interface WebsitePopupNotice {
+  id: string;
+  title: string | null;
+  title_bn: string | null;
+  description: string | null;
+  description_bn: string | null;
+  image_url: string | null;
+  button_text: string | null;
+  button_text_bn: string | null;
+  button_link: string | null;
+  display_type: 'image' | 'card';
+  is_enabled: boolean;
+  show_once_per_session: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useWebsitePopupNotice() {
+  return useQuery({
+    queryKey: ['website-popup-notice'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('website_popup_notice')
+        .select('*')
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as WebsitePopupNotice | null;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateWebsitePopupNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<WebsitePopupNotice> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_popup_notice')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-popup-notice'] });
+      toast({ title: 'পপআপ নোটিশ আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// ============ CTA BUTTONS ============
+export interface WebsiteCTAButton {
+  id: string;
+  button_key: string;
+  label: string;
+  label_bn: string | null;
+  link_url: string;
+  is_enabled: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useWebsiteCTAButtons() {
+  return useQuery({
+    queryKey: ['website-cta-buttons'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('website_cta_buttons')
+        .select('*')
+        .order('display_order');
+      if (error) throw error;
+      return data as WebsiteCTAButton[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateWebsiteCTAButton() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<WebsiteCTAButton> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('website_cta_buttons')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-cta-buttons'] });
+      toast({ title: 'বাটন আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// ============ AVAILABLE SECTIONS ============
+export interface WebsiteAvailableSection {
+  id: string;
+  section_key: string;
+  section_name: string;
+  section_name_bn: string | null;
+  description: string | null;
+  source_page: string | null;
+  component_name: string | null;
+  created_at: string;
+}
+
+export function useWebsiteAvailableSections() {
+  return useQuery({
+    queryKey: ['website-available-sections'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('website_available_sections')
+        .select('*')
+        .order('section_name');
+      if (error) throw error;
+      return data as WebsiteAvailableSection[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateWebsiteHomeSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (section: { section_key: string; section_name: string; section_name_bn?: string; display_order: number; is_enabled: boolean }) => {
+      const { data, error } = await supabase
+        .from('website_home_sections')
+        .insert(section)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-home-sections'] });
+      toast({ title: 'সেকশন যোগ হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteWebsiteHomeSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_home_sections')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-home-sections'] });
+      toast({ title: 'সেকশন সরানো হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}

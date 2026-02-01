@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { PublicHeader } from './components/PublicHeader';
 import { PublicFooter } from './components/PublicFooter';
+import { PopupNotice } from '@/components/website/PopupNotice';
 import { useWebsiteSettings } from '@/hooks/queries/useWebsiteCMS';
 
 export default function PublicLayout() {
@@ -77,6 +78,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <PublicFooter />
+      <PopupNotice />
     </div>
   );
 }

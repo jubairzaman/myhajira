@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useHeroSlides, useWebsiteNotices, useWebsiteSettings } from '@/hooks/queries/useWebsiteCMS';
+import { useWebsiteCTAButtons } from '@/hooks/queries/useWebsiteCMSNew';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 
@@ -12,10 +13,15 @@ export function HeroSlider() {
   const { data: slides } = useHeroSlides();
   const { data: notices } = useWebsiteNotices(true);
   const { data: settings } = useWebsiteSettings();
+  const { data: ctaButtons } = useWebsiteCTAButtons();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const enabledSlides = slides?.filter(s => s.is_enabled) || [];
   const latestNotices = notices?.slice(0, 5) || [];
+
+  // Get CTA buttons
+  const heroPrimaryBtn = ctaButtons?.find(b => b.button_key === 'hero_primary' && b.is_enabled);
+  const heroSecondaryBtn = ctaButtons?.find(b => b.button_key === 'hero_secondary' && b.is_enabled);
 
   // Get colors from settings or use defaults
   const primaryColor = settings?.primary_color || '#4B0082';
@@ -94,35 +100,39 @@ export function HeroSlider() {
                   {currentSlideData?.subtitle_bn || currentSlideData?.subtitle || settings?.hero_subtitle_bn || 'আজকের শিক্ষায় আগামীর নেতৃত্ব'}
                 </p>
                 <div className="flex flex-wrap gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <Button 
-                    asChild 
-                    size="lg" 
-                    className="font-medium shadow-lg"
-                    style={{ 
-                      backgroundColor: ctaColor,
-                      color: darkBg,
-                      boxShadow: `0 10px 25px -5px ${ctaColor}4d`
-                    }}
-                  >
-                    <Link to="/website/admissions">
-                      ভর্তি তথ্য
-                      <ArrowRight className="ml-2 w-4 h-4" />
-                    </Link>
-                  </Button>
-                  <Button 
-                    asChild 
-                    size="lg" 
-                    className="backdrop-blur-sm font-medium"
-                    style={{ 
-                      backgroundColor: secondaryBtnColor,
-                      color: '#ffffff',
-                      border: `1px solid ${secondaryBtnColor}`
-                    }}
-                  >
-                    <Link to="/website/contact">
-                      যোগাযোগ করুন
-                    </Link>
-                  </Button>
+                  {heroPrimaryBtn && (
+                    <Button 
+                      asChild 
+                      size="lg" 
+                      className="font-medium shadow-lg"
+                      style={{ 
+                        backgroundColor: ctaColor,
+                        color: darkBg,
+                        boxShadow: `0 10px 25px -5px ${ctaColor}4d`
+                      }}
+                    >
+                      <Link to={heroPrimaryBtn.link_url}>
+                        {heroPrimaryBtn.label_bn || heroPrimaryBtn.label}
+                        <ArrowRight className="ml-2 w-4 h-4" />
+                      </Link>
+                    </Button>
+                  )}
+                  {heroSecondaryBtn && (
+                    <Button 
+                      asChild 
+                      size="lg" 
+                      className="backdrop-blur-sm font-medium"
+                      style={{ 
+                        backgroundColor: secondaryBtnColor,
+                        color: '#ffffff',
+                        border: `1px solid ${secondaryBtnColor}`
+                      }}
+                    >
+                      <Link to={heroSecondaryBtn.link_url}>
+                        {heroSecondaryBtn.label_bn || heroSecondaryBtn.label}
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

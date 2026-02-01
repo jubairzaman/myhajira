@@ -1926,6 +1926,39 @@ export type Database = {
           },
         ]
       }
+      website_available_sections: {
+        Row: {
+          component_name: string | null
+          created_at: string
+          description: string | null
+          id: string
+          section_key: string
+          section_name: string
+          section_name_bn: string | null
+          source_page: string | null
+        }
+        Insert: {
+          component_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          section_key: string
+          section_name: string
+          section_name_bn?: string | null
+          source_page?: string | null
+        }
+        Update: {
+          component_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          section_key?: string
+          section_name?: string
+          section_name_bn?: string | null
+          source_page?: string | null
+        }
+        Relationships: []
+      }
       website_contacts: {
         Row: {
           created_at: string
@@ -1959,6 +1992,42 @@ export type Database = {
           phone?: string | null
           replied_at?: string | null
           subject?: string | null
+        }
+        Relationships: []
+      }
+      website_cta_buttons: {
+        Row: {
+          button_key: string
+          created_at: string
+          display_order: number | null
+          id: string
+          is_enabled: boolean | null
+          label: string
+          label_bn: string | null
+          link_url: string
+          updated_at: string
+        }
+        Insert: {
+          button_key: string
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          label: string
+          label_bn?: string | null
+          link_url?: string
+          updated_at?: string
+        }
+        Update: {
+          button_key?: string
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          label?: string
+          label_bn?: string | null
+          link_url?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2249,6 +2318,57 @@ export type Database = {
           relation?: string | null
           relation_bn?: string | null
           student_class?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      website_popup_notice: {
+        Row: {
+          button_link: string | null
+          button_text: string | null
+          button_text_bn: string | null
+          created_at: string
+          description: string | null
+          description_bn: string | null
+          display_type: string | null
+          id: string
+          image_url: string | null
+          is_enabled: boolean | null
+          show_once_per_session: boolean | null
+          title: string | null
+          title_bn: string | null
+          updated_at: string
+        }
+        Insert: {
+          button_link?: string | null
+          button_text?: string | null
+          button_text_bn?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean | null
+          show_once_per_session?: boolean | null
+          title?: string | null
+          title_bn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          button_link?: string | null
+          button_text?: string | null
+          button_text_bn?: string | null
+          created_at?: string
+          description?: string | null
+          description_bn?: string | null
+          display_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_enabled?: boolean | null
+          show_once_per_session?: boolean | null
+          title?: string | null
+          title_bn?: string | null
           updated_at?: string
         }
         Relationships: []

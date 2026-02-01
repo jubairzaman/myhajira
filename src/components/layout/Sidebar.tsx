@@ -106,6 +106,8 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Settings', labelBn: 'সেটিংস', icon: ChevronRight, href: '/website/admin/settings' },
       { label: 'Home Page', labelBn: 'হোম পেজ', icon: ChevronRight, href: '/website/admin/home-page' },
+      { label: 'Button Links', labelBn: 'বাটন লিংক', icon: ChevronRight, href: '/website/admin/cta-buttons' },
+      { label: 'Popup Notice', labelBn: 'পপআপ নোটিশ', icon: ChevronRight, href: '/website/admin/popup-notice' },
       { label: 'Hero Slides', labelBn: 'হিরো স্লাইড', icon: ChevronRight, href: '/website/admin/hero-slides' },
       { label: 'About', labelBn: 'আমাদের সম্পর্কে', icon: ChevronRight, href: '/website/admin/about' },
       { label: 'Academics', labelBn: 'শিক্ষা কার্যক্রম', icon: ChevronRight, href: '/website/admin/academics' },
