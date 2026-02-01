@@ -226,7 +226,16 @@ export default function Home() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10">
+            <Button 
+              asChild 
+              size="lg" 
+              className="font-medium"
+              style={{ 
+                backgroundColor: secondaryBtnColor,
+                color: '#ffffff',
+                border: `1px solid ${secondaryBtnColor}`
+              }}
+            >
               <Link to="/website/contact">
                 যোগাযোগ করুন
               </Link>

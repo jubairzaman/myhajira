@@ -21,6 +21,7 @@ export function HeroSlider() {
   const primaryColor = settings?.primary_color || '#4B0082';
   const primaryColorLight = settings?.primary_color ? adjustColorBrightness(settings.primary_color, 30) : '#6B2D8B';
   const ctaColor = settings?.cta_button_color || settings?.secondary_color || '#00D4FF';
+  const secondaryBtnColor = settings?.secondary_button_color || primaryColor;
   const darkBg = '#0D0221';
   const darkBgLight = '#1a0a2e';
 
@@ -108,7 +109,16 @@ export function HeroSlider() {
                       <ArrowRight className="ml-2 w-4 h-4" />
                     </Link>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm">
+                  <Button 
+                    asChild 
+                    size="lg" 
+                    className="backdrop-blur-sm font-medium"
+                    style={{ 
+                      backgroundColor: secondaryBtnColor,
+                      color: '#ffffff',
+                      border: `1px solid ${secondaryBtnColor}`
+                    }}
+                  >
                     <Link to="/website/contact">
                       যোগাযোগ করুন
                     </Link>
