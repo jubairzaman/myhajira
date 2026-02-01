@@ -17,6 +17,13 @@ export function HeroSlider() {
   const enabledSlides = slides?.filter(s => s.is_enabled) || [];
   const latestNotices = notices?.slice(0, 5) || [];
 
+  // Get colors from settings or use defaults
+  const primaryColor = settings?.primary_color || '#4B0082';
+  const primaryColorLight = settings?.primary_color ? adjustColorBrightness(settings.primary_color, 30) : '#6B2D8B';
+  const ctaColor = settings?.cta_button_color || settings?.secondary_color || '#00D4FF';
+  const darkBg = '#0D0221';
+  const darkBgLight = '#1a0a2e';
+
   // Auto-advance slides
   useEffect(() => {
     if (enabledSlides.length <= 1) return;
@@ -40,11 +47,22 @@ export function HeroSlider() {
     <section className="relative min-h-[600px] lg:min-h-[650px] flex items-stretch overflow-hidden">
       <div className="flex flex-col lg:flex-row w-full">
         {/* Main Slider Area */}
-        <div className="relative flex-1 min-h-[400px] lg:min-h-full bg-gradient-to-br from-[#0D0221] via-[#1a0a2e] to-[#4B0082]">
+        <div 
+          className="relative flex-1 min-h-[400px] lg:min-h-full"
+          style={{ 
+            background: `linear-gradient(to bottom right, ${darkBg}, ${darkBgLight}, ${primaryColor})`
+          }}
+        >
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-20 left-10 w-72 h-72 bg-[#00D4FF] rounded-full blur-[100px]" />
-            <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#6B2D8B] rounded-full blur-[120px]" />
+            <div 
+              className="absolute top-20 left-10 w-72 h-72 rounded-full blur-[100px]" 
+              style={{ backgroundColor: ctaColor }}
+            />
+            <div 
+              className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-[120px]" 
+              style={{ backgroundColor: primaryColorLight }}
+            />
           </div>
 
           {/* Slide Image */}
@@ -55,7 +73,12 @@ export function HeroSlider() {
                 alt={currentSlideData.title || 'Hero'}
                 className="w-full h-full object-cover opacity-60 transition-opacity duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0D0221]/70 via-[#0D0221]/40 to-transparent" />
+              <div 
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to right, ${darkBg}b3, ${darkBg}66, transparent)`
+                }}
+              />
             </div>
           )}
 
@@ -70,7 +93,16 @@ export function HeroSlider() {
                   {currentSlideData?.subtitle_bn || currentSlideData?.subtitle || settings?.hero_subtitle_bn || 'আজকের শিক্ষায় আগামীর নেতৃত্ব'}
                 </p>
                 <div className="flex flex-wrap gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <Button asChild size="lg" className="bg-[#00D4FF] text-[#0D0221] hover:bg-[#00D4FF]/90 font-medium shadow-lg shadow-[#00D4FF]/30">
+                  <Button 
+                    asChild 
+                    size="lg" 
+                    className="font-medium shadow-lg"
+                    style={{ 
+                      backgroundColor: ctaColor,
+                      color: darkBg,
+                      boxShadow: `0 10px 25px -5px ${ctaColor}4d`
+                    }}
+                  >
                     <Link to="/website/admissions">
                       ভর্তি তথ্য
                       <ArrowRight className="ml-2 w-4 h-4" />
@@ -109,10 +141,9 @@ export function HeroSlider() {
                     key={index}
                     onClick={() => setCurrentSlide(index)}
                     className={`w-2 h-2 rounded-full transition-all ${
-                      index === currentSlide 
-                        ? 'w-8 bg-[#00D4FF]' 
-                        : 'bg-white/40 hover:bg-white/60'
+                      index === currentSlide ? 'w-8' : 'bg-white/40 hover:bg-white/60'
                     }`}
+                    style={index === currentSlide ? { backgroundColor: ctaColor } : undefined}
                   />
                 ))}
               </div>
@@ -121,10 +152,20 @@ export function HeroSlider() {
         </div>
 
         {/* Notice Sidebar */}
-        <div className="w-full lg:w-[380px] bg-gradient-to-b from-[#1a0a2e] to-[#0D0221] border-l border-white/10">
+        <div 
+          className="w-full lg:w-[380px] border-l border-white/10"
+          style={{
+            background: `linear-gradient(to bottom, ${darkBgLight}, ${darkBg})`
+          }}
+        >
           <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="p-4 lg:p-6 border-b border-white/10 bg-gradient-to-r from-[#4B0082] to-[#6B2D8B]">
+            <div 
+              className="p-4 lg:p-6 border-b border-white/10"
+              style={{
+                background: `linear-gradient(to right, ${primaryColor}, ${primaryColorLight})`
+              }}
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
                   <Bell className="w-5 h-5 text-white" />
@@ -148,12 +189,21 @@ export function HeroSlider() {
                     <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all overflow-hidden">
                       <CardContent className="p-3">
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#4B0082] to-[#6B2D8B] flex items-center justify-center flex-shrink-0">
+                          <div 
+                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{
+                              background: `linear-gradient(to bottom right, ${primaryColor}, ${primaryColorLight})`
+                            }}
+                          >
                             <Calendar className="w-4 h-4 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-white font-bengali line-clamp-2 group-hover:text-[#00D4FF] transition-colors">
-                              {notice.title_bn || notice.title}
+                            <h4 
+                              className="text-sm font-medium text-white font-bengali line-clamp-2 transition-colors group-hover:text-opacity-100"
+                              style={{ '--hover-color': ctaColor } as React.CSSProperties}
+                            >
+                              <span className="group-hover:hidden">{notice.title_bn || notice.title}</span>
+                              <span className="hidden group-hover:inline" style={{ color: ctaColor }}>{notice.title_bn || notice.title}</span>
                             </h4>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-xs text-white/50">
@@ -184,7 +234,12 @@ export function HeroSlider() {
             {/* View All Button */}
             {latestNotices.length > 0 && (
               <div className="p-4 border-t border-white/10">
-                <Button asChild variant="ghost" className="w-full text-[#00D4FF] hover:text-white hover:bg-white/10">
+                <Button 
+                  asChild 
+                  variant="ghost" 
+                  className="w-full hover:bg-white/10"
+                  style={{ color: ctaColor }}
+                >
                   <Link to="/website/notices">
                     সব নোটিশ দেখুন
                     <ArrowRight className="ml-2 w-4 h-4" />
@@ -197,4 +252,14 @@ export function HeroSlider() {
       </div>
     </section>
   );
+}
+
+// Helper function to adjust color brightness
+function adjustColorBrightness(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, Math.max(0, (num >> 16) + amt));
+  const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt));
+  const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
 }

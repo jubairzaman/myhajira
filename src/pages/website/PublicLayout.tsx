@@ -18,6 +18,36 @@ export default function PublicLayout() {
     }
   }, [settings?.favicon_url]);
 
+  // Apply dynamic colors as CSS variables
+  useEffect(() => {
+    if (settings) {
+      const root = document.documentElement;
+      
+      // Apply colors from settings
+      if (settings.primary_color) {
+        root.style.setProperty('--website-primary', settings.primary_color);
+      }
+      if (settings.secondary_color) {
+        root.style.setProperty('--website-secondary', settings.secondary_color);
+      }
+      if (settings.cta_button_color) {
+        root.style.setProperty('--website-cta', settings.cta_button_color);
+      }
+      if (settings.secondary_button_color) {
+        root.style.setProperty('--website-btn-secondary', settings.secondary_button_color);
+      }
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      const root = document.documentElement;
+      root.style.removeProperty('--website-primary');
+      root.style.removeProperty('--website-secondary');
+      root.style.removeProperty('--website-cta');
+      root.style.removeProperty('--website-btn-secondary');
+    };
+  }, [settings]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4B0082] to-[#6B2D8B]">

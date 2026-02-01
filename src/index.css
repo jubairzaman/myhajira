@@ -105,6 +105,15 @@
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
+    
+    /* Website CMS Dynamic Colors - Can be overridden via JS */
+    --website-primary: #4B0082;
+    --website-primary-light: #6B2D8B;
+    --website-secondary: #00D4FF;
+    --website-cta: #00D4FF;
+    --website-btn-secondary: #4B0082;
+    --website-dark: #0D0221;
+    --website-dark-light: #1a0a2e;
   }
 
   .dark {
