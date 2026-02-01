@@ -3,6 +3,7 @@ import { GraduationCap, Users, Award, Heart, ArrowRight, Star } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWebsiteSettings, useWebsiteSections, useWebsiteTestimonials } from '@/hooks/queries/useWebsiteCMS';
+import { useWebsiteCTAButtons } from '@/hooks/queries/useWebsiteCMSNew';
 import { HeroSlider } from '@/components/website/HeroSlider';
 import { AlumniBubbles } from '@/components/website/AlumniBubbles';
 import { ParentTestimonials } from '@/components/website/ParentTestimonials';
@@ -18,12 +19,17 @@ export default function Home() {
   const { data: settings } = useWebsiteSettings();
   const { data: sections } = useWebsiteSections('home');
   const { data: testimonials } = useWebsiteTestimonials(true);
+  const { data: ctaButtons } = useWebsiteCTAButtons();
 
   const featuresSection = sections?.find(s => s.section_type === 'features');
   const statsSection = sections?.find(s => s.section_type === 'stats');
 
   const featureItems = (featuresSection?.metadata as any)?.items || [];
   const statsItems = (statsSection?.metadata as any)?.items || [];
+
+  // Get CTA buttons
+  const ctaPrimaryBtn = ctaButtons?.find(b => b.button_key === 'cta_primary' && b.is_enabled);
+  const ctaSecondaryBtn = ctaButtons?.find(b => b.button_key === 'cta_secondary' && b.is_enabled);
 
   // Get colors from settings or use defaults
   const primaryColor = settings?.primary_color || '#4B0082';
@@ -211,35 +217,39 @@ export default function Home() {
             আজই ভর্তি হয়ে সেরা শিক্ষার সুযোগ নিন
           </p>
           <div className="flex justify-center gap-4 flex-wrap">
-            <Button 
-              asChild 
-              size="lg" 
-              className="shadow-lg"
-              style={{ 
-                backgroundColor: ctaColor,
-                color: darkBg,
-                boxShadow: `0 10px 25px -5px ${ctaColor}4d`
-              }}
-            >
-              <Link to="/website/admissions">
-                ভর্তি তথ্য দেখুন
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Link>
-            </Button>
-            <Button 
-              asChild 
-              size="lg" 
-              className="font-medium"
-              style={{ 
-                backgroundColor: secondaryBtnColor,
-                color: '#ffffff',
-                border: `1px solid ${secondaryBtnColor}`
-              }}
-            >
-              <Link to="/website/contact">
-                যোগাযোগ করুন
-              </Link>
-            </Button>
+            {ctaPrimaryBtn && (
+              <Button 
+                asChild 
+                size="lg" 
+                className="shadow-lg"
+                style={{ 
+                  backgroundColor: ctaColor,
+                  color: darkBg,
+                  boxShadow: `0 10px 25px -5px ${ctaColor}4d`
+                }}
+              >
+                <Link to={ctaPrimaryBtn.link_url}>
+                  {ctaPrimaryBtn.label_bn || ctaPrimaryBtn.label}
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Link>
+              </Button>
+            )}
+            {ctaSecondaryBtn && (
+              <Button 
+                asChild 
+                size="lg" 
+                className="font-medium"
+                style={{ 
+                  backgroundColor: secondaryBtnColor,
+                  color: '#ffffff',
+                  border: `1px solid ${secondaryBtnColor}`
+                }}
+              >
+                <Link to={ctaSecondaryBtn.link_url}>
+                  {ctaSecondaryBtn.label_bn || ctaSecondaryBtn.label}
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </section>
