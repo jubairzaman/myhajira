@@ -70,6 +70,7 @@ import AboutManager from "./pages/website/admin/AboutManager";
 import AcademicsManager from "./pages/website/admin/AcademicsManager";
 import PopupNoticeManager from "./pages/website/admin/PopupNoticeManager";
 import CTAButtonsManager from "./pages/website/admin/CTAButtonsManager";
+import NavigationManager from "./pages/website/admin/NavigationManager";
 
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
@@ -264,6 +265,11 @@ const App = () => (
               <Route path="/website/admin/settings" element={
                 <ProtectedRoute requireAdmin>
                   <WebsiteSettingsAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/navigation" element={
+                <ProtectedRoute requireAdmin>
+                  <NavigationManager />
                 </ProtectedRoute>
               } />
               <Route path="/website/admin/notices" element={

@@ -2235,9 +2235,13 @@ export type Database = {
       website_pages: {
         Row: {
           created_at: string
+          custom_content: string | null
+          custom_content_bn: string | null
           display_order: number
           id: string
+          is_custom_page: boolean | null
           is_enabled: boolean
+          parent_page_id: string | null
           seo_description: string | null
           seo_title: string | null
           slug: string
@@ -2247,9 +2251,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_content?: string | null
+          custom_content_bn?: string | null
           display_order?: number
           id?: string
+          is_custom_page?: boolean | null
           is_enabled?: boolean
+          parent_page_id?: string | null
           seo_description?: string | null
           seo_title?: string | null
           slug: string
@@ -2259,9 +2267,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_content?: string | null
+          custom_content_bn?: string | null
           display_order?: number
           id?: string
+          is_custom_page?: boolean | null
           is_enabled?: boolean
+          parent_page_id?: string | null
           seo_description?: string | null
           seo_title?: string | null
           slug?: string
@@ -2269,7 +2281,15 @@ export type Database = {
           title_bn?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "website_pages_parent_page_id_fkey"
+            columns: ["parent_page_id"]
+            isOneToOne: false
+            referencedRelation: "website_pages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       website_parent_testimonials: {
         Row: {

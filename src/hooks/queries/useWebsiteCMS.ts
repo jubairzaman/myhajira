@@ -44,6 +44,10 @@ export interface WebsitePage {
   display_order: number;
   seo_title: string | null;
   seo_description: string | null;
+  parent_page_id?: string | null;
+  is_custom_page?: boolean;
+  custom_content?: string | null;
+  custom_content_bn?: string | null;
 }
 
 export interface WebsiteSection {
@@ -268,6 +272,51 @@ export function useUpdateWebsitePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['website-pages'] });
       toast({ title: 'পেজ আপডেট হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// Alias for compatibility
+export const useUpdateWebsitePages = useUpdateWebsitePage;
+
+export function useCreateWebsitePage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (page: Omit<WebsitePage, 'id'> & { parent_page_id?: string | null; is_custom_page?: boolean; custom_content?: string; custom_content_bn?: string }) => {
+      const { data, error } = await supabase
+        .from('website_pages')
+        .insert(page)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-pages'] });
+      toast({ title: 'পেজ তৈরি হয়েছে' });
+    },
+    onError: (error) => {
+      toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useDeleteWebsitePage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('website_pages')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website-pages'] });
+      toast({ title: 'পেজ মুছে ফেলা হয়েছে' });
     },
     onError: (error) => {
       toast({ title: 'ত্রুটি', description: error.message, variant: 'destructive' });
