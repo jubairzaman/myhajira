@@ -112,6 +112,7 @@ const navItems: NavItem[] = [
       { label: 'Hero Slides', labelBn: 'হিরো স্লাইড', icon: ChevronRight, href: '/website/admin/hero-slides' },
       { label: 'About', labelBn: 'আমাদের সম্পর্কে', icon: ChevronRight, href: '/website/admin/about' },
       { label: 'Academics', labelBn: 'শিক্ষা কার্যক্রম', icon: ChevronRight, href: '/website/admin/academics' },
+      { label: 'Admissions', labelBn: 'ভর্তি তথ্য', icon: ChevronRight, href: '/website/admin/admissions' },
       { label: 'Notices', labelBn: 'নোটিশ', icon: ChevronRight, href: '/website/admin/notices' },
       { label: 'Results', labelBn: 'ফলাফল', icon: ChevronRight, href: '/website/admin/results' },
       { label: 'Alumni', labelBn: 'প্রাক্তন ছাত্র', icon: ChevronRight, href: '/website/admin/alumni' },
