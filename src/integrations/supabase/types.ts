@@ -1415,6 +1415,7 @@ export type Database = {
           created_at: string
           id: string
           monitor_logo_url: string | null
+          report_header_image_url: string | null
           school_logo_url: string | null
           school_name: string | null
           school_name_bn: string | null
@@ -1431,6 +1432,7 @@ export type Database = {
           created_at?: string
           id?: string
           monitor_logo_url?: string | null
+          report_header_image_url?: string | null
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null
@@ -1447,6 +1449,7 @@ export type Database = {
           created_at?: string
           id?: string
           monitor_logo_url?: string | null
+          report_header_image_url?: string | null
           school_logo_url?: string | null
           school_name?: string | null
           school_name_bn?: string | null

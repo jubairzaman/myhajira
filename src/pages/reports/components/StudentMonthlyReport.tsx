@@ -1,9 +1,6 @@
 /**
  * Student Monthly Attendance Report — Professional A4 Print Engine
- * Paper: A4 Portrait (210mm × 297mm)
- * Margins: Top 20mm, Bottom 20mm, Left 15mm, Right 15mm
- * 
- * Developed by Jubair Zaman
+ * Now supports uploaded report header image from system_settings.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -49,6 +46,7 @@ interface SchoolSettings {
   school_name: string | null;
   school_name_bn: string | null;
   school_logo_url: string | null;
+  report_header_image_url: string | null;
 }
 
 const DAY_NAMES_BN: Record<number, string> = {
@@ -85,7 +83,6 @@ export function StudentMonthlyReport({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Parallel fetch: student, attendance, school settings
       const [studentRes, attendanceRes, settingsRes] = await Promise.all([
         supabase
           .from('students')
@@ -106,7 +103,7 @@ export function StudentMonthlyReport({
           .order('attendance_date'),
         supabase
           .from('system_settings')
-          .select('school_name, school_name_bn, school_logo_url')
+          .select('school_name, school_name_bn, school_logo_url, report_header_image_url')
           .limit(1)
           .single(),
       ]);
@@ -127,13 +124,12 @@ export function StudentMonthlyReport({
       }
 
       if (settingsRes.data) {
-        setSettings(settingsRes.data);
+        setSettings(settingsRes.data as SchoolSettings);
       }
 
       const attData = attendanceRes.data || [];
       setAttendance(attData);
 
-      // Working days count via DB function
       const { data: workingDaysData } = await supabase.rpc('get_working_days_count', {
         p_start_date: format(monthStart, 'yyyy-MM-dd'),
         p_end_date: format(monthEnd, 'yyyy-MM-dd'),
@@ -222,33 +218,49 @@ export function StudentMonthlyReport({
 
   const monthNameBn = format(month, 'MMMM yyyy', { locale: bn });
   const now = new Date();
+  const hasHeaderImage = !!settings?.report_header_image_url;
 
   return (
     <div className="student-attendance-report">
       {/* ====== PAGE HEADER ====== */}
       <div className="sar-header">
-        <div className="sar-header-row">
-          {settings?.school_logo_url && (
+        {hasHeaderImage ? (
+          /* Uploaded header image mode */
+          <div className="sar-header-image-mode">
             <img
-              src={settings.school_logo_url}
-              alt="Logo"
-              className="sar-logo"
+              src={settings!.report_header_image_url!}
+              alt="Report Header"
+              className="sar-header-image"
             />
-          )}
-          <div className="sar-header-center">
-            <h1 className="sar-school-name-bn">
-              {settings?.school_name_bn || 'বিদ্যালয়ের নাম'}
-            </h1>
-            {settings?.school_name && (
-              <p className="sar-school-name-en">{settings.school_name}</p>
+            <div className="sar-header-meta">
+              <h2 className="sar-report-title">শিক্ষার্থী মাসিক উপস্থিতি রিপোর্ট</h2>
+              <div className="sar-header-meta-row">
+                <span>শিক্ষাবর্ষ: <strong>{academicYearName}</strong></span>
+                <span>মাস: <strong>{monthNameBn}</strong></span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Text-based header fallback */
+          <div className="sar-header-row">
+            {settings?.school_logo_url && (
+              <img src={settings.school_logo_url} alt="Logo" className="sar-logo" />
             )}
-            <h2 className="sar-report-title">শিক্ষার্থী মাসিক উপস্থিতি রিপোর্ট</h2>
+            <div className="sar-header-center">
+              <h1 className="sar-school-name-bn">
+                {settings?.school_name_bn || 'বিদ্যালয়ের নাম'}
+              </h1>
+              {settings?.school_name && (
+                <p className="sar-school-name-en">{settings.school_name}</p>
+              )}
+              <h2 className="sar-report-title">শিক্ষার্থী মাসিক উপস্থিতি রিপোর্ট</h2>
+            </div>
+            <div className="sar-header-right">
+              <p>শিক্ষাবর্ষ: <strong>{academicYearName}</strong></p>
+              <p>মাস: <strong>{monthNameBn}</strong></p>
+            </div>
           </div>
-          <div className="sar-header-right">
-            <p>শিক্ষাবর্ষ: <strong>{academicYearName}</strong></p>
-            <p>মাস: <strong>{monthNameBn}</strong></p>
-          </div>
-        </div>
+        )}
         <div className="sar-divider" />
       </div>
 

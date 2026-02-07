@@ -12,6 +12,7 @@ interface SystemSettings {
   school_name: string | null;
   school_name_bn: string | null;
   school_logo_url: string | null;
+  report_header_image_url: string | null;
 }
 
 export function ReportHeader({ title, subtitle, academicYear, month }: ReportHeaderProps) {
@@ -21,17 +22,51 @@ export function ReportHeader({ title, subtitle, academicYear, month }: ReportHea
     const fetchSettings = async () => {
       const { data } = await supabase
         .from('system_settings')
-        .select('school_name, school_name_bn, school_logo_url')
+        .select('school_name, school_name_bn, school_logo_url, report_header_image_url')
         .limit(1)
         .single();
       
       if (data) {
-        setSettings(data);
+        setSettings(data as SystemSettings);
       }
     };
     fetchSettings();
   }, []);
 
+  // If a report header image is uploaded, use it as the full header
+  if (settings?.report_header_image_url) {
+    return (
+      <div className="report-header-image-container mb-6 pb-4">
+        <img
+          src={settings.report_header_image_url}
+          alt="Report Header"
+          className="report-header-img w-full object-contain"
+          style={{ maxHeight: '120px' }}
+        />
+        <div className="text-center mt-3">
+          <h2 className="text-xl font-semibold text-foreground print:text-black print:text-2xl">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-lg text-muted-foreground print:text-gray-700">
+              {subtitle}
+            </p>
+          )}
+          <div className="flex justify-center gap-6 mt-2 text-sm text-muted-foreground print:text-gray-600">
+            {academicYear && (
+              <span>শিক্ষাবর্ষ: <strong className="text-foreground print:text-black">{academicYear}</strong></span>
+            )}
+            {month && (
+              <span>মাস: <strong className="text-foreground print:text-black">{month}</strong></span>
+            )}
+          </div>
+        </div>
+        <div className="h-[1px] bg-gradient-to-r from-transparent via-border to-transparent mt-3 print:via-black" />
+      </div>
+    );
+  }
+
+  // Fallback: text-based header (original)
   return (
     <div className="report-header text-center mb-6 pb-4 border-b-2 border-border print:border-black">
       <div className="flex items-center justify-center gap-4 mb-2">
@@ -72,10 +107,6 @@ export function ReportHeader({ title, subtitle, academicYear, month }: ReportHea
           <span>মাস: <strong className="text-foreground print:text-black">{month}</strong></span>
         )}
       </div>
-      
-      <p className="text-xs text-muted-foreground mt-4 print:text-gray-500">
-        Developed by Jubair Zaman
-      </p>
     </div>
   );
 }

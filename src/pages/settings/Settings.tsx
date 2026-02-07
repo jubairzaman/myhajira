@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings as SettingsIcon, Save, Building2, Shield, UserPlus } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Building2, Shield, UserPlus, Upload, Trash2, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +29,9 @@ export default function Settings() {
     school_name_bn: '',
     timezone: 'Asia/Dhaka',
   });
+  const [reportHeaderUrl, setReportHeaderUrl] = useState<string | null>(null);
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+  const headerInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -52,6 +55,7 @@ export default function Settings() {
             school_name_bn: data.school_name_bn || '',
             timezone: data.timezone || 'Asia/Dhaka',
           });
+          setReportHeaderUrl((data as any).report_header_image_url || null);
         }
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -91,8 +95,71 @@ export default function Settings() {
     }
   };
 
+  const handleHeaderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('শুধুমাত্র ইমেজ ফাইল আপলোড করুন');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('ফাইলের সাইজ ২ MB এর বেশি হতে পারবে না');
+      return;
+    }
+
+    setUploadingHeader(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `report-header-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('photos')
+        .upload(`report-headers/${fileName}`, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(`report-headers/${fileName}`);
+
+      const publicUrl = urlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('system_settings')
+        .update({ report_header_image_url: publicUrl } as any)
+        .not('id', 'is', null);
+
+      if (updateError) throw updateError;
+
+      setReportHeaderUrl(publicUrl);
+      toast.success('রিপোর্ট হেডার ইমেজ আপলোড সফল হয়েছে');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'আপলোড ব্যর্থ হয়েছে');
+    } finally {
+      setUploadingHeader(false);
+      if (headerInputRef.current) headerInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveHeader = async () => {
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .update({ report_header_image_url: null } as any)
+        .not('id', 'is', null);
+
+      if (error) throw error;
+      setReportHeaderUrl(null);
+      toast.success('রিপোর্ট হেডার ইমেজ মুছে ফেলা হয়েছে');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove header');
+    }
+  };
+
   const handleAddUserRole = async () => {
-    // This would typically invite a user or assign a role
     toast.success('User role functionality - requires user to sign up first');
     setIsAddUserOpen(false);
   };
@@ -157,6 +224,81 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </div>
+
+        {/* Report Header Image */}
+        <div className="card-elevated p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <FileText className="w-5 h-5 text-primary" />
+            <div>
+              <h3 className="text-lg font-semibold">রিপোর্ট হেডার ইমেজ</h3>
+              <p className="text-xs text-muted-foreground">সকল রিপোর্টে এই হেডার ব্যবহার হবে</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
+              <p className="text-xs text-muted-foreground font-bengali">
+                📐 <strong>প্রস্তাবিত সাইজ:</strong> ৭৯৫ × ১২০ পিক্সেল (প্রায় ২১০mm × ৩০mm) — PNG বা JPG ফরম্যাটে। সর্বোচ্চ ২ MB
+              </p>
+            </div>
+
+            {reportHeaderUrl ? (
+              <div className="space-y-3">
+                <div className="border border-border rounded-lg p-3 bg-white">
+                  <img
+                    src={reportHeaderUrl}
+                    alt="Report Header Preview"
+                    className="w-full object-contain"
+                    style={{ maxHeight: '120px' }}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => headerInputRef.current?.click()}
+                    disabled={uploadingHeader}
+                  >
+                    {uploadingHeader ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    পরিবর্তন করুন
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRemoveHeader}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    মুছুন
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                onClick={() => headerInputRef.current?.click()}
+              >
+                {uploadingHeader ? (
+                  <Loader2 className="w-8 h-8 mx-auto text-muted-foreground animate-spin mb-2" />
+                ) : (
+                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                )}
+                <p className="text-sm text-muted-foreground font-bengali">
+                  {uploadingHeader ? 'আপলোড হচ্ছে...' : 'ক্লিক করে হেডার ইমেজ আপলোড করুন'}
+                </p>
+              </div>
+            )}
+
+            <input
+              ref={headerInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleHeaderUpload}
+              className="hidden"
+            />
           </div>
         </div>
 
