@@ -579,6 +579,347 @@
   }
 }
 
+/* ========================================
+   STUDENT ATTENDANCE REPORT (SAR) — ERP-Grade
+   A4 Portrait: 210mm × 297mm
+   Margins: Top 20mm, Bottom 20mm, Left 15mm, Right 15mm
+   ======================================== */
+
+/* Screen preview — simulates A4 paper */
+.student-attendance-report {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 20mm 15mm;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  box-shadow: 0 0 20px rgba(0,0,0,0.08);
+  border: 1px solid #e5e7eb;
+}
+
+/* ---- Header ---- */
+.sar-header {
+  margin-bottom: 6mm;
+}
+
+.sar-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 5mm;
+}
+
+.sar-logo {
+  width: 18mm;
+  height: 18mm;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.sar-header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.sar-school-name-bn {
+  font-size: 16pt;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  color: #111;
+  font-family: 'Hind Siliguri', sans-serif;
+}
+
+.sar-school-name-en {
+  font-size: 9pt;
+  color: #555;
+  margin: 1mm 0 0 0;
+  letter-spacing: 0.5px;
+}
+
+.sar-report-title {
+  font-size: 12pt;
+  font-weight: 600;
+  margin: 3mm 0 0 0;
+  color: #222;
+  font-family: 'Hind Siliguri', sans-serif;
+}
+
+.sar-header-right {
+  text-align: right;
+  font-size: 8.5pt;
+  color: #444;
+  flex-shrink: 0;
+  line-height: 1.8;
+}
+
+.sar-header-right strong {
+  color: #111;
+}
+
+.sar-divider {
+  height: 0.5mm;
+  background: linear-gradient(to right, #ccc, #333, #ccc);
+  margin-top: 3mm;
+}
+
+/* ---- Student Info ---- */
+.sar-student-info {
+  border: 0.5pt solid #bbb;
+  padding: 3mm 4mm;
+  margin-bottom: 5mm;
+  background: #fafafa;
+}
+
+.sar-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2mm 8mm;
+}
+
+.sar-info-item {
+  display: flex;
+  gap: 2mm;
+  align-items: baseline;
+}
+
+.sar-info-label {
+  font-size: 8pt;
+  color: #666;
+  min-width: 50mm;
+  flex-shrink: 0;
+}
+
+.sar-info-value {
+  font-size: 9.5pt;
+  font-weight: 600;
+  color: #111;
+}
+
+.sar-info-sub {
+  font-weight: 400;
+  color: #666;
+  font-size: 8pt;
+}
+
+/* ---- Attendance Table ---- */
+.sar-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 5mm;
+  font-size: 9pt;
+}
+
+.sar-table thead {
+  display: table-header-group; /* repeat on every page */
+}
+
+.sar-table th {
+  background: #f0f0f0;
+  border: 0.5pt solid #999;
+  padding: 2mm 3mm;
+  font-weight: 700;
+  font-size: 8.5pt;
+  color: #222;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sar-th-sl { width: 10%; text-align: center; }
+.sar-th-date { width: 18%; }
+.sar-th-day { width: 22%; }
+.sar-th-status { width: 25%; }
+.sar-th-time { width: 25%; text-align: center; }
+
+.sar-table td {
+  border: 0.5pt solid #ccc;
+  padding: 1.5mm 3mm;
+  vertical-align: middle;
+  color: #222;
+}
+
+.sar-table tbody tr {
+  page-break-inside: avoid;
+}
+
+.sar-td-center {
+  text-align: center;
+}
+
+.sar-td-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.sar-td-status {
+  font-weight: 600;
+}
+
+.sar-status-present {
+  color: #111;
+}
+
+.sar-status-late {
+  color: #666;
+}
+
+.sar-status-absent {
+  color: #c00;
+}
+
+.sar-row-weekend {
+  background: #f9f9f9;
+}
+
+.sar-row-weekend td {
+  color: #999;
+}
+
+/* ---- Summary ---- */
+.sar-summary {
+  margin-top: 5mm;
+  page-break-inside: avoid;
+}
+
+.sar-summary-title {
+  font-size: 10pt;
+  font-weight: 700;
+  margin-bottom: 3mm;
+  color: #222;
+  border-bottom: 0.5pt solid #ccc;
+  padding-bottom: 2mm;
+}
+
+.sar-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3mm;
+}
+
+.sar-summary-card {
+  border: 0.5pt solid #ccc;
+  padding: 3mm 2mm;
+  text-align: center;
+  background: #fafafa;
+}
+
+.sar-summary-num {
+  display: block;
+  font-size: 18pt;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #111;
+}
+
+.sar-summary-label {
+  display: block;
+  font-size: 8pt;
+  font-weight: 600;
+  color: #444;
+  margin-top: 1mm;
+  font-family: 'Hind Siliguri', sans-serif;
+}
+
+.sar-summary-label-en {
+  display: block;
+  font-size: 7pt;
+  color: #888;
+}
+
+.sar-card-present { border-bottom: 2pt solid #16a34a; }
+.sar-card-late { border-bottom: 2pt solid #999; }
+.sar-card-absent { border-bottom: 2pt solid #dc2626; }
+.sar-card-rate { border-bottom: 2pt solid #2563eb; }
+
+/* ---- Footer ---- */
+.sar-footer {
+  margin-top: 8mm;
+  padding-top: 3mm;
+  border-top: 0.5pt solid #ccc;
+  display: flex;
+  justify-content: space-between;
+  font-size: 7pt;
+  color: #888;
+}
+
+.sar-footer strong {
+  color: #555;
+}
+
+/* ========================================
+   SAR PRINT OVERRIDES
+   ======================================== */
+@media print {
+  .student-attendance-report {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 20mm 15mm;
+  }
+
+  /* Ensure header repeats on each printed page */
+  .sar-table thead {
+    display: table-header-group !important;
+  }
+
+  /* No row splitting */
+  .sar-table tbody tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Summary always on last page */
+  .sar-summary {
+    page-break-inside: avoid !important;
+  }
+
+  /* Crisp borders */
+  .sar-table th,
+  .sar-table td {
+    border-color: #444 !important;
+  }
+
+  .sar-student-info {
+    border-color: #444 !important;
+    background: #f5f5f5 !important;
+  }
+
+  .sar-divider {
+    background: #333 !important;
+    height: 0.5pt !important;
+  }
+
+  .sar-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3mm 15mm;
+    border-top: 0.5pt solid #999;
+  }
+
+  /* Summary card colors print */
+  .sar-card-present { border-bottom-color: #16a34a !important; }
+  .sar-card-late { border-bottom-color: #666 !important; }
+  .sar-card-absent { border-bottom-color: #dc2626 !important; }
+  .sar-card-rate { border-bottom-color: #2563eb !important; }
+
+  .sar-status-absent { color: #c00 !important; }
+  .sar-status-late { color: #555 !important; }
+
+  .sar-row-weekend {
+    background: #f5f5f5 !important;
+  }
+}
+
 /* Student & Teacher Reports - A4 Portrait */
 @media print {
   @page {

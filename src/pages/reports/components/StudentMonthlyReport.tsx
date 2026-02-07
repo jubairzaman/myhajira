@@ -1,18 +1,16 @@
+/**
+ * Student Monthly Attendance Report — Professional A4 Print Engine
+ * Paper: A4 Portrait (210mm × 297mm)
+ * Margins: Top 20mm, Bottom 20mm, Left 15mm, Right 15mm
+ * 
+ * Developed by Jubair Zaman
+ */
+
 import { useEffect, useState, useCallback } from 'react';
-import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
-import { ReportHeader } from './ReportHeader';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 interface StudentMonthlyReportProps {
   studentId: string;
@@ -47,25 +45,37 @@ interface Summary {
   attendancePercentage: number;
 }
 
-const dayNames: { [key: number]: string } = {
-  0: 'রবি',
-  1: 'সোম',
-  2: 'মঙ্গল',
-  3: 'বুধ',
-  4: 'বৃহ',
-  5: 'শুক্র',
-  6: 'শনি',
+interface SchoolSettings {
+  school_name: string | null;
+  school_name_bn: string | null;
+  school_logo_url: string | null;
+}
+
+const DAY_NAMES_BN: Record<number, string> = {
+  0: 'রবিবার',
+  1: 'সোমবার',
+  2: 'মঙ্গলবার',
+  3: 'বুধবার',
+  4: 'বৃহস্পতিবার',
+  5: 'শুক্রবার',
+  6: 'শনিবার',
 };
 
-export function StudentMonthlyReport({ 
-  studentId, 
-  month, 
+const toBengaliNum = (n: number | string): string => {
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return String(n).replace(/\d/g, (d) => bengaliDigits[parseInt(d)]);
+};
+
+export function StudentMonthlyReport({
+  studentId,
+  month,
   academicYearId,
-  academicYearName 
+  academicYearName,
 }: StudentMonthlyReportProps) {
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const monthStart = startOfMonth(month);
@@ -75,73 +85,72 @@ export function StudentMonthlyReport({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch student info with class and section
-      const { data: studentData } = await supabase
-        .from('students')
-        .select(`
-          id,
-          name,
-          name_bn,
-          student_id_number,
-          guardian_mobile,
-          class_id,
-          classes:class_id (name, name_bn),
-          sections:section_id (name, name_bn)
-        `)
-        .eq('id', studentId)
-        .single();
+      // Parallel fetch: student, attendance, school settings
+      const [studentRes, attendanceRes, settingsRes] = await Promise.all([
+        supabase
+          .from('students')
+          .select(`
+            id, name, name_bn, student_id_number, guardian_mobile, class_id,
+            classes:class_id (name, name_bn),
+            sections:section_id (name, name_bn)
+          `)
+          .eq('id', studentId)
+          .single(),
+        supabase
+          .from('student_attendance')
+          .select('attendance_date, status, punch_time')
+          .eq('student_id', studentId)
+          .eq('academic_year_id', academicYearId)
+          .gte('attendance_date', format(monthStart, 'yyyy-MM-dd'))
+          .lte('attendance_date', format(monthEnd, 'yyyy-MM-dd'))
+          .order('attendance_date'),
+        supabase
+          .from('system_settings')
+          .select('school_name, school_name_bn, school_logo_url')
+          .limit(1)
+          .single(),
+      ]);
 
-      if (studentData) {
+      if (studentRes.data) {
+        const s = studentRes.data;
         setStudent({
-          id: studentData.id,
-          name: studentData.name,
-          name_bn: studentData.name_bn,
-          student_id_number: studentData.student_id_number,
-          guardian_mobile: studentData.guardian_mobile,
-          class_name: (studentData.classes as any)?.name || '',
-          class_name_bn: (studentData.classes as any)?.name_bn,
-          section_name: (studentData.sections as any)?.name || '',
-          section_name_bn: (studentData.sections as any)?.name_bn,
+          id: s.id,
+          name: s.name,
+          name_bn: s.name_bn,
+          student_id_number: s.student_id_number,
+          guardian_mobile: s.guardian_mobile,
+          class_name: (s.classes as any)?.name || '',
+          class_name_bn: (s.classes as any)?.name_bn,
+          section_name: (s.sections as any)?.name || '',
+          section_name_bn: (s.sections as any)?.name_bn,
         });
       }
 
-      const classId = studentData?.class_id;
+      if (settingsRes.data) {
+        setSettings(settingsRes.data);
+      }
 
-      // Fetch attendance records
-      const { data: attendanceData } = await supabase
-        .from('student_attendance')
-        .select('attendance_date, status, punch_time')
-        .eq('student_id', studentId)
-        .eq('academic_year_id', academicYearId)
-        .gte('attendance_date', format(monthStart, 'yyyy-MM-dd'))
-        .lte('attendance_date', format(monthEnd, 'yyyy-MM-dd'))
-        .order('attendance_date');
+      const attData = attendanceRes.data || [];
+      setAttendance(attData);
 
-      setAttendance(attendanceData || []);
-
-      // Calculate working days using the database function
+      // Working days count via DB function
       const { data: workingDaysData } = await supabase.rpc('get_working_days_count', {
         p_start_date: format(monthStart, 'yyyy-MM-dd'),
         p_end_date: format(monthEnd, 'yyyy-MM-dd'),
-        p_class_id: classId,
+        p_class_id: studentRes.data?.class_id,
         p_academic_year_id: academicYearId,
       });
 
       const totalWorkingDays = workingDaysData || 0;
-      const totalPresent = (attendanceData || []).filter(a => a.status === 'present').length;
-      const totalLate = (attendanceData || []).filter(a => a.status === 'late').length;
-      const totalAbsent = (attendanceData || []).filter(a => a.status === 'absent').length;
-      const attendancePercentage = totalWorkingDays > 0 
-        ? Math.round(((totalPresent + totalLate) / totalWorkingDays) * 100) 
-        : 0;
+      const totalPresent = attData.filter((a) => a.status === 'present').length;
+      const totalLate = attData.filter((a) => a.status === 'late').length;
+      const totalAbsent = attData.filter((a) => a.status === 'absent').length;
+      const attendancePercentage =
+        totalWorkingDays > 0
+          ? Math.round(((totalPresent + totalLate) / totalWorkingDays) * 100)
+          : 0;
 
-      setSummary({
-        totalWorkingDays,
-        totalPresent,
-        totalAbsent,
-        totalLate,
-        attendancePercentage,
-      });
+      setSummary({ totalWorkingDays, totalPresent, totalAbsent, totalLate, attendancePercentage });
     } catch (error) {
       console.error('Error fetching report data:', error);
     } finally {
@@ -152,9 +161,8 @@ export function StudentMonthlyReport({
   useEffect(() => {
     fetchData();
 
-    // Real-time subscription
     const channel = supabase
-      .channel(`student-attendance-${studentId}`)
+      .channel(`student-attendance-report-${studentId}`)
       .on(
         'postgres_changes',
         {
@@ -163,9 +171,7 @@ export function StudentMonthlyReport({
           table: 'student_attendance',
           filter: `student_id=eq.${studentId}`,
         },
-        () => {
-          fetchData();
-        }
+        () => fetchData()
       )
       .subscribe();
 
@@ -176,28 +182,24 @@ export function StudentMonthlyReport({
 
   const getAttendanceForDate = (date: Date): AttendanceRecord | undefined => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return attendance.find(a => a.attendance_date === dateStr);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'present':
-        return <Badge className="bg-green-500 hover:bg-green-600">উপস্থিত</Badge>;
-      case 'late':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">বিলম্ব</Badge>;
-      case 'absent':
-        return <Badge variant="destructive">অনুপস্থিত</Badge>;
-      default:
-        return <Badge variant="outline">-</Badge>;
-    }
+    return attendance.find((a) => a.attendance_date === dateStr);
   };
 
   const formatPunchTime = (punchTime: string | null) => {
-    if (!punchTime) return '-';
+    if (!punchTime) return '—';
     try {
-      return format(new Date(punchTime), 'hh:mm a', { locale: bn });
+      return format(new Date(punchTime), 'hh:mm a');
     } catch {
       return punchTime;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'present': return 'উপস্থিত';
+      case 'late': return 'বিলম্বে';
+      case 'absent': return 'অনুপস্থিত';
+      default: return '—';
     }
   };
 
@@ -218,125 +220,160 @@ export function StudentMonthlyReport({
     );
   }
 
+  const monthNameBn = format(month, 'MMMM yyyy', { locale: bn });
+  const now = new Date();
+
   return (
-    <div className="report-container p-6 bg-background print:bg-white print:p-0">
-      <ReportHeader
-        title="শিক্ষার্থী মাসিক উপস্থিতি রিপোর্ট"
-        academicYear={academicYearName}
-        month={format(month, 'MMMM yyyy', { locale: bn })}
-      />
+    <div className="student-attendance-report">
+      {/* ====== PAGE HEADER ====== */}
+      <div className="sar-header">
+        <div className="sar-header-row">
+          {settings?.school_logo_url && (
+            <img
+              src={settings.school_logo_url}
+              alt="Logo"
+              className="sar-logo"
+            />
+          )}
+          <div className="sar-header-center">
+            <h1 className="sar-school-name-bn">
+              {settings?.school_name_bn || 'বিদ্যালয়ের নাম'}
+            </h1>
+            {settings?.school_name && (
+              <p className="sar-school-name-en">{settings.school_name}</p>
+            )}
+            <h2 className="sar-report-title">শিক্ষার্থী মাসিক উপস্থিতি রিপোর্ট</h2>
+          </div>
+          <div className="sar-header-right">
+            <p>শিক্ষাবর্ষ: <strong>{academicYearName}</strong></p>
+            <p>মাস: <strong>{monthNameBn}</strong></p>
+          </div>
+        </div>
+        <div className="sar-divider" />
+      </div>
 
-      {/* Student Info */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 p-4 bg-muted/30 rounded-lg print:bg-gray-50 print:border print:border-gray-300">
-        <div>
-          <span className="text-sm text-muted-foreground print:text-gray-600">নাম:</span>
-          <p className="font-semibold text-foreground print:text-black">
-            {student.name_bn || student.name}
-          </p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground print:text-gray-600">শ্রেণী:</span>
-          <p className="font-semibold text-foreground print:text-black">
-            {student.class_name_bn || student.class_name}
-          </p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground print:text-gray-600">শাখা:</span>
-          <p className="font-semibold text-foreground print:text-black">
-            {student.section_name_bn || student.section_name}
-          </p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground print:text-gray-600">রোল:</span>
-          <p className="font-semibold text-foreground print:text-black">
-            {student.student_id_number || '-'}
-          </p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground print:text-gray-600">অভিভাবকের মোবাইল:</span>
-          <p className="font-semibold text-foreground print:text-black">
-            {student.guardian_mobile}
-          </p>
+      {/* ====== STUDENT INFO BOX ====== */}
+      <div className="sar-student-info">
+        <div className="sar-info-grid">
+          <div className="sar-info-item">
+            <span className="sar-info-label">নাম (Name)</span>
+            <span className="sar-info-value">
+              {student.name_bn || student.name}
+              {student.name_bn && student.name && (
+                <span className="sar-info-sub"> ({student.name})</span>
+              )}
+            </span>
+          </div>
+          <div className="sar-info-item">
+            <span className="sar-info-label">শ্রেণী (Class)</span>
+            <span className="sar-info-value">
+              {student.class_name_bn || student.class_name}
+            </span>
+          </div>
+          <div className="sar-info-item">
+            <span className="sar-info-label">শাখা (Section)</span>
+            <span className="sar-info-value">
+              {student.section_name_bn || student.section_name}
+            </span>
+          </div>
+          <div className="sar-info-item">
+            <span className="sar-info-label">রোল / আইডি (Roll)</span>
+            <span className="sar-info-value">
+              {student.student_id_number || '—'}
+            </span>
+          </div>
+          <div className="sar-info-item">
+            <span className="sar-info-label">অভিভাবকের মোবাইল</span>
+            <span className="sar-info-value">{student.guardian_mobile}</span>
+          </div>
         </div>
       </div>
 
-      {/* Attendance Table */}
-      <div className="border rounded-lg overflow-hidden print:border-black">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted print:bg-gray-100">
-              <TableHead className="font-bold text-foreground print:text-black">তারিখ</TableHead>
-              <TableHead className="font-bold text-foreground print:text-black">বার</TableHead>
-              <TableHead className="font-bold text-foreground print:text-black">অবস্থা</TableHead>
-              <TableHead className="font-bold text-foreground print:text-black">পাঞ্চ সময়</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {daysInMonth.map((day) => {
-              const record = getAttendanceForDate(day);
-              const dayOfWeek = day.getDay();
-              
-              return (
-                <TableRow key={day.toISOString()} className="print:border-gray-300">
-                  <TableCell className="font-medium print:text-black">
-                    {format(day, 'dd', { locale: bn })}
-                  </TableCell>
-                  <TableCell className="print:text-black">
-                    {dayNames[dayOfWeek]}
-                  </TableCell>
-                  <TableCell>
-                    {record ? getStatusBadge(record.status) : (
-                      <span className="text-muted-foreground print:text-gray-400">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="print:text-black">
-                    {record ? formatPunchTime(record.punch_time) : '-'}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      {/* ====== ATTENDANCE TABLE ====== */}
+      <table className="sar-table">
+        <thead>
+          <tr>
+            <th className="sar-th-sl">ক্র.নং</th>
+            <th className="sar-th-date">তারিখ</th>
+            <th className="sar-th-day">বার</th>
+            <th className="sar-th-status">অবস্থা</th>
+            <th className="sar-th-time">পাঞ্চ সময়</th>
+          </tr>
+        </thead>
+        <tbody>
+          {daysInMonth.map((day, idx) => {
+            const record = getAttendanceForDate(day);
+            const dayOfWeek = day.getDay();
+            const dateBn = toBengaliNum(format(day, 'dd'));
+            const monthBn = format(day, 'MMM', { locale: bn });
+            const statusClass = record
+              ? record.status === 'absent'
+                ? 'sar-status-absent'
+                : record.status === 'late'
+                ? 'sar-status-late'
+                : 'sar-status-present'
+              : '';
 
-      {/* Summary */}
+            return (
+              <tr key={day.toISOString()} className={dayOfWeek === 5 || dayOfWeek === 6 ? 'sar-row-weekend' : ''}>
+                <td className="sar-td-center">{toBengaliNum(idx + 1)}</td>
+                <td className="sar-td-date">{dateBn} {monthBn}</td>
+                <td>{DAY_NAMES_BN[dayOfWeek]}</td>
+                <td className={`sar-td-status ${statusClass}`}>
+                  {record ? getStatusText(record.status) : '—'}
+                </td>
+                <td className="sar-td-center">
+                  {record ? formatPunchTime(record.punch_time) : '—'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* ====== MONTHLY SUMMARY ====== */}
       {summary && (
-        <div className="mt-6 p-4 bg-muted/30 rounded-lg print:bg-gray-50 print:border print:border-gray-300">
-          <h3 className="text-lg font-bold mb-4 text-foreground print:text-black">মাসিক সারাংশ</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="text-center p-3 bg-background rounded-lg print:bg-white print:border">
-              <p className="text-2xl font-bold text-foreground print:text-black">
-                {summary.totalWorkingDays}
-              </p>
-              <p className="text-sm text-muted-foreground print:text-gray-600">মোট কার্যদিবস</p>
+        <div className="sar-summary">
+          <h3 className="sar-summary-title">মাসিক সারাংশ (Monthly Summary)</h3>
+          <div className="sar-summary-grid">
+            <div className="sar-summary-card">
+              <span className="sar-summary-num">{toBengaliNum(summary.totalWorkingDays)}</span>
+              <span className="sar-summary-label">মোট কার্যদিবস</span>
+              <span className="sar-summary-label-en">Working Days</span>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg print:border print:border-green-300">
-              <p className="text-2xl font-bold text-green-600">
-                {summary.totalPresent}
-              </p>
-              <p className="text-sm text-green-700">উপস্থিত</p>
+            <div className="sar-summary-card sar-card-present">
+              <span className="sar-summary-num">{toBengaliNum(summary.totalPresent)}</span>
+              <span className="sar-summary-label">উপস্থিত</span>
+              <span className="sar-summary-label-en">Present</span>
             </div>
-            <div className="text-center p-3 bg-yellow-50 rounded-lg print:border print:border-yellow-300">
-              <p className="text-2xl font-bold text-yellow-600">
-                {summary.totalLate}
-              </p>
-              <p className="text-sm text-yellow-700">বিলম্ব</p>
+            <div className="sar-summary-card sar-card-late">
+              <span className="sar-summary-num">{toBengaliNum(summary.totalLate)}</span>
+              <span className="sar-summary-label">বিলম্ব</span>
+              <span className="sar-summary-label-en">Late</span>
             </div>
-            <div className="text-center p-3 bg-red-50 rounded-lg print:border print:border-red-300">
-              <p className="text-2xl font-bold text-red-600">
-                {summary.totalAbsent}
-              </p>
-              <p className="text-sm text-red-700">অনুপস্থিত</p>
+            <div className="sar-summary-card sar-card-absent">
+              <span className="sar-summary-num">{toBengaliNum(summary.totalAbsent)}</span>
+              <span className="sar-summary-label">অনুপস্থিত</span>
+              <span className="sar-summary-label-en">Absent</span>
             </div>
-            <div className="text-center p-3 bg-blue-50 rounded-lg print:border print:border-blue-300">
-              <p className="text-2xl font-bold text-blue-600">
-                {summary.attendancePercentage}%
-              </p>
-              <p className="text-sm text-blue-700">উপস্থিতি হার</p>
+            <div className="sar-summary-card sar-card-rate">
+              <span className="sar-summary-num">{toBengaliNum(summary.attendancePercentage)}%</span>
+              <span className="sar-summary-label">উপস্থিতি হার</span>
+              <span className="sar-summary-label-en">Attendance %</span>
             </div>
           </div>
         </div>
       )}
+
+      {/* ====== FOOTER ====== */}
+      <div className="sar-footer">
+        <div className="sar-footer-left">
+          Generated by <strong>Amar Hajira Smart</strong>
+        </div>
+        <div className="sar-footer-center">
+          তৈরির তারিখ: {toBengaliNum(format(now, 'dd'))}/{toBengaliNum(format(now, 'MM'))}/{toBengaliNum(format(now, 'yyyy'))} — {format(now, 'hh:mm a')}
+        </div>
+      </div>
     </div>
   );
 }
