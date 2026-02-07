@@ -658,6 +658,47 @@
   color: #111;
 }
 
+/* ---- Header Image Mode ---- */
+.sar-header-image-mode {
+  text-align: center;
+}
+
+.sar-header-image {
+  width: 100%;
+  max-height: 100px;
+  object-fit: contain;
+}
+
+.sar-header-meta {
+  margin-top: 3mm;
+}
+
+.sar-header-meta .sar-report-title {
+  margin-top: 1mm;
+}
+
+.sar-header-meta-row {
+  display: flex;
+  justify-content: center;
+  gap: 8mm;
+  font-size: 8.5pt;
+  color: #444;
+  margin-top: 2mm;
+}
+
+.sar-header-meta-row strong {
+  color: #111;
+}
+
+/* ---- Report Header Image (shared ReportHeader) ---- */
+.report-header-image-container {
+  text-align: center;
+}
+
+.report-header-img {
+  max-height: 100px;
+}
+
 .sar-divider {
   height: 0.5mm;
   background: linear-gradient(to right, #ccc, #333, #ccc);
@@ -917,6 +958,19 @@
 
   .sar-row-weekend {
     background: #f5f5f5 !important;
+  }
+
+  /* Header image print */
+  .sar-header-image {
+    max-height: 90px !important;
+  }
+
+  .report-header-img {
+    max-height: 90px !important;
+  }
+
+  .report-header-image-container {
+    margin-bottom: 5mm !important;
   }
 }
 
