@@ -451,132 +451,338 @@
 }
 
 /* ========================================
-   PRINT STYLES - Attendance Reports
-   Developed by Jubair Zaman
+   UNIVERSAL PRINT ENGINE — Professional ERP Grade
+   All Reports: Attendance, Fee, Summaries
+   A4 Paper: 210mm × 297mm
    ======================================== */
 
-/* Hide elements when printing */
+/* Print-only utility — hidden on screen */
+.print-only {
+  display: none !important;
+}
+
 @media print {
-  /* Hide navigation, filters, and non-report elements */
+  /* ===== SHOW / HIDE ===== */
+  .print-only {
+    display: block !important;
+  }
+
+  .print-only-flex {
+    display: flex !important;
+  }
+
   .no-print,
   .no-print *,
-  header,
+  header:not(.erp-report-header),
   nav,
   aside,
   .sidebar,
   button:not(.print-visible),
-  [data-radix-popper-content-wrapper] {
+  [data-radix-popper-content-wrapper],
+  [data-radix-dialog-overlay],
+  [role="dialog"]:not(.receipt-print-area),
+  .success-dialog {
     display: none !important;
   }
 
-  /* Reset page margins and background */
+  /* ===== PAGE SETUP ===== */
+  @page {
+    size: A4 portrait;
+    margin: 20mm 15mm;
+  }
+
+  /* ===== GLOBAL RESET ===== */
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
+    color: #1a1a1a !important;
+    font-family: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif !important;
+    font-size: 10pt !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
 
-  /* Main print area takes full width */
-  .print-area {
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Layout containers → full width */
+  main,
+  .print-area,
+  [class*="MainLayout"] {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Report container styles */
-  .report-container {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 20mm !important;
+  /* Cards → plain containers */
+  [data-slot="card"],
+  .card {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
     background: white !important;
-    color: black !important;
-    page-break-inside: avoid;
   }
 
-  /* Report header */
-  .report-header {
+  /* Page break utilities */
+  .page-break-before { page-break-before: always; }
+  .page-break-after { page-break-after: always; }
+  .avoid-page-break { page-break-inside: avoid; }
+
+  /* ===== ERP REPORT BASE ===== */
+  .erp-report {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: #1a1a1a !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .erp-report * {
+    border-radius: 0 !important;
+  }
+
+  /* ===== ERP REPORT HEADER (print-only) ===== */
+  .erp-report-header {
     text-align: center;
-    margin-bottom: 15mm;
-    padding-bottom: 5mm;
-    border-bottom: 2px solid #000;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+    border-bottom: 1.5pt solid #333;
+  }
+
+  .erp-report-header .erp-school-name {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+    font-family: 'Hind Siliguri', sans-serif;
+  }
+
+  .erp-report-header .erp-school-name-en {
+    font-size: 9pt;
+    color: #555;
+    margin: 1mm 0;
+  }
+
+  .erp-report-header .erp-report-title {
+    font-size: 13pt;
+    font-weight: 600;
+    color: #222;
+    margin-top: 3mm;
+    font-family: 'Hind Siliguri', sans-serif;
+  }
+
+  .erp-report-header .erp-report-meta {
+    display: flex;
+    justify-content: center;
+    gap: 8mm;
+    font-size: 9pt;
+    color: #444;
+    margin-top: 2mm;
+  }
+
+  .erp-report-header .erp-report-meta strong {
+    color: #111;
+  }
+
+  .erp-report-header .erp-header-image {
+    width: 100%;
+    max-height: 90px;
+    object-fit: contain;
+    margin-bottom: 2mm;
+  }
+
+  /* ===== SHARED REPORT HEADER COMPONENT ===== */
+  .report-header {
+    text-align: center !important;
+    margin-bottom: 5mm !important;
+    padding-bottom: 3mm !important;
+    border-bottom: 1.5pt solid #333 !important;
+    border-radius: 0 !important;
   }
 
   .report-header img {
-    max-width: 80px !important;
-    max-height: 80px !important;
+    max-width: 70px !important;
+    max-height: 70px !important;
   }
 
   .report-header h1 {
-    font-size: 24pt !important;
+    font-size: 16pt !important;
     margin: 0 !important;
-    color: black !important;
+    color: #111 !important;
+    font-family: 'Hind Siliguri', sans-serif !important;
   }
 
   .report-header h2 {
-    font-size: 18pt !important;
-    margin-top: 5mm !important;
-    color: black !important;
+    font-size: 12pt !important;
+    margin-top: 3mm !important;
+    color: #222 !important;
+    font-family: 'Hind Siliguri', sans-serif !important;
   }
 
-  /* Tables */
-  table {
+  .report-header-image-container {
+    margin-bottom: 3mm !important;
+  }
+
+  .report-header-img {
+    max-height: 90px !important;
+  }
+
+  /* ===== INFO BOX ===== */
+  .erp-info-box {
+    border: 0.5pt solid #999 !important;
+    padding: 3mm 4mm !important;
+    margin-bottom: 4mm !important;
+    background: #fafafa !important;
+    border-radius: 0 !important;
+  }
+
+  /* ===== UNIVERSAL TABLE STYLES ===== */
+  .erp-report table,
+  .report-container table,
+  .student-fee-report table {
     width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 10pt !important;
+    font-size: 9pt !important;
+    page-break-inside: auto !important;
   }
 
-  th, td {
-    border: 1px solid #333 !important;
-    padding: 4px 8px !important;
+  .erp-report thead,
+  .report-container thead,
+  .student-fee-report thead {
+    display: table-header-group !important;
+  }
+
+  .erp-report th,
+  .report-container th,
+  .student-fee-report th {
+    background: #f0f0f0 !important;
+    border: 0.5pt solid #666 !important;
+    padding: 2mm 3mm !important;
+    font-weight: 700 !important;
+    font-size: 9pt !important;
+    color: #222 !important;
     text-align: left !important;
   }
 
-  th {
-    background-color: #f0f0f0 !important;
-    font-weight: bold !important;
+  .erp-report td,
+  .report-container td,
+  .student-fee-report td {
+    border: 0.5pt solid #bbb !important;
+    padding: 1.5mm 3mm !important;
+    color: #222 !important;
+    vertical-align: middle !important;
   }
 
-  /* Badge styles for print */
-  .badge,
-  [class*="bg-green"],
-  [class*="bg-yellow"],
-  [class*="bg-red"] {
-    border: 1px solid #333 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-weight: bold !important;
+  .erp-report tbody tr,
+  .report-container tbody tr,
+  .student-fee-report tbody tr {
+    page-break-inside: avoid !important;
   }
 
-  /* Cards */
-  .card,
-  [class*="Card"] {
-    box-shadow: none !important;
-    border: none !important;
+  /* Column alignments preserved in print */
+  .erp-report td.text-right,
+  .report-container td.text-right,
+  .student-fee-report td.text-right,
+  .erp-report th.text-right,
+  .report-container th.text-right,
+  .student-fee-report th.text-right {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
   }
 
-  /* Summary sections */
-  .summary-grid {
+  .erp-report td.text-center,
+  .report-container td.text-center,
+  .student-fee-report td.text-center,
+  .erp-report th.text-center,
+  .report-container th.text-center,
+  .student-fee-report th.text-center {
+    text-align: center !important;
+  }
+
+  /* ===== STATUS COLORS ===== */
+  .erp-status-present { color: #111 !important; font-weight: 700 !important; }
+  .erp-status-late { color: #666 !important; font-weight: 700 !important; }
+  .erp-status-absent { color: #c00 !important; font-weight: 700 !important; }
+
+  /* ===== BADGES → PLAIN TEXT ===== */
+  .erp-report [data-slot="badge"] {
+    all: unset !important;
+    font-weight: 600 !important;
+    font-size: 8pt !important;
+  }
+
+  /* ===== SUMMARY SECTION ===== */
+  .erp-summary {
+    margin-top: 5mm !important;
+    page-break-inside: avoid !important;
+    border: 0.5pt solid #ccc !important;
+    padding: 3mm !important;
+    background: #fafafa !important;
+  }
+
+  .erp-summary-grid {
     display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
-    gap: 10px !important;
-    margin-top: 10mm !important;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)) !important;
+    gap: 3mm !important;
   }
 
-  /* Page break controls */
-  .page-break-before {
-    page-break-before: always;
+  .erp-summary-card {
+    border: 0.5pt solid #ccc !important;
+    padding: 3mm 2mm !important;
+    text-align: center !important;
+    background: #fafafa !important;
+    border-radius: 0 !important;
   }
 
-  .page-break-after {
-    page-break-after: always;
+  /* ===== REPORT FOOTER ===== */
+  .erp-report-footer {
+    margin-top: 8mm;
+    padding-top: 3mm;
+    border-top: 0.5pt solid #999;
+    display: flex !important;
+    justify-content: space-between;
+    font-size: 7.5pt;
+    color: #888;
   }
 
-  .avoid-page-break {
-    page-break-inside: avoid;
+  .erp-report-footer strong {
+    color: #555;
   }
+
+  /* ===== MUTED BACKGROUNDS ===== */
+  .erp-report .bg-muted,
+  .erp-report .bg-muted\/30,
+  .erp-report [class*="bg-muted"] {
+    background: #f5f5f5 !important;
+    border: 0.5pt solid #ddd !important;
+    border-radius: 0 !important;
+  }
+
+  /* Fee amount colors in print */
+  .erp-report .text-green-600,
+  .student-fee-report .text-green-600 { color: #16a34a !important; }
+  .erp-report .text-green-700 { color: #15803d !important; }
+  .erp-report .text-amber-600,
+  .student-fee-report .text-amber-600 { color: #d97706 !important; }
+  .erp-report .text-amber-700 { color: #b45309 !important; }
+  .erp-report .text-red-600,
+  .student-fee-report .text-red-600 { color: #dc2626 !important; }
+  .erp-report .text-red-700 { color: #b91c1c !important; }
+  .erp-report .text-blue-700,
+  .student-fee-report .text-blue-700 { color: #1d4ed8 !important; }
+
+  .erp-report .bg-blue-50 { background: #eff6ff !important; }
+  .erp-report .bg-amber-50 { background: #fffbeb !important; }
+  .erp-report .bg-green-50 { background: #f0fdf4 !important; }
+  .erp-report .bg-red-50 { background: #fef2f2 !important; }
 }
 
 /* ========================================
@@ -974,18 +1180,21 @@
   }
 }
 
-/* Student & Teacher Reports - A4 Portrait */
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 15mm;
-  }
+/* ========================================
+   CLASS REGISTER — Landscape Override
+   ======================================== */
+.class-register {
+  page: class-register-page;
 }
 
-/* Class Register - A3 Landscape (when class-register class is present) */
+@page class-register-page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
 @media print {
   .class-register {
-    font-size: 8pt !important;
+    font-size: 7.5pt !important;
   }
 
   .class-register table {
@@ -994,116 +1203,62 @@
 
   .class-register th,
   .class-register td {
-    padding: 2px 4px !important;
+    padding: 1.5mm 2mm !important;
   }
 
-  /* Sticky columns for class register */
   .class-register .sticky {
     position: relative !important;
     left: auto !important;
   }
 }
 
-/* For A3 landscape printing, add this class to the parent */
-.class-register-card {
-  @media print {
-    @page {
-      size: A3 landscape;
-      margin: 10mm;
-    }
+/* ========================================
+   FEE REPORTS — Print Overrides
+   ======================================== */
+@media print {
+  .student-fee-report {
+    width: 100% !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .student-fee-report .bg-muted\/30 {
+    background: #f8f9fa !important;
+    border: 0.5pt solid #bbb !important;
+    padding: 8px !important;
+    margin-bottom: 5mm !important;
+    border-radius: 0 !important;
+  }
+
+  .student-fee-report .grid.grid-cols-2 {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 5mm !important;
+  }
+
+  .student-fee-report .grid.grid-cols-2 > div {
+    border: 0.5pt solid #bbb !important;
+    padding: 6px !important;
+    text-align: center !important;
+    border-radius: 0 !important;
+  }
+
+  /* Hidden elements visible in print */
+  .student-fee-report .hidden.print\:block,
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  .hidden.print\:flex {
+    display: flex !important;
   }
 }
 
 /* ========================================
-   FEE REPORTS - A4 Print Optimization
+   POS RECEIPT — Thermal Print
    ======================================== */
 @media print {
-  /* Fee report specific styles */
-  .fee-report {
-    width: 100% !important;
-    background: white !important;
-  }
-
-  .fee-report .report-title {
-    font-size: 16pt !important;
-    font-weight: bold !important;
-    text-align: center !important;
-    margin-bottom: 10mm !important;
-  }
-
-  .fee-report table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 9pt !important;
-  }
-
-  .fee-report th {
-    background-color: #e5e7eb !important;
-    font-weight: bold !important;
-    text-align: left !important;
-    padding: 6px 8px !important;
-    border: 1px solid #374151 !important;
-  }
-
-  .fee-report td {
-    padding: 4px 8px !important;
-    border: 1px solid #9ca3af !important;
-    vertical-align: top !important;
-  }
-
-  /* Status badges in print */
-  .fee-report .badge-paid {
-    background: #dcfce7 !important;
-    color: #166534 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-weight: 600 !important;
-  }
-
-  .fee-report .badge-unpaid {
-    background: #fee2e2 !important;
-    color: #991b1b !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-weight: 600 !important;
-  }
-
-  .fee-report .badge-partial {
-    background: #fef3c7 !important;
-    color: #92400e !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-weight: 600 !important;
-  }
-
-  /* Summary footer */
-  .fee-report .report-summary {
-    margin-top: 10mm !important;
-    padding-top: 5mm !important;
-    border-top: 2px solid #374151 !important;
-  }
-
-  .fee-report .report-summary p {
-    font-size: 10pt !important;
-    margin: 2mm 0 !important;
-  }
-
-  /* Signature area */
-  .fee-report .signature-area {
-    display: flex !important;
-    justify-content: space-between !important;
-    margin-top: 20mm !important;
-  }
-
-  .fee-report .signature-box {
-    width: 40% !important;
-    text-align: center !important;
-    padding-top: 15mm !important;
-    border-top: 1px solid #374151 !important;
-    font-size: 9pt !important;
-  }
-
-  /* Receipt print styles */
   .receipt-print {
     width: 80mm !important;
     padding: 5mm !important;
@@ -1141,121 +1296,5 @@
     padding-top: 3mm !important;
     border-top: 1px dashed #333 !important;
     font-size: 8pt !important;
-  }
-
-  /* ========================================
-     STUDENT FEE REPORT - A4 Portrait Print
-     ======================================== */
-  .student-fee-report {
-    width: 100% !important;
-    background: white !important;
-    padding: 0 !important;
-  }
-
-  .student-fee-report .print-header {
-    display: block !important;
-    text-align: center !important;
-    margin-bottom: 10mm !important;
-    padding-bottom: 5mm !important;
-    border-bottom: 2px solid #000 !important;
-  }
-
-  .student-fee-report .print-header h1 {
-    font-size: 18pt !important;
-    font-weight: bold !important;
-    margin: 0 !important;
-  }
-
-  /* Student info section */
-  .student-fee-report .bg-muted\/30 {
-    background: #f8f9fa !important;
-    border: 1px solid #e5e7eb !important;
-    padding: 10px !important;
-    margin-bottom: 10mm !important;
-  }
-
-  /* Summary cards */
-  .student-fee-report .grid.grid-cols-2.md\\:grid-cols-4 {
-    display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 8px !important;
-    margin-bottom: 8mm !important;
-  }
-
-  .student-fee-report .grid.grid-cols-2.md\\:grid-cols-4 > div {
-    border: 1px solid #d1d5db !important;
-    padding: 8px !important;
-    text-align: center !important;
-  }
-
-  .student-fee-report .bg-blue-50 {
-    background: #eff6ff !important;
-  }
-
-  .student-fee-report .bg-amber-50 {
-    background: #fffbeb !important;
-  }
-
-  .student-fee-report .bg-green-50 {
-    background: #f0fdf4 !important;
-  }
-
-  .student-fee-report .bg-red-50 {
-    background: #fef2f2 !important;
-  }
-
-  /* Table in student report */
-  .student-fee-report table {
-    font-size: 9pt !important;
-    border-collapse: collapse !important;
-    width: 100% !important;
-  }
-
-  .student-fee-report th {
-    background: #f3f4f6 !important;
-    font-weight: bold !important;
-    padding: 6px 8px !important;
-    border: 1px solid #374151 !important;
-    font-size: 8pt !important;
-  }
-
-  .student-fee-report td {
-    padding: 4px 6px !important;
-    border: 1px solid #9ca3af !important;
-    font-size: 8pt !important;
-  }
-
-  /* Status icons */
-  .student-fee-report .text-green-600 {
-    color: #16a34a !important;
-  }
-
-  .student-fee-report .text-amber-600 {
-    color: #d97706 !important;
-  }
-
-  .student-fee-report .text-red-600 {
-    color: #dc2626 !important;
-  }
-
-  /* Print footer signatures */
-  .student-fee-report .hidden.print\\:block {
-    display: block !important;
-  }
-
-  .student-fee-report .border-t.border-black {
-    border-top: 1px solid #000 !important;
-    margin-top: 30mm !important;
-  }
-}
-
-/* POS Fee Collection Print Styles */
-@media print {
-  /* Hide success dialog during print */
-  [data-radix-dialog-overlay],
-  [role="dialog"]:not(.receipt-print-area),
-  .success-dialog,
-  .no-print {
-    display: none !important;
   }
 }
