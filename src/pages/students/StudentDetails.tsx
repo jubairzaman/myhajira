@@ -17,13 +17,19 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Edit
+  Edit,
+  Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useRequiredDocuments, useStudentDocuments, useUpsertStudentDocument } from '@/hooks/queries/useDocuments';
 import { useStudentCustomFee } from '@/hooks/queries/useStudentCustomFee';
+import { useStudentFeeRecords, type StudentFeeRecord } from '@/hooks/queries/useFeeCollection';
+import { useAcademicYear } from '@/hooks/useAcademicYear';
+import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 
 interface StudentData {
   id: string;
@@ -47,10 +53,17 @@ export default function StudentDetails() {
   const [student, setStudent] = useState<StudentData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { activeYear } = useAcademicYear();
   const { data: requiredDocuments = [] } = useRequiredDocuments();
   const { data: studentDocuments = [], isLoading: docsLoading } = useStudentDocuments(id);
   const { data: customFee } = useStudentCustomFee(id);
+  const { data: feeRecords = [] } = useStudentFeeRecords(id);
   const upsertDocument = useUpsertStudentDocument();
+
+  // Attendance stats
+  const [attendanceStats, setAttendanceStats] = useState<{
+    present: number; late: number; absent: number; total: number;
+  } | null>(null);
 
   // Fetch student data
   useEffect(() => {
@@ -94,6 +107,25 @@ export default function StudentDetails() {
 
     fetchStudent();
   }, [id, navigate]);
+
+  // Fetch attendance stats
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      if (!id || !activeYear?.id) return;
+      const { data } = await supabase
+        .from('student_attendance')
+        .select('status')
+        .eq('student_id', id)
+        .eq('academic_year_id', activeYear.id);
+      if (data) {
+        const present = data.filter(r => r.status === 'present').length;
+        const late = data.filter(r => r.status === 'late').length;
+        const absent = data.filter(r => r.status === 'absent').length;
+        setAttendanceStats({ present, late, absent, total: data.length });
+      }
+    };
+    fetchAttendance();
+  }, [id, activeYear?.id]);
 
   // Get document submission status
   const getDocumentStatus = (docId: string) => {
@@ -183,10 +215,14 @@ export default function StudentDetails() {
         </div>
 
         <Tabs defaultValue="info" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="info" className="gap-2">
               <User className="w-4 h-4" />
               <span className="font-bengali">তথ্য</span>
+            </TabsTrigger>
+            <TabsTrigger value="fees" className="gap-2">
+              <Receipt className="w-4 h-4" />
+              <span className="font-bengali">ফি ও উপস্থিতি</span>
             </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="w-4 h-4" />
@@ -261,13 +297,177 @@ export default function StudentDetails() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Financial Info */}
+          {/* Fees & Attendance Tab */}
+          <TabsContent value="fees" className="space-y-6">
+            {/* Attendance Stats */}
+            {attendanceStats && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="w-5 h-5" />
+                    <span className="font-bengali">উপস্থিতি তথ্য</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="text-center p-3 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold">{attendanceStats.total}</p>
+                      <p className="text-sm text-muted-foreground font-bengali">মোট দিন</p>
+                    </div>
+                    <div className="text-center p-3 bg-success/10 rounded-lg">
+                      <p className="text-2xl font-bold text-success">{attendanceStats.present}</p>
+                      <p className="text-sm text-muted-foreground font-bengali">উপস্থিত</p>
+                    </div>
+                    <div className="text-center p-3 bg-warning/10 rounded-lg">
+                      <p className="text-2xl font-bold text-warning">{attendanceStats.late}</p>
+                      <p className="text-sm text-muted-foreground font-bengali">বিলম্ব</p>
+                    </div>
+                    <div className="text-center p-3 bg-destructive/10 rounded-lg">
+                      <p className="text-2xl font-bold text-destructive">{attendanceStats.absent}</p>
+                      <p className="text-sm text-muted-foreground font-bengali">অনুপস্থিত</p>
+                    </div>
+                    {attendanceStats.total > 0 && (
+                      <div className="text-center p-3 bg-primary/10 rounded-lg">
+                        <p className="text-2xl font-bold text-primary">
+                          {(((attendanceStats.present + attendanceStats.late) / attendanceStats.total) * 100).toFixed(1)}%
+                        </p>
+                        <p className="text-sm text-muted-foreground font-bengali">উপস্থিতি হার</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Fee Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Receipt className="w-5 h-5" />
+                  <span className="font-bengali">ফি সারসংক্ষেপ</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const totalDue = feeRecords.reduce((s, r) => s + Number(r.amount_due) + Number(r.late_fine), 0);
+                  const totalPaid = feeRecords.reduce((s, r) => s + Number(r.amount_paid), 0);
+                  const totalRemaining = totalDue - totalPaid;
+                  const paidCount = feeRecords.filter(r => r.status === 'paid').length;
+                  const unpaidCount = feeRecords.filter(r => r.status === 'unpaid').length;
+                  const partialCount = feeRecords.filter(r => r.status === 'partial').length;
+
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold">৳{totalDue}</p>
+                        <p className="text-sm text-muted-foreground font-bengali">মোট বকেয়া</p>
+                      </div>
+                      <div className="text-center p-3 bg-success/10 rounded-lg">
+                        <p className="text-2xl font-bold text-success">৳{totalPaid}</p>
+                        <p className="text-sm text-muted-foreground font-bengali">মোট পরিশোধ</p>
+                      </div>
+                      <div className="text-center p-3 bg-destructive/10 rounded-lg">
+                        <p className="text-2xl font-bold text-destructive">৳{totalRemaining}</p>
+                        <p className="text-sm text-muted-foreground font-bengali">অবশিষ্ট</p>
+                      </div>
+                      <div className="text-center p-3 bg-success/10 rounded-lg">
+                        <p className="text-2xl font-bold text-success">{paidCount}</p>
+                        <p className="text-sm text-muted-foreground font-bengali">পরিশোধিত</p>
+                      </div>
+                      <div className="text-center p-3 bg-warning/10 rounded-lg">
+                        <p className="text-2xl font-bold text-warning">{unpaidCount + partialCount}</p>
+                        <p className="text-sm text-muted-foreground font-bengali">অপরিশোধিত</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Fee Records Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg font-bengali">
+                  <FileText className="w-5 h-5" />
+                  ফি রেকর্ড তালিকা
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {feeRecords.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground font-bengali">
+                    কোন ফি রেকর্ড নেই
+                  </p>
+                ) : (
+                  <div className="overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-2 font-bengali">ধরন</th>
+                          <th className="text-left p-2 font-bengali">বিবরণ</th>
+                          <th className="text-right p-2 font-bengali">বকেয়া</th>
+                          <th className="text-right p-2 font-bengali">জরিমানা</th>
+                          <th className="text-right p-2 font-bengali">পরিশোধ</th>
+                          <th className="text-center p-2 font-bengali">স্ট্যাটাস</th>
+                          <th className="text-center p-2 font-bengali">তারিখ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {feeRecords.map(record => {
+                          const feeTypeLabels: Record<string, string> = {
+                            monthly: 'মাসিক',
+                            admission: 'ভর্তি',
+                            session: 'সেশন',
+                            exam: 'পরীক্ষা',
+                          };
+                          let description = feeTypeLabels[record.fee_type] || record.fee_type;
+                          if (record.fee_type === 'monthly' && record.fee_month) {
+                            try {
+                              description = format(new Date(record.fee_month), 'MMMM yyyy', { locale: bn });
+                            } catch { /* keep default */ }
+                          }
+                          if (record.fee_type === 'exam' && record.exam) {
+                            description = record.exam.name_bn || record.exam.name;
+                          }
+
+                          return (
+                            <tr key={record.id} className="border-b">
+                              <td className="p-2 font-bengali">{feeTypeLabels[record.fee_type] || record.fee_type}</td>
+                              <td className="p-2">{description}</td>
+                              <td className="p-2 text-right font-mono">৳{record.amount_due}</td>
+                              <td className="p-2 text-right font-mono">৳{record.late_fine}</td>
+                              <td className="p-2 text-right font-mono">৳{record.amount_paid}</td>
+                              <td className="p-2 text-center">
+                                <Badge variant={
+                                  record.status === 'paid' ? 'default' :
+                                  record.status === 'partial' ? 'secondary' : 'destructive'
+                                } className="text-xs">
+                                  {record.status === 'paid' ? 'পরিশোধিত' :
+                                   record.status === 'partial' ? 'আংশিক' : 'অপরিশোধিত'}
+                                </Badge>
+                              </td>
+                              <td className="p-2 text-center text-muted-foreground">
+                                {record.payment_date
+                                  ? format(new Date(record.payment_date), 'dd/MM/yyyy')
+                                  : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Custom Fee Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Calendar className="w-5 h-5" />
-                  <span className="font-bengali">আর্থিক তথ্য</span>
+                  <span className="font-bengali">কাস্টম ফি তথ্য</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -283,12 +483,6 @@ export default function StudentDetails() {
                         <p className="text-xl font-bold text-primary">৳{customFee.custom_admission_fee}</p>
                       </div>
                     )}
-                    <div>
-                      <p className="text-sm text-muted-foreground font-bengali">কার্যকর তারিখ</p>
-                      <p className="font-medium">
-                        {new Date(customFee.effective_from).toLocaleDateString('bn-BD')}
-                      </p>
-                    </div>
                   </div>
                 ) : (
                   <p className="text-muted-foreground font-bengali">
@@ -299,7 +493,6 @@ export default function StudentDetails() {
             </Card>
           </TabsContent>
 
-          {/* Documents Tab */}
           <TabsContent value="documents" className="space-y-6">
             {/* Document Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -17,6 +17,7 @@ import StudentDetails from "./pages/students/StudentDetails";
 import TeacherList from "./pages/teachers/TeacherList";
 import TeacherRegistration from "./pages/teachers/TeacherRegistration";
 import TeacherEdit from "./pages/teachers/TeacherEdit";
+import TeacherDetails from "./pages/teachers/TeacherDetails";
 import GateMonitor from "./pages/monitor/GateMonitor";
 import OfficeMonitor from "./pages/monitor/OfficeMonitor";
 import DeviceManagement from "./pages/devices/DeviceManagement";
@@ -155,6 +156,11 @@ const App = () => (
               <Route path="/teachers/:id/edit" element={
                 <ProtectedRoute requireAdmin>
                   <TeacherEdit />
+                </ProtectedRoute>
+              } />
+              <Route path="/teachers/:id" element={
+                <ProtectedRoute>
+                  <TeacherDetails />
                 </ProtectedRoute>
               } />
 

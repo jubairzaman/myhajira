@@ -51,6 +51,7 @@ import {
   type StudentWithFees,
   type StudentFeeRecord,
 } from '@/hooks/queries/useFeeCollection';
+import { useClassesQuery } from '@/hooks/queries/useClassesQuery';
 import { useFeeSettings } from '@/hooks/queries/useFeesQuery';
 import { ReceiptPrint, type ReceiptData } from '@/components/fees/ReceiptPrint';
 import { 
@@ -95,6 +96,15 @@ export default function FeeCollection() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithFees | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Class/Section browse mode
+  const [browseMode, setBrowseMode] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [sections, setSections] = useState<{ id: string; name: string; name_bn: string | null }[]>([]);
+  const [browseStudents, setBrowseStudents] = useState<StudentWithFees[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const { data: classes = [] } = useClassesQuery();
   
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -201,11 +211,69 @@ export default function FeeCollection() {
     setCart([]);
   }, [selectedStudent?.id]);
 
+  // Fetch sections when class selected in browse mode
+  useEffect(() => {
+    const fetchSections = async () => {
+      if (!selectedClassId) {
+        setSections([]);
+        setBrowseStudents([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('sections')
+        .select('id, name, name_bn')
+        .eq('class_id', selectedClassId)
+        .eq('is_active', true)
+        .order('name');
+      setSections(data || []);
+      setSelectedSectionId('');
+      setBrowseStudents([]);
+    };
+    fetchSections();
+  }, [selectedClassId]);
+
+  // Fetch students when section selected in browse mode
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (!selectedClassId || !selectedSectionId || !activeYear?.id) {
+        setBrowseStudents([]);
+        return;
+      }
+      setBrowseLoading(true);
+      const { data } = await supabase
+        .from('students')
+        .select(`
+          id, name, name_bn, student_id_number, guardian_mobile, photo_url,
+          class:classes(id, name, name_bn),
+          section:sections(id, name),
+          shift:shifts(id, name),
+          rfid_card:rfid_cards_students(card_number)
+        `)
+        .eq('academic_year_id', activeYear.id)
+        .eq('class_id', selectedClassId)
+        .eq('section_id', selectedSectionId)
+        .eq('is_active', true)
+        .order('name');
+
+      const students = (data || []).map((s: any) => ({
+        ...s,
+        class: Array.isArray(s.class) ? s.class[0] : s.class,
+        section: Array.isArray(s.section) ? s.section[0] : s.section,
+        shift: Array.isArray(s.shift) ? s.shift[0] : s.shift,
+        rfid_card: Array.isArray(s.rfid_card) ? s.rfid_card[0] : s.rfid_card,
+      })) as StudentWithFees[];
+      setBrowseStudents(students);
+      setBrowseLoading(false);
+    };
+    fetchStudents();
+  }, [selectedClassId, selectedSectionId, activeYear?.id]);
+
   const handleSearch = () => {
     if (!searchTerm.trim()) return;
     searchMutation.mutate(searchTerm, {
       onSuccess: (student) => {
         setSelectedStudent(student);
+        setBrowseMode(false);
         setCart([]);
       },
     });
@@ -542,68 +610,179 @@ export default function FeeCollection() {
         {/* Search Screen */}
         {!selectedStudent && (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="w-full max-w-xl space-y-6">
+            <div className="w-full max-w-2xl space-y-6">
               <div className="text-center">
                 <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                   <CreditCard className="w-10 h-10 text-primary" />
                 </div>
                 <h1 className="text-3xl font-bold">ফি আদায়</h1>
                 <p className="text-muted-foreground mt-2">
-                  Student ID বা RFID কার্ড পাঞ্চ করুন
+                  Student ID / RFID পাঞ্চ অথবা শ্রেণী-শাখা অনুযায়ী খুঁজুন
                 </p>
               </div>
 
-              <Card className="shadow-lg">
-                <CardContent className="p-6">
-                  <div className="flex gap-3">
-                    <div className="flex-1 relative">
-                      <Input
-                        ref={searchInputRef}
-                        placeholder="Student ID বা RFID Card পাঞ্চ করুন..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setSearchTerm(value);
-                          if (value.length >= 10 && /^\d+$/.test(value)) {
-                            setTimeout(() => {
-                              if (value === e.target.value) {
-                                handleSearch();
-                              }
-                            }, 300);
-                          }
-                        }}
-                        onKeyPress={handleKeyPress}
-                        className="text-lg h-14 font-mono"
-                        autoFocus
-                      />
-                      {searchMutation.isPending && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      onClick={handleSearch}
-                      disabled={searchMutation.isPending || !searchTerm.trim()}
-                      size="lg"
-                      className="px-8 h-14"
-                    >
-                      <Search className="w-5 h-5" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-3 text-center flex items-center justify-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    RFID রিডারে কার্ড পাঞ্চ করুন
-                  </p>
-                </CardContent>
-              </Card>
+              {/* Toggle between search modes */}
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant={!browseMode ? 'default' : 'outline'}
+                  onClick={() => setBrowseMode(false)}
+                  className="gap-2"
+                >
+                  <Search className="w-4 h-4" />
+                  ID / RFID সার্চ
+                </Button>
+                <Button
+                  variant={browseMode ? 'default' : 'outline'}
+                  onClick={() => setBrowseMode(true)}
+                  className="gap-2"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  শ্রেণী-শাখা অনুযায়ী
+                </Button>
+              </div>
 
-              {searchMutation.isSuccess && !selectedStudent && (
-                <div className="text-center p-6 bg-muted/50 rounded-lg">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-lg font-medium">কোন শিক্ষার্থী পাওয়া যায়নি</p>
-                  <p className="text-sm text-muted-foreground">সঠিক ID দিয়ে আবার চেষ্টা করুন</p>
-                </div>
+              {!browseMode ? (
+                <>
+                  <Card className="shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="flex gap-3">
+                        <div className="flex-1 relative">
+                          <Input
+                            ref={searchInputRef}
+                            placeholder="Student ID বা RFID Card পাঞ্চ করুন..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setSearchTerm(value);
+                              if (value.length >= 10 && /^\d+$/.test(value)) {
+                                setTimeout(() => {
+                                  if (value === e.target.value) {
+                                    handleSearch();
+                                  }
+                                }, 300);
+                              }
+                            }}
+                            onKeyPress={handleKeyPress}
+                            className="text-lg h-14 font-mono"
+                            autoFocus
+                          />
+                          {searchMutation.isPending && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          onClick={handleSearch}
+                          disabled={searchMutation.isPending || !searchTerm.trim()}
+                          size="lg"
+                          className="px-8 h-14"
+                        >
+                          <Search className="w-5 h-5" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-3 text-center flex items-center justify-center gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        RFID রিডারে কার্ড পাঞ্চ করুন
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {searchMutation.isSuccess && !selectedStudent && (
+                    <div className="text-center p-6 bg-muted/50 rounded-lg">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-lg font-medium">কোন শিক্ষার্থী পাওয়া যায়নি</p>
+                      <p className="text-sm text-muted-foreground">সঠিক ID দিয়ে আবার চেষ্টা করুন</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Card className="shadow-lg">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-bengali">শ্রেণী নির্বাচন করুন</Label>
+                        <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="শ্রেণী নির্বাচন..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classes.map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name} {c.name_bn ? `(${c.name_bn})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="font-bengali">শাখা নির্বাচন করুন</Label>
+                        <Select
+                          value={selectedSectionId}
+                          onValueChange={setSelectedSectionId}
+                          disabled={!selectedClassId || sections.length === 0}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="শাখা নির্বাচন..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sections.map(s => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name} {s.name_bn ? `(${s.name_bn})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Student list */}
+                    {browseLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : browseStudents.length > 0 ? (
+                      <ScrollArea className="h-[340px]">
+                        <div className="space-y-2">
+                          {browseStudents.map(student => (
+                            <button
+                              key={student.id}
+                              onClick={() => {
+                                setSelectedStudent(student);
+                                setCart([]);
+                              }}
+                              className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <img
+                                src={student.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
+                                alt={student.name}
+                                className="w-10 h-10 rounded-full bg-muted"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{student.name}</p>
+                                {student.name_bn && (
+                                  <p className="text-sm text-muted-foreground truncate">{student.name_bn}</p>
+                                )}
+                              </div>
+                              <div className="text-right text-sm">
+                                {student.student_id_number && (
+                                  <Badge variant="outline" className="font-mono">
+                                    {student.student_id_number}
+                                  </Badge>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : selectedSectionId ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <GraduationCap className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="font-bengali">এই শাখায় কোন শিক্ষার্থী নেই</p>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
               )}
             </div>
           </div>
