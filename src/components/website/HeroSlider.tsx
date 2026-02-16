@@ -71,12 +71,13 @@ export function HeroSlider() {
               <img
                 src={currentSlideData.image_url}
                 alt={currentSlideData.title || 'Hero'}
-                className="w-full h-full object-cover opacity-60 transition-opacity duration-700"
+                className="w-full h-full object-cover transition-opacity duration-700"
               />
+              {/* Bottom-only gradient for text readability */}
               <div 
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(to right, ${darkBg}b3, ${darkBg}66, transparent)`
+                  background: `linear-gradient(to top, ${darkBg}cc 0%, ${darkBg}66 30%, transparent 60%)`
                 }}
               />
             </div>
