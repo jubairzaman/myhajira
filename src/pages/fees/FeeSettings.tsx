@@ -67,6 +67,7 @@ export default function FeeSettings() {
   const [monthlyDueDate, setMonthlyDueDate] = useState(10);
   const [lateFineAmount, setLateFineAmount] = useState(50);
   const [lateFineEnabled, setLateFineEnabled] = useState(false);
+  const [receiptCopyMode, setReceiptCopyMode] = useState<'single' | 'dual'>('dual');
 
   // Class Monthly Fees State
   const { data: classes, isLoading: isLoadingClasses } = useClassesQuery();
@@ -102,6 +103,7 @@ export default function FeeSettings() {
       setMonthlyDueDate(feeSettings.monthly_due_date);
       setLateFineAmount(Number(feeSettings.late_fine_amount));
       setLateFineEnabled(feeSettings.late_fine_enabled);
+      setReceiptCopyMode((feeSettings as any).receipt_copy_mode || 'dual');
     }
   }, [feeSettings]);
 
@@ -125,7 +127,8 @@ export default function FeeSettings() {
       monthly_due_date: monthlyDueDate,
       late_fine_amount: lateFineAmount,
       late_fine_enabled: lateFineEnabled,
-    });
+      receipt_copy_mode: receiptCopyMode,
+    } as any);
   };
 
   const handleSaveClassFee = (classId: string) => {
@@ -239,7 +242,7 @@ export default function FeeSettings() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-5">
                   <div className="flex items-center justify-between md:col-span-1">
                     <Label htmlFor="late-fine-enabled">জরিমানা সক্রিয়</Label>
                     <Switch
@@ -277,6 +280,18 @@ export default function FeeSettings() {
                       <Save className="w-4 h-4 mr-2" />
                       সংরক্ষণ করুন
                     </Button>
+                  </div>
+                  <div className="flex items-center gap-3 md:col-span-1">
+                    <Label>রিসিপ্ট কপি</Label>
+                    <Select value={receiptCopyMode} onValueChange={(v) => setReceiptCopyMode(v as 'single' | 'dual')}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dual">২ কপি</SelectItem>
+                        <SelectItem value="single">১ কপি</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>

@@ -135,6 +135,12 @@ export default function FeeCollection() {
 
   // Fee settings for late fine
   const { data: feeSettings } = useFeeSettings();
+  
+  // School settings for receipt
+  const [schoolName, setSchoolName] = useState('');
+  const [schoolNameBn, setSchoolNameBn] = useState('');
+  const [collectorName, setCollectorName] = useState('');
+  const receiptCopyMode = ((feeSettings as any)?.receipt_copy_mode || 'dual') as 'single' | 'dual';
 
   const searchMutation = useSearchStudent();
   const { data: feeRecords, isLoading: isLoadingRecords } = useStudentFeeRecords(
@@ -151,6 +157,38 @@ export default function FeeCollection() {
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   const cartLateFines = cart.reduce((sum, item) => sum + item.lateFine, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
+
+  // Fetch school settings for receipt
+  useEffect(() => {
+    const fetchSchool = async () => {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('school_name, school_name_bn')
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setSchoolName(data.school_name || '');
+        setSchoolNameBn(data.school_name_bn || '');
+      }
+    };
+    fetchSchool();
+  }, []);
+
+  // Fetch collector name from profile
+  useEffect(() => {
+    const fetchCollector = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (profile) setCollectorName(profile.full_name);
+      }
+    };
+    fetchCollector();
+  }, []);
 
   // Fetch class fees when student is selected
   useEffect(() => {
@@ -485,6 +523,7 @@ export default function FeeCollection() {
         amountPaid: cartTotal,
         lateFine: cartLateFines,
         items: receiptItems,
+        collectorName,
       });
 
       // 4. Show success dialog
@@ -1279,6 +1318,9 @@ export default function FeeCollection() {
           open={receiptOpen} 
           onOpenChange={setReceiptOpen} 
           data={receiptData}
+          schoolName={schoolName}
+          schoolNameBn={schoolNameBn}
+          copyMode={receiptCopyMode}
         />
       </div>
     </MainLayout>
