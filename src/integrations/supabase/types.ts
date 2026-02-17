@@ -312,6 +312,7 @@ export type Database = {
           late_fine_amount: number
           late_fine_enabled: boolean
           monthly_due_date: number
+          receipt_copy_mode: string
           updated_at: string
         }
         Insert: {
@@ -321,6 +322,7 @@ export type Database = {
           late_fine_amount?: number
           late_fine_enabled?: boolean
           monthly_due_date?: number
+          receipt_copy_mode?: string
           updated_at?: string
         }
         Update: {
@@ -330,6 +332,7 @@ export type Database = {
           late_fine_amount?: number
           late_fine_enabled?: boolean
           monthly_due_date?: number
+          receipt_copy_mode?: string
           updated_at?: string
         }
         Relationships: [

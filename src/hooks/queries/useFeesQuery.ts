@@ -10,6 +10,7 @@ export interface FeeSettings {
   monthly_due_date: number;
   late_fine_amount: number;
   late_fine_enabled: boolean;
+  receipt_copy_mode: 'single' | 'dual';
 }
 
 export interface ClassMonthlyFee {
