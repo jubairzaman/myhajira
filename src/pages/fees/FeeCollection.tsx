@@ -538,13 +538,10 @@ export default function FeeCollection() {
     }
   };
 
-  // Print and continue
+  // Print and continue - just open the receipt dialog, user prints from there
   const handlePrintAndContinue = () => {
+    setSuccessDialogOpen(false);
     setReceiptOpen(true);
-    setTimeout(() => {
-      window.print();
-      resetToSearch();
-    }, 200);
   };
 
   // Exit without print
@@ -1316,7 +1313,13 @@ export default function FeeCollection() {
         {/* Receipt Print Dialog */}
         <ReceiptPrint 
           open={receiptOpen} 
-          onOpenChange={setReceiptOpen} 
+          onOpenChange={(open) => {
+            setReceiptOpen(open);
+            if (!open) {
+              // Reset after receipt dialog is closed
+              resetToSearch();
+            }
+          }} 
           data={receiptData}
           schoolName={schoolName}
           schoolNameBn={schoolNameBn}
