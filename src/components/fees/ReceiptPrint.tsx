@@ -298,7 +298,10 @@ export function ReceiptPrint({
   if (!data) return null;
 
   const handlePrint = () => {
-    window.print();
+    // Use a small delay to ensure the DOM is fully rendered before printing
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const feeItems = data.items && data.items.length > 0 
@@ -552,32 +555,64 @@ export function ReceiptPrint({
           @media print {
             @page {
               size: A4 portrait;
-              margin: 10mm;
+              margin: 10mm 10mm 10mm 10mm;
             }
 
-            /* Hide everything except receipt */
-            body * {
-              visibility: hidden !important;
+            /* Hide everything */
+            html, body {
+              height: auto !important;
+              overflow: visible !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
-            .rcpt-print-area,
-            .rcpt-print-area * {
-              visibility: visible !important;
+            body > * {
+              display: none !important;
             }
-            .rcpt-print-area {
-              position: fixed !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 190mm !important;
+
+            /* Show only the receipt print area */
+            /* The dialog portal is appended to body, so we target it */
+            [data-radix-portal] {
+              display: block !important;
+            }
+            [data-radix-portal] > [role="dialog"] {
+              display: block !important;
+              position: static !important;
+              transform: none !important;
+              border: none !important;
+              box-shadow: none !important;
+              max-width: none !important;
+              max-height: none !important;
+              width: 100% !important;
               padding: 0 !important;
               margin: 0 !important;
               background: #fff !important;
-              z-index: 99999 !important;
+              overflow: visible !important;
+            }
+            /* Hide the overlay */
+            [data-radix-portal] > [data-state] {
+              display: none !important;
+            }
+            [data-radix-portal] > [role="dialog"] > [data-state] {
+              display: block !important;
+            }
+
+            .rcpt-print-area {
+              display: block !important;
+              visibility: visible !important;
+              position: static !important;
+              width: 190mm !important;
+              padding: 0 !important;
+              margin: 0 auto !important;
+              background: #fff !important;
+            }
+            .rcpt-print-area * {
+              visibility: visible !important;
             }
 
             /* No-print elements */
             .no-print,
-            [role="dialog"] > div:first-child,
-            button {
+            [role="dialog"] button[class*="absolute"],
+            .rcpt-print-area ~ style {
               display: none !important;
             }
 
@@ -611,12 +646,6 @@ export function ReceiptPrint({
               background: #f5f5f5 !important;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
-            }
-
-            /* Prevent blank trailing page */
-            html, body {
-              height: auto !important;
-              overflow: visible !important;
             }
           }
         `}</style>
