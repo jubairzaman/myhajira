@@ -111,6 +111,37 @@ function convertToWords(num: number): string {
   return words.trim();
 }
 
+// Group fee items by type, merging monthly fees into one row with all months listed
+function groupFeeItems(items: ReceiptFeeItem[]): { description: string; amountDue: number; lateFine: number; amountPaid: number }[] {
+  const grouped: { description: string; amountDue: number; lateFine: number; amountPaid: number }[] = [];
+  const monthlyItems = items.filter(i => i.feeType === 'monthly');
+  const otherItems = items.filter(i => i.feeType !== 'monthly');
+
+  if (monthlyItems.length > 0) {
+    const months = monthlyItems
+      .map(i => formatMonth(i.feeMonth))
+      .filter(Boolean)
+      .join(', ');
+    grouped.push({
+      description: `${getFeeTypeLabel('monthly')}${months ? ` - ${months}` : ''}`,
+      amountDue: monthlyItems.reduce((s, i) => s + i.amountDue, 0),
+      lateFine: monthlyItems.reduce((s, i) => s + i.lateFine, 0),
+      amountPaid: monthlyItems.reduce((s, i) => s + i.amountPaid, 0),
+    });
+  }
+
+  otherItems.forEach(item => {
+    grouped.push({
+      description: `${getFeeTypeLabel(item.feeType)}${item.examName ? ` - ${item.examName}` : ''}${item.feeMonth ? ` - ${formatMonth(item.feeMonth)}` : ''}`,
+      amountDue: item.amountDue,
+      lateFine: item.lateFine,
+      amountPaid: item.amountPaid,
+    });
+  });
+
+  return grouped;
+}
+
 // Single receipt copy component
 function ReceiptCopy({ 
   data, 
@@ -134,6 +165,7 @@ function ReceiptCopy({
   grandTotal: number;
 }) {
   const remaining = grandTotal - totalPaid;
+  const displayItems = groupFeeItems(feeItems);
 
   return (
     <div className="rcpt-copy">
@@ -202,14 +234,10 @@ function ReceiptCopy({
           </tr>
         </thead>
         <tbody>
-          {feeItems.map((item, index) => (
+          {displayItems.map((item, index) => (
             <tr key={index}>
               <td className="rcpt-td rcpt-td-center">{index + 1}</td>
-              <td className="rcpt-td">
-                {getFeeTypeLabel(item.feeType)}
-                {item.feeMonth && ` - ${formatMonth(item.feeMonth)}`}
-                {item.examName && ` - ${item.examName}`}
-              </td>
+              <td className="rcpt-td">{item.description}</td>
               <td className="rcpt-td rcpt-td-right rcpt-mono">
                 {item.amountDue.toLocaleString('bn-BD')}/-
               </td>
