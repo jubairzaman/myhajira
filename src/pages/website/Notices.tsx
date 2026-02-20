@@ -102,7 +102,7 @@ export default function Notices() {
               <p className="text-gray-500 font-bengali text-lg">কোনো নোটিশ পাওয়া যায়নি</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {filteredNotices.map((notice) => (
                 <Card key={notice.id} className="border-0 shadow-md hover:shadow-xl transition-all group overflow-hidden">
                   <CardContent className="p-0">

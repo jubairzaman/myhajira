@@ -128,7 +128,7 @@ export default function Alumni() {
               <h2 className="text-3xl font-bold text-[#4B0082] font-bengali mb-4">বিশিষ্ট প্রাক্তন ছাত্র</h2>
               <div className="w-24 h-1 bg-gradient-to-r from-[#4B0082] to-[#00D4FF] mx-auto rounded-full" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {featuredAlumni.map((person) => (
                 <Card key={person.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                   <CardContent className="p-6 text-center">

@@ -114,7 +114,7 @@ export default function Results() {
               <p className="text-gray-400 text-sm mt-2">অনুগ্রহ করে শ্রেণী ও পরীক্ষা নির্বাচন করুন</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {filteredResults.map((result) => (
                 <Card key={result.id} className="border-0 shadow-md hover:shadow-xl transition-all overflow-hidden">
                   <div className="bg-gradient-to-r from-[#4B0082] to-[#6B2D8B] p-4">

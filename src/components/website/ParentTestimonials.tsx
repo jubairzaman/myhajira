@@ -24,7 +24,7 @@ export function ParentTestimonials() {
           <div className="w-24 h-1 bg-gradient-to-r from-[#4B0082] to-[#00D4FF] mx-auto rounded-full mt-4" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {testimonials.slice(0, 6).map((testimonial) => (
             <Card 
               key={testimonial.id} 
