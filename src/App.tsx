@@ -81,9 +81,9 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes - data won't refetch if younger
       gcTime: 30 * 60 * 1000, // 30 minutes - keep unused data in cache
       refetchOnWindowFocus: false, // Don't refetch on tab focus
-      refetchOnMount: false, // Don't refetch when component mounts if data exists
-      refetchOnReconnect: false, // Don't refetch on reconnect
-      retry: 1, // Only retry once on failure
+      refetchOnMount: true, // Refetch on mount if data is stale (fixes missing data bug)
+      refetchOnReconnect: true, // Refetch on reconnect to get fresh data
+      retry: 2, // Retry twice on failure
     },
   },
 });
