@@ -15,24 +15,21 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Inter',
+  				'Li Ador Noirrit A-V1',
+  				'Hind Siliguri',
   				'ui-sans-serif',
   				'system-ui',
   				'-apple-system',
-  				'BlinkMacSystemFont',
-  				'Segoe UI',
-  				'Roboto',
-  				'Helvetica Neue',
-  				'Arial',
-  				'Noto Sans',
   				'sans-serif'
   			],
   			bengali: [
+  				'Li Ador Noirrit A-V1',
   				'Hind Siliguri',
   				'Noto Sans Bengali',
   				'sans-serif'
   			],
   			display: [
+  				'Li Ador Noirrit A-V1',
   				'Inter',
   				'sans-serif'
   			],

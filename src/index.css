@@ -3,18 +3,16 @@
 @tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
-
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap");
-
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap");
-
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
 @import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
-
 @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
+
+/* আদর নৈর্ঋত - Free Bengali Font via CDN */
+@import url("https://db.onlinewebfonts.com/c/4e2ffdd669618de8991fddb0b820892a?family=Li+Ador+Noirrit+A-V1");
+
 
 @layer base {
   :root {
@@ -177,16 +175,16 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', 'Hind Siliguri', system-ui, sans-serif;
+    font-family: 'Li Ador Noirrit A-V1', 'Hind Siliguri', system-ui, sans-serif;
   }
 
-  /* Bengali Typography */
+  /* Bengali Typography - আদর নৈর্ঋত as primary */
   .font-bengali {
-    font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+    font-family: 'Li Ador Noirrit A-V1', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
   }
 
   .font-display {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Li Ador Noirrit A-V1', 'Inter', sans-serif;
     font-weight: 700;
   }
 }

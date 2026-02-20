@@ -41,7 +41,7 @@ export default function Academics() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               {programs.map((program) => {
                 const Icon = iconMap[program.icon || 'GraduationCap'] || GraduationCap;
                 return (
@@ -121,7 +121,7 @@ export default function Academics() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 max-w-5xl mx-auto">
               {academics.map((academic) => (
                 <Card key={academic.id} className="border-0 shadow-md hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
