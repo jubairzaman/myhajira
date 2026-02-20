@@ -21,6 +21,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const roleCache = new Map<string, { role: string; timestamp: number }>();
 const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Prefetch academic years as soon as auth is known — parallel with role fetch
+async function prefetchAcademicYears() {
+  try {
+    await supabase
+      .from('academic_years')
+      .select('*')
+      .order('start_date', { ascending: false });
+  } catch {
+    // Silently ignore — the query will be retried by React Query
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -53,7 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Get initial session and role in parallel for faster loading
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -61,10 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Fetch role in parallel, don't block loading state
         if (session?.user) {
-          // Start role fetch but don't await it
+          // Fetch role AND prefetch academic years in parallel — eliminates waterfall
           fetchUserRole(session.user.id);
+          prefetchAcademicYears();
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -75,15 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     initializeAuth();
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer role check to avoid blocking
-          setTimeout(() => fetchUserRole(session.user.id), 0);
+          setTimeout(() => {
+            fetchUserRole(session.user.id);
+            prefetchAcademicYears();
+          }, 0);
         } else {
           setUserRole(null);
         }
