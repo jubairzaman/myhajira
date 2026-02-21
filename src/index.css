@@ -11,7 +11,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
 
 /* আদর নৈর্ঋত - Free Bengali Font via CDN */
-@import url("https://db.onlinewebfonts.com/c/4e2ffdd669618de8991fddb0b820892a?family=Li+Ador+Noirrit+A-V1");
+@import url('https://fonts.cdnfonts.com/css/li-ador-noirrit');
 
 
 @layer base {
@@ -175,16 +175,16 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Li Ador Noirrit A-V1', 'Hind Siliguri', system-ui, sans-serif;
+    font-family: 'Li Ador Noirrit', 'Hind Siliguri', system-ui, sans-serif;
   }
 
   /* Bengali Typography - আদর নৈর্ঋত as primary */
   .font-bengali {
-    font-family: 'Li Ador Noirrit A-V1', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+    font-family: 'Li Ador Noirrit', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
   }
 
   .font-display {
-    font-family: 'Li Ador Noirrit A-V1', 'Inter', sans-serif;
+    font-family: 'Li Ador Noirrit', 'Inter', sans-serif;
     font-weight: 700;
   }
 }

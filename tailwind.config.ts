@@ -14,25 +14,25 @@ export default {
   	},
   	extend: {
   		fontFamily: {
-  			sans: [
-  				'Li Ador Noirrit A-V1',
-  				'Hind Siliguri',
-  				'ui-sans-serif',
-  				'system-ui',
-  				'-apple-system',
-  				'sans-serif'
-  			],
-  			bengali: [
-  				'Li Ador Noirrit A-V1',
-  				'Hind Siliguri',
-  				'Noto Sans Bengali',
-  				'sans-serif'
-  			],
-  			display: [
-  				'Li Ador Noirrit A-V1',
-  				'Inter',
-  				'sans-serif'
-  			],
+			sans: [
+				'Li Ador Noirrit',
+				'Hind Siliguri',
+				'ui-sans-serif',
+				'system-ui',
+				'-apple-system',
+				'sans-serif'
+			],
+			bengali: [
+				'Li Ador Noirrit',
+				'Hind Siliguri',
+				'Noto Sans Bengali',
+				'sans-serif'
+			],
+			display: [
+				'Li Ador Noirrit',
+				'Inter',
+				'sans-serif'
+			],
   			serif: [
   				'Lora',
   				'ui-serif',
