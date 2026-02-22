@@ -74,6 +74,10 @@ import CTAButtonsManager from "./pages/website/admin/CTAButtonsManager";
 import NavigationManager from "./pages/website/admin/NavigationManager";
 import AdmissionsManager from "./pages/website/admin/AdmissionsManager";
 
+// Help Pages
+import Documentation from "./pages/help/Documentation";
+import HelpContact from "./pages/help/HelpContact";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -340,7 +344,17 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
-              {/* Legacy /website redirect - remove this section */}
+              {/* Help */}
+              <Route path="/help/documentation" element={
+                <ProtectedRoute>
+                  <Documentation />
+                </ProtectedRoute>
+              } />
+              <Route path="/help/contact" element={
+                <ProtectedRoute>
+                  <HelpContact />
+                </ProtectedRoute>
+              } />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

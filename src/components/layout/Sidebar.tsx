@@ -21,6 +21,7 @@ import {
   Wallet,
   Package,
   Globe,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -138,6 +139,15 @@ const navItems: NavItem[] = [
       { label: 'SMS Settings', labelBn: 'এসএমএস সেটিংস', icon: MessageSquare, href: '/sms' },
       { label: 'Monitor Display', labelBn: 'মনিটর ডিসপ্লে', icon: Tv, href: '/settings/monitor' },
       { label: 'System Settings', labelBn: 'সিস্টেম সেটিংস', icon: Settings, href: '/settings' },
+    ],
+  },
+  {
+    label: 'Help',
+    labelBn: 'সাহায্য',
+    icon: HelpCircle,
+    children: [
+      { label: 'Documentation', labelBn: 'ডকুমেন্টেশন', icon: ChevronRight, href: '/help/documentation' },
+      { label: 'Contact', labelBn: 'যোগাযোগ', icon: ChevronRight, href: '/help/contact' },
     ],
   },
 ];
