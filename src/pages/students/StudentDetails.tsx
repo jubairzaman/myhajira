@@ -20,6 +20,7 @@ import {
   Edit,
   Receipt,
   BarChart3,
+  Download,
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -130,6 +131,71 @@ export default function StudentDetails() {
   // Get document submission status
   const getDocumentStatus = (docId: string) => {
     return studentDocuments.find(sd => sd.document_id === docId);
+  };
+
+  // Print report handler
+  const handlePrintReport = (type: 'attendance' | 'fee') => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow || !student) return;
+
+    const schoolName = 'আমার হাজিরা';
+    const title = type === 'attendance' ? 'উপস্থিতি রিপোর্ট' : 'ফি রিপোর্ট';
+
+    let tableHtml = '';
+    if (type === 'attendance' && attendanceStats) {
+      tableHtml = `
+        <table><thead><tr>
+          <th>মোট দিন</th><th>উপস্থিত</th><th>বিলম্ব</th><th>অনুপস্থিত</th><th>হার</th>
+        </tr></thead><tbody><tr>
+          <td>${attendanceStats.total}</td>
+          <td>${attendanceStats.present}</td>
+          <td>${attendanceStats.late}</td>
+          <td>${attendanceStats.absent}</td>
+          <td>${attendanceStats.total > 0 ? (((attendanceStats.present + attendanceStats.late) / attendanceStats.total) * 100).toFixed(1) : 0}%</td>
+        </tr></tbody></table>`;
+    } else if (type === 'fee') {
+      const rows = feeRecords.map(r => `<tr>
+        <td>${r.fee_type}</td>
+        <td>৳${r.amount_due}</td><td>৳${r.late_fine}</td>
+        <td>৳${r.amount_paid}</td><td>${r.status === 'paid' ? 'পরিশোধিত' : r.status === 'partial' ? 'আংশিক' : 'অপরিশোধিত'}</td>
+      </tr>`).join('');
+      const totalDue = feeRecords.reduce((s, r) => s + Number(r.amount_due) + Number(r.late_fine), 0);
+      const totalPaid = feeRecords.reduce((s, r) => s + Number(r.amount_paid), 0);
+      tableHtml = `<table><thead><tr>
+        <th>ধরন</th><th>বকেয়া</th><th>জরিমানা</th><th>পরিশোধ</th><th>স্ট্যাটাস</th>
+      </tr></thead><tbody>${rows}
+        <tr style="font-weight:bold;border-top:2px solid #000">
+          <td>মোট</td><td>৳${totalDue}</td><td></td><td>৳${totalPaid}</td><td>বাকি: ৳${totalDue - totalPaid}</td>
+        </tr>
+      </tbody></table>`;
+    }
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${title} - ${student.name}</title>
+      <style>
+        body{font-family:'Li Ador Noirrit','Hind Siliguri',sans-serif;padding:20px;font-size:14px}
+        h1{text-align:center;font-size:20px;margin-bottom:4px}
+        h2{text-align:center;font-size:16px;color:#666;margin-bottom:16px}
+        .info{display:flex;gap:20px;margin-bottom:16px;padding:10px;background:#f5f5f5;border-radius:8px}
+        .info div{flex:1}
+        table{width:100%;border-collapse:collapse;margin-top:16px}
+        th,td{border:1px solid #ddd;padding:8px;text-align:center}
+        th{background:#f0f0f0}
+        @media print{body{padding:0}}
+      </style>
+    </head><body>
+      <h1>${schoolName}</h1>
+      <h2>${title}</h2>
+      <div class="info">
+        <div><strong>নাম:</strong> ${student.name}${student.name_bn ? ` (${student.name_bn})` : ''}</div>
+        <div><strong>শ্রেণী:</strong> ${student.class?.name || '-'}</div>
+        <div><strong>শাখা:</strong> ${student.section?.name || '-'}</div>
+        <div><strong>আইডি:</strong> ${student.student_id_number || '-'}</div>
+      </div>
+      ${tableHtml}
+      <script>window.print();window.close();</script>
+    </body></html>`);
+    printWindow.document.close();
   };
 
   // Handle document toggle
@@ -301,6 +367,17 @@ export default function StudentDetails() {
 
           {/* Fees & Attendance Tab */}
           <TabsContent value="fees" className="space-y-6">
+            {/* Download Buttons */}
+            <div className="flex gap-3 flex-wrap">
+              <Button variant="outline" className="gap-2" onClick={() => handlePrintReport('attendance')}>
+                <Download className="w-4 h-4" />
+                <span className="font-bengali">উপস্থিতি রিপোর্ট PDF</span>
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={() => handlePrintReport('fee')}>
+                <Download className="w-4 h-4" />
+                <span className="font-bengali">ফি রিপোর্ট PDF</span>
+              </Button>
+            </div>
             {/* Attendance Stats */}
             {attendanceStats && (
               <Card>
