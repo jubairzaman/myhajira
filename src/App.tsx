@@ -78,6 +78,10 @@ import AdmissionsManager from "./pages/website/admin/AdmissionsManager";
 import Documentation from "./pages/help/Documentation";
 import HelpContact from "./pages/help/HelpContact";
 
+// User Management & Profile
+import UserManagement from "./pages/settings/UserManagement";
+import CompleteProfile from "./pages/auth/CompleteProfile";
+
 // Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,6 +120,7 @@ const App = () => (
               
               {/* Auth */}
               <Route path="/login" element={<Login />} />
+              <Route path="/complete-profile" element={<CompleteProfile />} />
               
               {/* Dashboard */}
               <Route path="/dashboard" element={
@@ -269,6 +274,11 @@ const App = () => (
               <Route path="/settings/documents" element={
                 <ProtectedRoute requireAdmin>
                   <DocumentSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings/users" element={
+                <ProtectedRoute requireAdmin>
+                  <UserManagement />
                 </ProtectedRoute>
               } />
               

@@ -138,6 +138,7 @@ const navItems: NavItem[] = [
       { label: 'Devices', labelBn: 'ডিভাইস', icon: Cpu, href: '/devices' },
       { label: 'SMS Settings', labelBn: 'এসএমএস সেটিংস', icon: MessageSquare, href: '/sms' },
       { label: 'Monitor Display', labelBn: 'মনিটর ডিসপ্লে', icon: Tv, href: '/settings/monitor' },
+      { label: 'User Management', labelBn: 'ইউজার ম্যানেজমেন্ট', icon: ChevronRight, href: '/settings/users' },
       { label: 'System Settings', labelBn: 'সিস্টেম সেটিংস', icon: Settings, href: '/settings' },
     ],
   },
