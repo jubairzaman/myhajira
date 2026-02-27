@@ -122,6 +122,15 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    label: 'Accounts',
+    labelBn: 'হিসাব',
+    icon: Wallet,
+    children: [
+      { label: 'Daily Dashboard', labelBn: 'দৈনিক হিসাব', icon: ChevronRight, href: '/accounts/dashboard' },
+      { label: 'Control Panel', labelBn: 'কন্ট্রোল প্যানেল', icon: ChevronRight, href: '/finance/control-panel' },
+    ],
+  },
+  {
     label: 'Reports',
     labelBn: 'রিপোর্ট',
     icon: FileText,

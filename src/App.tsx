@@ -78,6 +78,10 @@ import AdmissionsManager from "./pages/website/admin/AdmissionsManager";
 import Documentation from "./pages/help/Documentation";
 import HelpContact from "./pages/help/HelpContact";
 
+// Finance & Accounts Pages
+import FinanceControlPanel from "./pages/finance/FinanceControlPanel";
+import AccountsDashboard from "./pages/accounts/AccountsDashboard";
+
 // User Management & Profile
 import UserManagement from "./pages/settings/UserManagement";
 import CompleteProfile from "./pages/auth/CompleteProfile";
@@ -354,6 +358,18 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
+              {/* Finance & Accounts */}
+              <Route path="/finance/control-panel" element={
+                <ProtectedRoute requireAdmin>
+                  <FinanceControlPanel />
+                </ProtectedRoute>
+              } />
+              <Route path="/accounts/dashboard" element={
+                <ProtectedRoute>
+                  <AccountsDashboard />
+                </ProtectedRoute>
+              } />
+
               {/* Help */}
               <Route path="/help/documentation" element={
                 <ProtectedRoute>

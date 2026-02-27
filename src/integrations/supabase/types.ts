@@ -304,6 +304,45 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          created_by: string
+          expense_date: string
+          id: string
+          notes: string | null
+          payment_method: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fee_settings: {
         Row: {
           academic_year_id: string
@@ -344,6 +383,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      finance_feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          feature_key: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          feature_key: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          feature_key?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      finance_mode: {
+        Row: {
+          id: string
+          mode: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          mode?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          mode?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       inventory_products: {
         Row: {
@@ -2802,6 +2886,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_daily_finance_summary: { Args: { p_date: string }; Returns: Json }
       get_dashboard_stats: {
         Args: { p_academic_year_id: string; p_date: string }
         Returns: Json
