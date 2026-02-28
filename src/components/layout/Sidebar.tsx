@@ -127,6 +127,9 @@ const navItems: NavItem[] = [
     icon: Wallet,
     children: [
       { label: 'Daily Dashboard', labelBn: 'দৈনিক হিসাব', icon: ChevronRight, href: '/accounts/dashboard' },
+      { label: 'Finance Dashboard', labelBn: 'ফাইন্যান্স ড্যাশবোর্ড', icon: ChevronRight, href: '/finance/admin-dashboard' },
+      { label: 'Finance Reports', labelBn: 'ফাইন্যান্স রিপোর্ট', icon: ChevronRight, href: '/finance/admin-reports' },
+      { label: 'Admin Control', labelBn: 'এডমিন কন্ট্রোল', icon: ChevronRight, href: '/finance/admin-control' },
       { label: 'Control Panel', labelBn: 'কন্ট্রোল প্যানেল', icon: ChevronRight, href: '/finance/control-panel' },
     ],
   },

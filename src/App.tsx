@@ -80,6 +80,9 @@ import HelpContact from "./pages/help/HelpContact";
 
 // Finance & Accounts Pages
 import FinanceControlPanel from "./pages/finance/FinanceControlPanel";
+import AdminFinanceDashboard from "./pages/finance/AdminFinanceDashboard";
+import AdminFinanceReports from "./pages/finance/AdminFinanceReports";
+import AdminFinanceControl from "./pages/finance/AdminFinanceControl";
 import AccountsDashboard from "./pages/accounts/AccountsDashboard";
 
 // User Management & Profile
@@ -362,6 +365,21 @@ const App = () => (
               <Route path="/finance/control-panel" element={
                 <ProtectedRoute requireAdmin>
                   <FinanceControlPanel />
+                </ProtectedRoute>
+              } />
+              <Route path="/finance/admin-dashboard" element={
+                <ProtectedRoute requireAdmin>
+                  <AdminFinanceDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/finance/admin-reports" element={
+                <ProtectedRoute requireAdmin>
+                  <AdminFinanceReports />
+                </ProtectedRoute>
+              } />
+              <Route path="/finance/admin-control" element={
+                <ProtectedRoute requireAdmin>
+                  <AdminFinanceControl />
                 </ProtectedRoute>
               } />
               <Route path="/accounts/dashboard" element={
