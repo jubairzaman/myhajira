@@ -22,6 +22,14 @@ import {
   Package,
   Globe,
   HelpCircle,
+  BarChart3,
+  ClipboardList,
+  Shield,
+  SlidersHorizontal,
+  TrendingUp,
+  Receipt,
+  CircleDollarSign,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -44,16 +52,6 @@ const navItems: NavItem[] = [
     href: '/dashboard',
   },
   {
-    label: 'Structure',
-    labelBn: 'কাঠামো',
-    icon: Building2,
-    children: [
-      { label: 'Shifts', labelBn: 'শিফট', icon: ChevronRight, href: '/shifts' },
-      { label: 'Classes', labelBn: 'শ্রেণী', icon: ChevronRight, href: '/classes' },
-      { label: 'Sections', labelBn: 'শাখা', icon: ChevronRight, href: '/sections' },
-    ],
-  },
-  {
     label: 'Students',
     labelBn: 'শিক্ষার্থী',
     icon: GraduationCap,
@@ -73,6 +71,23 @@ const navItems: NavItem[] = [
       { label: 'Student Attendance', labelBn: 'শিক্ষার্থী উপস্থিতি', icon: ChevronRight, href: '/attendance/students' },
       { label: 'Teacher Attendance', labelBn: 'শিক্ষক উপস্থিতি', icon: ChevronRight, href: '/attendance/teachers' },
       { label: 'Manual Entry', labelBn: 'ম্যানুয়াল এন্ট্রি', icon: ChevronRight, href: '/attendance/manual' },
+      { label: 'Attendance Reports', labelBn: 'উপস্থিতি রিপোর্ট', icon: ChevronRight, href: '/reports' },
+    ],
+  },
+  {
+    label: 'Accounts',
+    labelBn: 'হিসাব ব্যবস্থাপনা',
+    icon: CircleDollarSign,
+    children: [
+      { label: 'Fee Settings', labelBn: 'ফি সেটিংস', icon: SlidersHorizontal, href: '/fees/settings' },
+      { label: 'Fee Collection', labelBn: 'ফি আদায় (POS)', icon: Receipt, href: '/fees/collection' },
+      { label: 'Fee Reports', labelBn: 'ফি রিপোর্ট', icon: BarChart3, href: '/fees/reports' },
+      { label: 'Inventory / POS', labelBn: 'ইনভেন্টরি', icon: Package, href: '/inventory' },
+      { label: 'Daily Accounts', labelBn: 'দৈনিক হিসাব', icon: ClipboardList, href: '/accounts/dashboard' },
+      { label: 'Finance Dashboard', labelBn: 'ফাইন্যান্স ড্যাশবোর্ড', icon: TrendingUp, href: '/finance/admin-dashboard' },
+      { label: 'Finance Reports', labelBn: 'ফাইন্যান্স রিপোর্ট', icon: BookOpen, href: '/finance/admin-reports' },
+      { label: 'Finance Control', labelBn: 'ফাইন্যান্স কন্ট্রোল', icon: Shield, href: '/finance/admin-control' },
+      { label: 'Feature Toggles', labelBn: 'ফিচার কন্ট্রোল', icon: SlidersHorizontal, href: '/finance/control-panel' },
     ],
   },
   {
@@ -83,22 +98,6 @@ const navItems: NavItem[] = [
       { label: 'Gate Monitor', labelBn: 'গেট মনিটর', icon: ChevronRight, href: '/monitor/gate' },
       { label: 'Office Monitor', labelBn: 'অফিস মনিটর', icon: ChevronRight, href: '/monitor/office' },
     ],
-  },
-  {
-    label: 'Fees',
-    labelBn: 'ফি ম্যানেজমেন্ট',
-    icon: Wallet,
-    children: [
-      { label: 'Fee Settings', labelBn: 'ফি সেটিংস', icon: ChevronRight, href: '/fees/settings' },
-      { label: 'Fee Collection', labelBn: 'ফি আদায়', icon: ChevronRight, href: '/fees/collection' },
-      { label: 'Fee Reports', labelBn: 'ফি রিপোর্ট', icon: ChevronRight, href: '/fees/reports' },
-    ],
-  },
-  {
-    label: 'Inventory',
-    labelBn: 'ইনভেন্টরি',
-    icon: Package,
-    href: '/inventory',
   },
   {
     label: 'Website CMS',
@@ -122,28 +121,13 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    label: 'Accounts',
-    labelBn: 'হিসাব',
-    icon: Wallet,
-    children: [
-      { label: 'Daily Dashboard', labelBn: 'দৈনিক হিসাব', icon: ChevronRight, href: '/accounts/dashboard' },
-      { label: 'Finance Dashboard', labelBn: 'ফাইন্যান্স ড্যাশবোর্ড', icon: ChevronRight, href: '/finance/admin-dashboard' },
-      { label: 'Finance Reports', labelBn: 'ফাইন্যান্স রিপোর্ট', icon: ChevronRight, href: '/finance/admin-reports' },
-      { label: 'Admin Control', labelBn: 'এডমিন কন্ট্রোল', icon: ChevronRight, href: '/finance/admin-control' },
-      { label: 'Control Panel', labelBn: 'কন্ট্রোল প্যানেল', icon: ChevronRight, href: '/finance/control-panel' },
-    ],
-  },
-  {
-    label: 'Reports',
-    labelBn: 'রিপোর্ট',
-    icon: FileText,
-    href: '/reports',
-  },
-  {
     label: 'Settings',
     labelBn: 'সেটিংস',
     icon: Settings,
     children: [
+      { label: 'Structure', labelBn: 'কাঠামো (শিফট/ক্লাস/শাখা)', icon: Building2, href: '/shifts' },
+      { label: 'Classes', labelBn: 'শ্রেণী', icon: ChevronRight, href: '/classes' },
+      { label: 'Sections', labelBn: 'শাখা', icon: ChevronRight, href: '/sections' },
       { label: 'Academic Year', labelBn: 'শিক্ষাবর্ষ', icon: Calendar, href: '/academic-year' },
       { label: 'School Calendar', labelBn: 'স্কুল ক্যালেন্ডার', icon: Calendar, href: '/calendar' },
       { label: 'Admission Documents', labelBn: 'ভর্তি ডকুমেন্ট', icon: FileText, href: '/settings/documents' },
@@ -307,7 +291,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <aside className={cn(
       "fixed left-0 top-0 h-full w-64 bg-sidebar text-sidebar-foreground flex flex-col z-50 transition-transform duration-300",
-      // Mobile: hidden by default, shown when isOpen
       "lg:translate-x-0",
       isOpen ? "translate-x-0" : "-translate-x-full"
     )}>
@@ -323,7 +306,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="text-xs opacity-70">Amar Hajira</p>
             </div>
           </div>
-          {/* Close button for mobile */}
           <button
             onClick={onClose}
             className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
