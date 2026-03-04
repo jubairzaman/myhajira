@@ -8,6 +8,13 @@ import { useWebsiteSettings } from '@/hooks/queries/useWebsiteCMS';
 export default function PublicLayout() {
   const { data: settings, isLoading } = useWebsiteSettings();
 
+  // Dynamic site title
+  useEffect(() => {
+    if (settings?.site_title) {
+      document.title = settings.site_title;
+    }
+  }, [settings?.site_title]);
+
   // Dynamic favicon
   useEffect(() => {
     if (settings?.favicon_url) {

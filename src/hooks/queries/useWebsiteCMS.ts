@@ -9,6 +9,7 @@ export interface WebsiteSettings {
   school_name_bn: string | null;
   logo_url: string | null;
   favicon_url: string | null;
+  site_title: string | null;
   hero_title: string | null;
   hero_title_bn: string | null;
   hero_subtitle: string | null;

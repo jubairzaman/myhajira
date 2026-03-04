@@ -20,6 +20,7 @@ export default function WebsiteSettings() {
     id: '',
     school_name: '',
     school_name_bn: '',
+    site_title: '',
     hero_title: '',
     hero_title_bn: '',
     hero_subtitle: '',
@@ -50,6 +51,7 @@ export default function WebsiteSettings() {
         id: settings.id,
         school_name: settings.school_name || '',
         school_name_bn: settings.school_name_bn || '',
+        site_title: (settings as any).site_title || '',
         hero_title: settings.hero_title || '',
         hero_title_bn: settings.hero_title_bn || '',
         hero_subtitle: settings.hero_subtitle || '',
@@ -138,6 +140,17 @@ export default function WebsiteSettings() {
                         className="font-bengali"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>ব্রাউজার ট্যাব টাইটেল (Site Title)</Label>
+                    <Input
+                      value={formData.site_title}
+                      onChange={(e) => setFormData({ ...formData, site_title: e.target.value })}
+                      placeholder="ব্রাউজার ট্যাবে যা দেখাবে"
+                      className="font-bengali"
+                    />
+                    <p className="text-xs text-muted-foreground font-bengali">ফেভিকনের পাশে ব্রাউজার ট্যাবে এই নামটি দেখা যাবে</p>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">

@@ -2729,6 +2729,7 @@ export type Database = {
           secondary_color: string | null
           seo_description: string | null
           seo_title: string | null
+          site_title: string | null
           twitter_url: string | null
           updated_at: string
           youtube_url: string | null
@@ -2762,6 +2763,7 @@ export type Database = {
           secondary_color?: string | null
           seo_description?: string | null
           seo_title?: string | null
+          site_title?: string | null
           twitter_url?: string | null
           updated_at?: string
           youtube_url?: string | null
@@ -2795,6 +2797,7 @@ export type Database = {
           secondary_color?: string | null
           seo_description?: string | null
           seo_title?: string | null
+          site_title?: string | null
           twitter_url?: string | null
           updated_at?: string
           youtube_url?: string | null
