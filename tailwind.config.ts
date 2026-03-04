@@ -14,45 +14,31 @@ export default {
   	},
   	extend: {
   		fontFamily: {
-			sans: [
-				'Li Ador Noirrit',
-				'Hind Siliguri',
-				'ui-sans-serif',
-				'system-ui',
-				'-apple-system',
-				'sans-serif'
-			],
-			bengali: [
-				'Li Ador Noirrit',
-				'Hind Siliguri',
-				'Noto Sans Bengali',
-				'sans-serif'
-			],
-			display: [
-				'Li Ador Noirrit',
-				'Inter',
-				'sans-serif'
-			],
-  			serif: [
-  				'Lora',
-  				'ui-serif',
-  				'Georgia',
-  				'Cambria',
-  				'Times New Roman',
-  				'Times',
-  				'serif'
-  			],
-  			mono: [
-  				'Space Mono',
-  				'ui-monospace',
-  				'SFMono-Regular',
-  				'Menlo',
-  				'Monaco',
-  				'Consolas',
-  				'Liberation Mono',
-  				'Courier New',
-  				'monospace'
-  			]
+		sans: [
+			'Li Ador Noirrit',
+			'ui-sans-serif',
+			'system-ui',
+			'-apple-system',
+			'sans-serif'
+		],
+		bengali: [
+			'Li Ador Noirrit',
+			'sans-serif'
+		],
+		display: [
+			'Li Ador Noirrit',
+			'sans-serif'
+		],
+  		serif: [
+  			'Li Ador Noirrit',
+  			'ui-serif',
+  			'serif'
+  		],
+  		mono: [
+  			'Li Ador Noirrit',
+  			'ui-monospace',
+  			'monospace'
+  		]
   		},
   		colors: {
   			border: 'hsl(var(--border))',

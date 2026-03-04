@@ -1,0 +1,1 @@
+ALTER TABLE public.website_settings ADD COLUMN site_title text DEFAULT 'আমার হাজিরা';
