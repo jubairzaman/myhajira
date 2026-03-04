@@ -8,23 +8,7 @@ import { useWebsiteSettings } from '@/hooks/queries/useWebsiteCMS';
 export default function PublicLayout() {
   const { data: settings, isLoading } = useWebsiteSettings();
 
-  // Dynamic site title
-  useEffect(() => {
-    if (settings?.site_title) {
-      document.title = settings.site_title;
-    }
-  }, [settings?.site_title]);
-
-  // Dynamic favicon
-  useEffect(() => {
-    if (settings?.favicon_url) {
-      const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement || document.createElement('link');
-      link.type = 'image/x-icon';
-      link.rel = 'shortcut icon';
-      link.href = settings.favicon_url;
-      document.getElementsByTagName('head')[0].appendChild(link);
-    }
-  }, [settings?.favicon_url]);
+  // Dynamic site title and favicon are now handled globally in App.tsx via GlobalMeta
 
   // Apply dynamic colors as CSS variables
   useEffect(() => {
