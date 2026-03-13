@@ -75,6 +75,7 @@ import PopupNoticeManager from "./pages/website/admin/PopupNoticeManager";
 import CTAButtonsManager from "./pages/website/admin/CTAButtonsManager";
 import NavigationManager from "./pages/website/admin/NavigationManager";
 import AdmissionsManager from "./pages/website/admin/AdmissionsManager";
+import SeoSettings from "./pages/website/admin/SeoSettings";
 
 // Help Pages
 import Documentation from "./pages/help/Documentation";
