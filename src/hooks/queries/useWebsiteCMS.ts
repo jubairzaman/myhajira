@@ -235,7 +235,7 @@ export function useUpdateWebsiteSettings() {
       const { id, ...updateData } = settings;
       const { data, error } = await supabase
         .from('website_settings')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
