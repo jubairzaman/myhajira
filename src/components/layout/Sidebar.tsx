@@ -105,6 +105,7 @@ const navItems: NavItem[] = [
     icon: Globe,
     children: [
       { label: 'Settings', labelBn: 'সেটিংস', icon: ChevronRight, href: '/website/admin/settings' },
+      { label: 'SEO Settings', labelBn: 'SEO সেটিংস', icon: ChevronRight, href: '/website/admin/seo' },
       { label: 'Navigation', labelBn: 'ন্যাভিগেশন', icon: ChevronRight, href: '/website/admin/navigation' },
       { label: 'Home Page', labelBn: 'হোম পেজ', icon: ChevronRight, href: '/website/admin/home-page' },
       { label: 'Button Links', labelBn: 'বাটন লিংক', icon: ChevronRight, href: '/website/admin/cta-buttons' },

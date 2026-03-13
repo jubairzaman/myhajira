@@ -2701,6 +2701,7 @@ export type Database = {
       }
       website_settings: {
         Row: {
+          canonical_url: string | null
           contact_address: string | null
           contact_address_bn: string | null
           contact_email: string | null
@@ -2719,22 +2720,33 @@ export type Database = {
           id: string
           instagram_url: string | null
           is_website_enabled: boolean
+          json_ld_extra: Json | null
+          json_ld_type: string | null
           logo_url: string | null
           office_hours: string | null
           office_hours_bn: string | null
+          og_description: string | null
+          og_image_url: string | null
+          og_title: string | null
           primary_color: string | null
+          robots_txt_override: string | null
           school_name: string | null
           school_name_bn: string | null
           secondary_button_color: string | null
           secondary_color: string | null
           seo_description: string | null
+          seo_keywords: string | null
           seo_title: string | null
           site_title: string | null
+          twitter_card_description: string | null
+          twitter_card_image_url: string | null
+          twitter_card_title: string | null
           twitter_url: string | null
           updated_at: string
           youtube_url: string | null
         }
         Insert: {
+          canonical_url?: string | null
           contact_address?: string | null
           contact_address_bn?: string | null
           contact_email?: string | null
@@ -2753,22 +2765,33 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           is_website_enabled?: boolean
+          json_ld_extra?: Json | null
+          json_ld_type?: string | null
           logo_url?: string | null
           office_hours?: string | null
           office_hours_bn?: string | null
+          og_description?: string | null
+          og_image_url?: string | null
+          og_title?: string | null
           primary_color?: string | null
+          robots_txt_override?: string | null
           school_name?: string | null
           school_name_bn?: string | null
           secondary_button_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null
+          seo_keywords?: string | null
           seo_title?: string | null
           site_title?: string | null
+          twitter_card_description?: string | null
+          twitter_card_image_url?: string | null
+          twitter_card_title?: string | null
           twitter_url?: string | null
           updated_at?: string
           youtube_url?: string | null
         }
         Update: {
+          canonical_url?: string | null
           contact_address?: string | null
           contact_address_bn?: string | null
           contact_email?: string | null
@@ -2787,17 +2810,27 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           is_website_enabled?: boolean
+          json_ld_extra?: Json | null
+          json_ld_type?: string | null
           logo_url?: string | null
           office_hours?: string | null
           office_hours_bn?: string | null
+          og_description?: string | null
+          og_image_url?: string | null
+          og_title?: string | null
           primary_color?: string | null
+          robots_txt_override?: string | null
           school_name?: string | null
           school_name_bn?: string | null
           secondary_button_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null
+          seo_keywords?: string | null
           seo_title?: string | null
           site_title?: string | null
+          twitter_card_description?: string | null
+          twitter_card_image_url?: string | null
+          twitter_card_title?: string | null
           twitter_url?: string | null
           updated_at?: string
           youtube_url?: string | null

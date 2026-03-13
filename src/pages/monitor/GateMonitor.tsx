@@ -113,7 +113,7 @@ export default function GateMonitor() {
   const [latestPunches, setLatestPunches] = useState<PunchRecord[]>([]);
   const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(true);
-  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  const [idleTimer, setIdleTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   
   // TV Display states
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
@@ -142,7 +142,7 @@ export default function GateMonitor() {
   // USB RFID Reader states
   const [isScanning, setIsScanning] = useState(false);
   const cardBufferRef = useRef('');
-  const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Debug state
   const [showDebug, setShowDebug] = useState(false);

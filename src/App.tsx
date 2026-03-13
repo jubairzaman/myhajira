@@ -1,10 +1,9 @@
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useWebsiteSettings } from "@/hooks/queries/useWebsiteCMS";
+import { DynamicSeoHead } from "@/components/seo/DynamicSeoHead";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AcademicYearProvider } from "@/hooks/useAcademicYear";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -75,6 +74,7 @@ import PopupNoticeManager from "./pages/website/admin/PopupNoticeManager";
 import CTAButtonsManager from "./pages/website/admin/CTAButtonsManager";
 import NavigationManager from "./pages/website/admin/NavigationManager";
 import AdmissionsManager from "./pages/website/admin/AdmissionsManager";
+import SeoSettings from "./pages/website/admin/SeoSettings";
 
 // Help Pages
 import Documentation from "./pages/help/Documentation";
@@ -105,31 +105,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Global dynamic favicon & title from website settings
-function GlobalMeta() {
-  const { data: settings } = useWebsiteSettings();
-
-  useEffect(() => {
-    if (settings?.site_title) {
-      document.title = settings.site_title;
-    }
-  }, [settings?.site_title]);
-
-  useEffect(() => {
-    if (settings?.favicon_url) {
-      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-      link.type = 'image/x-icon';
-      link.href = settings.favicon_url;
-    }
-  }, [settings?.favicon_url]);
-
-  return null;
-}
+// GlobalMeta is now replaced by DynamicSeoHead component
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -138,7 +114,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <GlobalMeta />
+          <DynamicSeoHead />
           <BrowserRouter>
             <Routes>
               {/* Public Website at root */}
@@ -322,6 +298,11 @@ const App = () => (
               <Route path="/website/admin/settings" element={
                 <ProtectedRoute requireAdmin>
                   <WebsiteSettingsAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="/website/admin/seo" element={
+                <ProtectedRoute requireAdmin>
+                  <SeoSettings />
                 </ProtectedRoute>
               } />
               <Route path="/website/admin/navigation" element={
