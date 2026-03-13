@@ -123,7 +123,7 @@ export default function SeoSettings() {
         </div>
 
         {showPreview && (
-          <Card className="border-2 border-blue-200 bg-blue-50/50">
+          <Card className="border-2 border-primary/20 bg-primary/5">
             <CardHeader>
               <CardTitle className="text-lg font-bengali">📱 Facebook / Messenger প্রিভিউ</CardTitle>
             </CardHeader>
