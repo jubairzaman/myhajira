@@ -103,7 +103,7 @@ export default function SeoSettings() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout title="SEO সেটিংস" titleBn="SEO সেটিংস">
       <div className="space-y-6 p-4 md:p-6">
         <div className="flex items-center justify-between">
           <div>
