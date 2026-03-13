@@ -199,10 +199,10 @@ export default function SeoSettings() {
                 <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-2 font-bengali">🔍 Google সার্চ প্রিভিউ:</p>
                   <div>
-                    <p className="text-blue-600 text-lg hover:underline cursor-pointer">
+                    <p className="text-primary text-lg hover:underline cursor-pointer">
                       {form.seo_title || 'আপনার সাইটের শিরোনাম'}
                     </p>
-                    <p className="text-green-700 text-sm">
+                    <p className="text-accent-foreground text-sm">
                       {form.canonical_url || 'https://yourschool.edu.bd'}
                     </p>
                     <p className="text-sm text-muted-foreground line-clamp-2">
