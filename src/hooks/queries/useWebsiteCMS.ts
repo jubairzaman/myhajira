@@ -44,7 +44,7 @@ export interface WebsiteSettings {
   canonical_url: string | null;
   robots_txt_override: string | null;
   json_ld_type: string | null;
-  json_ld_extra: Record<string, unknown> | null;
+  json_ld_extra: unknown | null;
 }
 
 export interface WebsitePage {
