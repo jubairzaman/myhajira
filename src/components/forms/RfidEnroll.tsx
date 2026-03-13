@@ -28,7 +28,7 @@ export function RfidEnroll({
   
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if card number already exists
   const checkCardExists = async (cardNumber: string): Promise<boolean> => {

@@ -23,7 +23,7 @@ export const VideoPlayer = forwardRef<HTMLDivElement, VideoPlayerProps>(
     const [hasError, setHasError] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleVideoEnd = useCallback(() => {
       const nextIndex = (currentIndex + 1) % videos.length;

@@ -142,7 +142,7 @@ export default function GateMonitor() {
   // USB RFID Reader states
   const [isScanning, setIsScanning] = useState(false);
   const cardBufferRef = useRef('');
-  const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Debug state
   const [showDebug, setShowDebug] = useState(false);
