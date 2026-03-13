@@ -105,31 +105,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Global dynamic favicon & title from website settings
-function GlobalMeta() {
-  const { data: settings } = useWebsiteSettings();
-
-  useEffect(() => {
-    if (settings?.site_title) {
-      document.title = settings.site_title;
-    }
-  }, [settings?.site_title]);
-
-  useEffect(() => {
-    if (settings?.favicon_url) {
-      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-      link.type = 'image/x-icon';
-      link.href = settings.favicon_url;
-    }
-  }, [settings?.favicon_url]);
-
-  return null;
-}
+// GlobalMeta is now replaced by DynamicSeoHead component
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
