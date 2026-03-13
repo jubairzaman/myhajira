@@ -94,7 +94,7 @@ export default function SeoSettings() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <MainLayout title="SEO সেটিংস" titleBn="SEO সেটিংস">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
