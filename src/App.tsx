@@ -114,7 +114,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <GlobalMeta />
+          <DynamicSeoHead />
           <BrowserRouter>
             <Routes>
               {/* Public Website at root */}
