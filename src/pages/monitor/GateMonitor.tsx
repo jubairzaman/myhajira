@@ -113,7 +113,7 @@ export default function GateMonitor() {
   const [latestPunches, setLatestPunches] = useState<PunchRecord[]>([]);
   const [topStudents, setTopStudents] = useState<TopStudent[]>([]);
   const [isIdle, setIsIdle] = useState(true);
-  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  const [idleTimer, setIdleTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   
   // TV Display states
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
