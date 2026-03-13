@@ -301,6 +301,11 @@ const App = () => (
                   <WebsiteSettingsAdmin />
                 </ProtectedRoute>
               } />
+              <Route path="/website/admin/seo" element={
+                <ProtectedRoute requireAdmin>
+                  <SeoSettings />
+                </ProtectedRoute>
+              } />
               <Route path="/website/admin/navigation" element={
                 <ProtectedRoute requireAdmin>
                   <NavigationManager />
