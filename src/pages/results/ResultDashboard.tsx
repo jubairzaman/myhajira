@@ -121,12 +121,12 @@ export default function ResultDashboard() {
 
             {selectedExam && selectedClass && (
               <div className="flex gap-2 flex-wrap">
-                {currentStatus !== 'reviewed' && currentStatus !== 'finalized' && currentStatus !== 'published' && (
+              {currentStatus === 'draft' && (
                   <Button variant="outline" onClick={() => handlePublishAction('reviewed')}>
                     <Eye className="w-4 h-4 mr-2" /> পর্যালোচনা
                   </Button>
                 )}
-                {(currentStatus === 'reviewed' || currentStatus === 'draft') && currentStatus !== 'finalized' && currentStatus !== 'published' && (
+                {currentStatus === 'reviewed' && (
                   <Button variant="outline" onClick={() => handlePublishAction('finalized')}>
                     <Lock className="w-4 h-4 mr-2" /> চূড়ান্ত করুন
                   </Button>

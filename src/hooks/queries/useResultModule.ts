@@ -144,8 +144,14 @@ export function useExamPatterns(classId?: string) {
 export function useCreateExamPattern() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { academic_year_id: string; class_id: string; name: string; name_bn?: string; pattern_type: string; config?: object }) => {
-      const { error, data } = await supabase.from('exam_patterns').insert(input).select().single();
+    mutationFn: async (input: { academic_year_id: string; class_id: string; name: string; name_bn?: string; pattern_type: string }) => {
+      const { error, data } = await supabase.from('exam_patterns').insert({
+        academic_year_id: input.academic_year_id,
+        class_id: input.class_id,
+        name: input.name,
+        name_bn: input.name_bn,
+        pattern_type: input.pattern_type,
+      }).select().single();
       if (error) throw error;
       return data;
     },
