@@ -77,6 +77,7 @@ const navItems: NavItem[] = [
       { label: 'Tabulation', labelBn: 'ট্যাবুলেশন', icon: ChevronRight, href: '/results/tabulation' },
     ],
   },
+  {
     label: 'Attendance',
     labelBn: 'উপস্থিতি',
     icon: UserCheck,
