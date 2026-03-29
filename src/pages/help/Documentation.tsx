@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, GraduationCap, Users, UserCheck, Monitor, Wallet,
   Package, FileText, Settings, Calendar, Globe, Cpu, MessageSquare, Tv,
-  Building2, ChevronRight, ArrowRight
+  Building2, ChevronRight, ArrowRight, ClipboardCheck, BookOpen, BarChart3,
+  Shield, DollarSign
 } from 'lucide-react';
 
 const modules = [
