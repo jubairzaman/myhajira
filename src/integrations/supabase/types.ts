@@ -263,6 +263,101 @@ export type Database = {
         }
         Relationships: []
       }
+      exam_patterns: {
+        Row: {
+          academic_year_id: string
+          class_id: string
+          config: Json | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          name_bn: string | null
+          pattern_type: string
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          academic_year_id: string
+          class_id: string
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_bn?: string | null
+          pattern_type?: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_bn?: string | null
+          pattern_type?: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_patterns_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_patterns_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_terms: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          exam_pattern_id: string
+          id: string
+          name: string
+          name_bn: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          exam_pattern_id: string
+          id?: string
+          name: string
+          name_bn?: string | null
+          weight?: number
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          exam_pattern_id?: string
+          id?: string
+          name?: string
+          name_bn?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_terms_exam_pattern_id_fkey"
+            columns: ["exam_pattern_id"]
+            isOneToOne: false
+            referencedRelation: "exam_patterns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exams: {
         Row: {
           academic_year_id: string
@@ -429,6 +524,94 @@ export type Database = {
         }
         Relationships: []
       }
+      grade_points: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          grade: string
+          grade_bn: string | null
+          grading_scale_id: string
+          id: string
+          max_marks: number
+          min_marks: number
+          point: number
+          remarks: string | null
+          remarks_bn: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          grade: string
+          grade_bn?: string | null
+          grading_scale_id: string
+          id?: string
+          max_marks: number
+          min_marks: number
+          point: number
+          remarks?: string | null
+          remarks_bn?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          grade?: string
+          grade_bn?: string | null
+          grading_scale_id?: string
+          id?: string
+          max_marks?: number
+          min_marks?: number
+          point?: number
+          remarks?: string | null
+          remarks_bn?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_points_grading_scale_id_fkey"
+            columns: ["grading_scale_id"]
+            isOneToOne: false
+            referencedRelation: "grading_scales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grading_scales: {
+        Row: {
+          academic_year_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          name_bn: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_bn?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_bn?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_scales_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_products: {
         Row: {
           academic_year_id: string | null
@@ -592,6 +775,187 @@ export type Database = {
         }
         Relationships: []
       }
+      marks_audit_log: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string | null
+          exam_id: string | null
+          id: string
+          marks_entry_id: string | null
+          new_marks: number | null
+          new_status: string | null
+          old_marks: number | null
+          old_status: string | null
+          student_id: string | null
+          subject_id: string | null
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          exam_id?: string | null
+          id?: string
+          marks_entry_id?: string | null
+          new_marks?: number | null
+          new_status?: string | null
+          old_marks?: number | null
+          old_status?: string | null
+          student_id?: string | null
+          subject_id?: string | null
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          exam_id?: string | null
+          id?: string
+          marks_entry_id?: string | null
+          new_marks?: number | null
+          new_status?: string | null
+          old_marks?: number | null
+          old_status?: string | null
+          student_id?: string | null
+          subject_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marks_audit_log_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_audit_log_marks_entry_id_fkey"
+            columns: ["marks_entry_id"]
+            isOneToOne: false
+            referencedRelation: "marks_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_audit_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_audit_log_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marks_entries: {
+        Row: {
+          academic_year_id: string
+          approved_at: string | null
+          approved_by: string | null
+          class_id: string
+          component_id: string | null
+          created_at: string | null
+          entered_by: string | null
+          exam_id: string
+          id: string
+          is_absent: boolean | null
+          marks: number | null
+          section_id: string
+          status: string
+          student_id: string
+          subject_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year_id: string
+          approved_at?: string | null
+          approved_by?: string | null
+          class_id: string
+          component_id?: string | null
+          created_at?: string | null
+          entered_by?: string | null
+          exam_id: string
+          id?: string
+          is_absent?: boolean | null
+          marks?: number | null
+          section_id: string
+          status?: string
+          student_id: string
+          subject_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year_id?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          class_id?: string
+          component_id?: string | null
+          created_at?: string | null
+          entered_by?: string | null
+          exam_id?: string
+          id?: string
+          is_absent?: boolean | null
+          marks?: number | null
+          section_id?: string
+          status?: string
+          student_id?: string
+          subject_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marks_entries_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "subject_components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_entries_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monitor_news: {
         Row: {
           created_at: string
@@ -744,6 +1108,54 @@ export type Database = {
         }
         Relationships: []
       }
+      promotion_overrides: {
+        Row: {
+          academic_year_id: string
+          created_at: string | null
+          id: string
+          original_status: string
+          overridden_by: string | null
+          override_status: string
+          reason: string | null
+          student_id: string
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string | null
+          id?: string
+          original_status: string
+          overridden_by?: string | null
+          override_status: string
+          reason?: string | null
+          student_id: string
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string | null
+          id?: string
+          original_status?: string
+          overridden_by?: string | null
+          override_status?: string
+          reason?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_overrides_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_overrides_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       punch_logs: {
         Row: {
           card_number: string | null
@@ -817,6 +1229,144 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      result_configs: {
+        Row: {
+          absent_as_zero: boolean | null
+          academic_year_id: string
+          class_id: string
+          created_at: string | null
+          grace_marks: number | null
+          grace_marks_enabled: boolean | null
+          grading_scale_id: string | null
+          id: string
+          optional_subject_bonus: boolean | null
+          practical_must_pass: boolean | null
+          ranking_priority: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          absent_as_zero?: boolean | null
+          academic_year_id: string
+          class_id: string
+          created_at?: string | null
+          grace_marks?: number | null
+          grace_marks_enabled?: boolean | null
+          grading_scale_id?: string | null
+          id?: string
+          optional_subject_bonus?: boolean | null
+          practical_must_pass?: boolean | null
+          ranking_priority?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          absent_as_zero?: boolean | null
+          academic_year_id?: string
+          class_id?: string
+          created_at?: string | null
+          grace_marks?: number | null
+          grace_marks_enabled?: boolean | null
+          grading_scale_id?: string | null
+          id?: string
+          optional_subject_bonus?: boolean | null
+          practical_must_pass?: boolean | null
+          ranking_priority?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_configs_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_configs_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_configs_grading_scale_id_fkey"
+            columns: ["grading_scale_id"]
+            isOneToOne: false
+            referencedRelation: "grading_scales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      result_publish_status: {
+        Row: {
+          academic_year_id: string
+          class_id: string
+          created_at: string | null
+          exam_id: string
+          id: string
+          locked: boolean | null
+          published_at: string | null
+          published_by: string | null
+          section_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year_id: string
+          class_id: string
+          created_at?: string | null
+          exam_id: string
+          id?: string
+          locked?: boolean | null
+          published_at?: string | null
+          published_by?: string | null
+          section_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string
+          created_at?: string | null
+          exam_id?: string
+          id?: string
+          locked?: boolean | null
+          published_at?: string | null
+          published_by?: string | null
+          section_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_publish_status_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_publish_status_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_publish_status_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_publish_status_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rfid_cards_students: {
         Row: {
@@ -1539,6 +2089,116 @@ export type Database = {
           },
         ]
       }
+      subject_components: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          full_marks: number
+          id: string
+          is_required_for_pass: boolean | null
+          name: string
+          name_bn: string | null
+          pass_marks: number
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          full_marks: number
+          id?: string
+          is_required_for_pass?: boolean | null
+          name: string
+          name_bn?: string | null
+          pass_marks?: number
+          subject_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          full_marks?: number
+          id?: string
+          is_required_for_pass?: boolean | null
+          name?: string
+          name_bn?: string | null
+          pass_marks?: number
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subject_components_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          academic_year_id: string
+          class_id: string
+          created_at: string | null
+          display_order: number | null
+          full_marks: number
+          has_components: boolean | null
+          id: string
+          is_active: boolean | null
+          name: string
+          name_bn: string | null
+          pass_marks: number
+          subject_code: string | null
+          subject_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year_id: string
+          class_id: string
+          created_at?: string | null
+          display_order?: number | null
+          full_marks?: number
+          has_components?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_bn?: string | null
+          pass_marks?: number
+          subject_code?: string | null
+          subject_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string
+          created_at?: string | null
+          display_order?: number | null
+          full_marks?: number
+          has_components?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_bn?: string | null
+          pass_marks?: number
+          subject_code?: string | null
+          subject_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subjects_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subjects_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           created_at: string
@@ -1729,6 +2389,48 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      term_exams: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          exam_id: string
+          id: string
+          term_id: string
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          exam_id: string
+          id?: string
+          term_id: string
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          exam_id?: string
+          id?: string
+          term_id?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "term_exams_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "term_exams_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "exam_terms"
             referencedColumns: ["id"]
           },
         ]
