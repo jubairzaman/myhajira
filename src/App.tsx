@@ -87,6 +87,15 @@ import AdminFinanceReports from "./pages/finance/AdminFinanceReports";
 import AdminFinanceControl from "./pages/finance/AdminFinanceControl";
 import AccountsDashboard from "./pages/accounts/AccountsDashboard";
 
+// Result Module
+import ResultDashboard from "./pages/results/ResultDashboard";
+import GradingScales from "./pages/results/GradingScales";
+import SubjectManagement from "./pages/results/SubjectManagement";
+import ExamPatterns from "./pages/results/ExamPatterns";
+import ResultConfig from "./pages/results/ResultConfig";
+import MarksEntry from "./pages/results/MarksEntry";
+import Tabulation from "./pages/results/Tabulation";
+
 // User Management & Profile
 import UserManagement from "./pages/settings/UserManagement";
 import CompleteProfile from "./pages/auth/CompleteProfile";
