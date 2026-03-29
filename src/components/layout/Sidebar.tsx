@@ -64,6 +64,20 @@ const navItems: NavItem[] = [
     href: '/teachers',
   },
   {
+    label: 'Results',
+    labelBn: 'ফলাফল',
+    icon: GraduationCap,
+    children: [
+      { label: 'Result Dashboard', labelBn: 'ফলাফল ড্যাশবোর্ড', icon: ChevronRight, href: '/results/dashboard' },
+      { label: 'Grading Scales', labelBn: 'গ্রেডিং স্কেল', icon: ChevronRight, href: '/results/grading-scales' },
+      { label: 'Subjects', labelBn: 'বিষয় ব্যবস্থাপনা', icon: ChevronRight, href: '/results/subjects' },
+      { label: 'Exam Patterns', labelBn: 'পরীক্ষা প্যাটার্ন', icon: ChevronRight, href: '/results/exam-patterns' },
+      { label: 'Result Config', labelBn: 'ফলাফল কনফিগ', icon: ChevronRight, href: '/results/config' },
+      { label: 'Marks Entry', labelBn: 'নম্বর এন্ট্রি', icon: ChevronRight, href: '/results/marks-entry' },
+      { label: 'Tabulation', labelBn: 'ট্যাবুলেশন', icon: ChevronRight, href: '/results/tabulation' },
+    ],
+  },
+  {
     label: 'Attendance',
     labelBn: 'উপস্থিতি',
     icon: UserCheck,

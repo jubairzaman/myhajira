@@ -87,6 +87,15 @@ import AdminFinanceReports from "./pages/finance/AdminFinanceReports";
 import AdminFinanceControl from "./pages/finance/AdminFinanceControl";
 import AccountsDashboard from "./pages/accounts/AccountsDashboard";
 
+// Result Module
+import ResultDashboard from "./pages/results/ResultDashboard";
+import GradingScales from "./pages/results/GradingScales";
+import SubjectManagement from "./pages/results/SubjectManagement";
+import ExamPatterns from "./pages/results/ExamPatterns";
+import ResultConfig from "./pages/results/ResultConfig";
+import MarksEntry from "./pages/results/MarksEntry";
+import Tabulation from "./pages/results/Tabulation";
+
 // User Management & Profile
 import UserManagement from "./pages/settings/UserManagement";
 import CompleteProfile from "./pages/auth/CompleteProfile";
@@ -396,6 +405,29 @@ const App = () => (
                 <ProtectedRoute>
                   <AccountsDashboard />
                 </ProtectedRoute>
+              } />
+
+              {/* Result Module */}
+              <Route path="/results/dashboard" element={
+                <ProtectedRoute><ResultDashboard /></ProtectedRoute>
+              } />
+              <Route path="/results/grading-scales" element={
+                <ProtectedRoute requireAdmin><GradingScales /></ProtectedRoute>
+              } />
+              <Route path="/results/subjects" element={
+                <ProtectedRoute requireAdmin><SubjectManagement /></ProtectedRoute>
+              } />
+              <Route path="/results/exam-patterns" element={
+                <ProtectedRoute requireAdmin><ExamPatterns /></ProtectedRoute>
+              } />
+              <Route path="/results/config" element={
+                <ProtectedRoute requireAdmin><ResultConfig /></ProtectedRoute>
+              } />
+              <Route path="/results/marks-entry" element={
+                <ProtectedRoute><MarksEntry /></ProtectedRoute>
+              } />
+              <Route path="/results/tabulation" element={
+                <ProtectedRoute><Tabulation /></ProtectedRoute>
               } />
 
               {/* Help */}
