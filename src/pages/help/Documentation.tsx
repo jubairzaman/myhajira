@@ -665,6 +665,30 @@ export default function Documentation() {
                   সাইডবার → ওয়েবসাইট সিএমএস → সংশ্লিষ্ট পেজে গিয়ে কনটেন্ট পরিবর্তন করুন। পরিবর্তন তৎক্ষণাৎ ওয়েবসাইটে প্রতিফলিত হবে।
                 </AccordionContent>
               </AccordionItem>
+              <AccordionItem value="faq7">
+                <AccordionTrigger className="text-sm">গ্রেডিং স্কেল কিভাবে তৈরি করবো?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  ফলাফল → গ্রেডিং স্কেল → "নতুন স্কেল" বাটন → স্কেলের নাম দিন → গ্রেড সারি যোগ করুন (A+ থেকে F পর্যন্ত) → প্রতিটি গ্রেডে মিনিমাম-ম্যাক্সিমাম নম্বর ও পয়েন্ট সেট করুন → সেভ করুন।
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="faq8">
+                <AccordionTrigger className="text-sm">মার্কস এন্ট্রি করার পর কি আবার এডিট করা যায়?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  ড্রাফট মোডে থাকলে এডিট করা যায়। কিন্তু "জমা দিন" বাটনে ক্লিক করলে শিক্ষক আর এডিট করতে পারবেন না। শুধুমাত্র এডমিন এডিট ও অনুমোদন করতে পারবেন। পাবলিশ হয়ে গেলে শুধু সুপার এডমিন আনলক করতে পারবেন।
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="faq9">
+                <AccordionTrigger className="text-sm">অনুপস্থিত শিক্ষার্থীর নম্বর কিভাবে হিসাব হবে?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  রেজাল্ট কনফিগ পেজে "অনুপস্থিত = ০" অপশন চালু থাকলে অনুপস্থিতদের নম্বর ০ ধরা হবে। বন্ধ থাকলে ক্যালকুলেশন থেকে বাদ যাবে। এটি ক্লাস ভিত্তিক কনফিগার করা যায়।
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="faq10">
+                <AccordionTrigger className="text-sm">ফলাফল পাবলিশ করলে কি আবার পরিবর্তন করা যায়?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  পাবলিশ হয়ে গেলে ফলাফল সম্পূর্ণ লক হয়ে যায়। শুধুমাত্র সুপার এডমিন "আনলক" করতে পারবেন। আনলক করলে মার্কস এডিট ও পুনরায় পাবলিশ করা যাবে।
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </CardContent>
         </Card>
