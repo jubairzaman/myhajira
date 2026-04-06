@@ -83,9 +83,10 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const { auto_logout_time, ...rest } = settings;
       const { error } = await supabase
         .from('system_settings')
-        .update(settings)
+        .update({ ...rest, auto_logout_time: `${auto_logout_time}:00` } as any)
         .not('id', 'is', null);
 
       if (error) throw error;
