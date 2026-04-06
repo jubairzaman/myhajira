@@ -3,7 +3,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings as SettingsIcon, Save, Building2, Shield, UserPlus, Upload, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Building2, Shield, UserPlus, Upload, Trash2, FileText, Loader2, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +28,7 @@ export default function Settings() {
     school_name: '',
     school_name_bn: '',
     timezone: 'Asia/Dhaka',
+    auto_logout_time: '21:00',
   });
   const [reportHeaderUrl, setReportHeaderUrl] = useState<string | null>(null);
   const [uploadingHeader, setUploadingHeader] = useState(false);
@@ -54,6 +55,7 @@ export default function Settings() {
             school_name: data.school_name || '',
             school_name_bn: data.school_name_bn || '',
             timezone: data.timezone || 'Asia/Dhaka',
+            auto_logout_time: (data as any).auto_logout_time ? (data as any).auto_logout_time.slice(0, 5) : '21:00',
           });
           setReportHeaderUrl((data as any).report_header_image_url || null);
         }
