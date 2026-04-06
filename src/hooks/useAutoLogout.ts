@@ -3,28 +3,31 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
- * Auto-logout hook: checks every minute if current time >= configured auto_logout_time.
- * If so, signs the user out automatically.
+ * Auto-logout hook: triggers logout once when the configured time is crossed.
+ * Users can log back in after being logged out.
  */
 export function useAutoLogout() {
   const { user, signOut } = useAuth();
-  const hasLoggedOutToday = useRef(false);
-  const lastCheckedDate = useRef('');
+  const hasLoggedOutThisSession = useRef(false);
+  const loginTimestamp = useRef<number>(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // Reset on logout so next login gets a fresh session
+      hasLoggedOutThisSession.current = false;
+      return;
+    }
+
+    // Record when this session started
+    if (loginTimestamp.current === 0) {
+      loginTimestamp.current = Date.now();
+    }
 
     const checkAutoLogout = async () => {
-      const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
+      if (hasLoggedOutThisSession.current) return;
 
-      // Reset flag on new day
-      if (lastCheckedDate.current !== todayStr) {
-        hasLoggedOutToday.current = false;
-        lastCheckedDate.current = todayStr;
-      }
-
-      if (hasLoggedOutToday.current) return;
+      // Don't auto-logout within 2 minutes of login
+      if (Date.now() - loginTimestamp.current < 2 * 60 * 1000) return;
 
       try {
         const { data } = await supabase
@@ -35,13 +38,18 @@ export function useAutoLogout() {
 
         if (!data?.auto_logout_time) return;
 
-        // Parse HH:MM:SS
         const [hours, minutes] = (data.auto_logout_time as string).split(':').map(Number);
+        const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
         const logoutMinutes = hours * 60 + minutes;
 
-        if (currentMinutes >= logoutMinutes) {
-          hasLoggedOutToday.current = true;
+        // Only logout if user was logged in BEFORE the cutoff time
+        // (i.e., they crossed the threshold while logged in)
+        const loginTime = new Date(loginTimestamp.current);
+        const loginMinutes = loginTime.getHours() * 60 + loginTime.getMinutes();
+
+        if (currentMinutes >= logoutMinutes && loginMinutes < logoutMinutes) {
+          hasLoggedOutThisSession.current = true;
           await signOut();
           window.location.href = '/login';
         }
@@ -50,15 +58,7 @@ export function useAutoLogout() {
       }
     };
 
-    // Delay first check by 2 minutes after login to avoid instant logout
-    const initialDelay = setTimeout(() => {
-      checkAutoLogout();
-    }, 2 * 60 * 1000);
-
     const interval = setInterval(checkAutoLogout, 60 * 1000);
-    return () => {
-      clearTimeout(initialDelay);
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [user, signOut]);
 }
