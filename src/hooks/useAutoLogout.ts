@@ -50,9 +50,15 @@ export function useAutoLogout() {
       }
     };
 
-    // Check immediately, then every 60 seconds
-    checkAutoLogout();
+    // Delay first check by 2 minutes after login to avoid instant logout
+    const initialDelay = setTimeout(() => {
+      checkAutoLogout();
+    }, 2 * 60 * 1000);
+
     const interval = setInterval(checkAutoLogout, 60 * 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(interval);
+    };
   }, [user, signOut]);
 }
