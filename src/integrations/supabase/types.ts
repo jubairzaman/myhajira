@@ -2201,6 +2201,7 @@ export type Database = {
       }
       system_settings: {
         Row: {
+          auto_logout_time: string
           created_at: string
           id: string
           monitor_logo_url: string | null
@@ -2218,6 +2219,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_logout_time?: string
           created_at?: string
           id?: string
           monitor_logo_url?: string | null
@@ -2235,6 +2237,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_logout_time?: string
           created_at?: string
           id?: string
           monitor_logo_url?: string | null

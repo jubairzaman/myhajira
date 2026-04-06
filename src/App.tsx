@@ -7,6 +7,13 @@ import { DynamicSeoHead } from "@/components/seo/DynamicSeoHead";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AcademicYearProvider } from "@/hooks/useAcademicYear";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useAutoLogout } from "@/hooks/useAutoLogout";
+
+// Auto-logout wrapper component
+function AutoLogoutWrapper({ children }: { children: React.ReactNode }) {
+  useAutoLogout();
+  return <>{children}</>;
+}
 
 // Pages
 import Index from "./pages/Index";
@@ -119,6 +126,7 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <AutoLogoutWrapper>
       <AcademicYearProvider>
         <TooltipProvider>
           <Toaster />
@@ -448,6 +456,7 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
       </AcademicYearProvider>
+      </AutoLogoutWrapper>
     </AuthProvider>
   </QueryClientProvider>
 );
