@@ -226,6 +226,21 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <Label>অটো লগআউট সময়</Label>
+              </div>
+              <Input
+                type="time"
+                value={settings.auto_logout_time}
+                onChange={(e) => setSettings({ ...settings, auto_logout_time: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground font-bengali">
+                প্রতিদিন এই সময়ে সকল ব্যবহারকারী স্বয়ংক্রিয়ভাবে লগআউট হয়ে যাবে
+              </p>
+            </div>
           </div>
         </div>
 
